@@ -20,7 +20,7 @@ const VIEWS = {
   store: ['latest', 'popular', 'az', 'categories'],
 };
 const COLUMNS = 3; // cards per row in the card layout
-const CREDITS = 'Mert Cobanov · mertcobanov@gmail.com · github.com/cobanov';
+const CREDITS = 'Mert Cobanov · cobanov.dev\nmertcobanov@gmail.com · github.com/cobanov · x.com/mertcobanov';
 
 const ui = {
   main: document.querySelector('main'),
@@ -369,7 +369,8 @@ function renderSettings() {
         </div>`;
       index++;
     }
-    html += `</div>${section.note ? `<div class="note">${escapeHtml(section.note)}</div>` : ''}`;
+    const note = section.note ? section.note.split('\n').map(escapeHtml).join('<br>') : '';
+    html += `</div>${note ? `<div class="note">${note}</div>` : ''}`;
   }
   ui.content.innerHTML = html;
 }
