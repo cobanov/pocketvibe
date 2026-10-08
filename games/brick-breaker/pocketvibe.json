@@ -2,14 +2,14 @@
   "id": "brick-breaker",
   "title": "Brick Breaker",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Bounce the ball, smash every brick and catch the falling power-ups before they hit the floor.",
+  "version": "1.2.0",
+  "description": "Bounce the ball through fourteen hand-made levels of coloured, steel, gold and bomb bricks, and catch the falling power-ups before they hit the floor.",
   "genre": "Arcade",
   "controls": {
-    "D-pad": "Move the paddle",
-    "A": "Launch the ball; start / play again",
-    "B": "Back to title (paused or game over)",
-    "START": "Pause / resume"
+    "D-pad": "Move the paddle; choose in menus",
+    "A": "Launch the ball; select",
+    "B": "Resume (pause menu); back to title (game over)",
+    "START": "Pause menu / resume"
   },
   "responsive": true
 }

@@ -1,6 +1,7 @@
 // Pooled debris: small colored cubes that pop out of broken bricks, plus
-// tiny white sparks on bounces. One InstancedMesh, a ring of slots; a new
-// particle simply takes the oldest slot.
+// tiny white sparks on bounces. One InstancedMesh whose live particles are
+// kept packed at the front (a dead one is replaced by the last), so only
+// those are drawn; when the pool is full a new particle takes an old slot.
 
 import * as THREE from 'three';
 
@@ -27,6 +28,7 @@ export function createEffects(scene) {
   const size = new Float32Array(MAX);
   const life = new Float32Array(MAX);
   const maxLife = new Float32Array(MAX);
+  const hexes = new Uint32Array(MAX);
 
   const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
   const dummy = new THREE.Object3D();
@@ -35,14 +37,19 @@ export function createEffects(scene) {
     mesh.setMatrixAt(i, ZERO);
     mesh.setColorAt(i, color);
   }
+  mesh.count = 0;
 
-  let cursor = 0;
+  let cursor = 0; // the slot a new particle takes when the pool is full
   let colorsDirty = false;
-  let live = 0; // particles alive after the last update
+  let live = 0; // particles alive, in slots 0 .. live - 1
 
   function spawn(x, y, z, sx, sy, sz, s, t, hex) {
-    const i = cursor;
-    cursor = (cursor + 1) % MAX;
+    let i;
+    if (live < MAX) i = live++;
+    else {
+      i = cursor;
+      cursor = (cursor + 1) % MAX;
+    }
     px[i] = x;
     py[i] = y;
     pz[i] = z;
@@ -54,10 +61,29 @@ export function createEffects(scene) {
     size[i] = s;
     life[i] = t;
     maxLife[i] = t;
+    hexes[i] = hex;
     color.setHex(hex);
     mesh.setColorAt(i, color);
     colorsDirty = true;
-    live++;
+  }
+
+  // Moves particle j into slot i (i's particle is dead).
+  function move(j, i) {
+    px[i] = px[j];
+    py[i] = py[j];
+    pz[i] = pz[j];
+    vx[i] = vx[j];
+    vy[i] = vy[j];
+    vz[i] = vz[j];
+    rot[i] = rot[j];
+    spin[i] = spin[j];
+    size[i] = size[j];
+    life[i] = life[j];
+    maxLife[i] = maxLife[j];
+    hexes[i] = hexes[j];
+    color.setHex(hexes[i]);
+    mesh.setColorAt(i, color);
+    colorsDirty = true;
   }
 
   return {
@@ -89,26 +115,33 @@ export function createEffects(scene) {
       }
     },
 
-    clear() {
-      for (let i = 0; i < MAX; i++) {
-        life[i] = 0;
-        mesh.setMatrixAt(i, ZERO);
+    // A spark or two jumping off a bomb's fuse.
+    fuse(x, z) {
+      const n = 1 + (Math.random() < 0.5 ? 1 : 0);
+      for (let k = 0; k < n; k++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 0.6 + Math.random() * 1.2;
+        spawn(x, 0.62, z, Math.cos(a) * sp, 3 + Math.random() * 3, Math.sin(a) * sp, 0.07, 0.3, k ? 0xff8a3a : 0xffe27a);
       }
+    },
+
+    clear() {
       live = 0;
-      mesh.instanceMatrix.needsUpdate = true;
+      cursor = 0;
+      mesh.count = 0;
     },
 
     update(dt) {
-      if (live === 0) return;
-      live = 0;
-      for (let i = 0; i < MAX; i++) {
-        if (life[i] <= 0) continue;
+      if (live === 0 && mesh.count === 0) return;
+      let i = 0;
+      while (i < live) {
         life[i] -= dt;
         if (life[i] <= 0) {
-          mesh.setMatrixAt(i, ZERO);
+          // The last live particle takes this slot and is updated next.
+          live--;
+          if (i < live) move(live, i);
           continue;
         }
-        live++;
         vy[i] -= GRAVITY * dt;
         px[i] += vx[i] * dt;
         py[i] += vy[i] * dt;
@@ -128,7 +161,9 @@ export function createEffects(scene) {
         dummy.scale.set(s, s, s);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
+        i++;
       }
+      mesh.count = live;
       mesh.instanceMatrix.needsUpdate = true;
       if (colorsDirty) {
         mesh.instanceColor.needsUpdate = true;

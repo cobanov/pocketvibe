@@ -2,8 +2,13 @@
 //   .                 empty
 //   r o y g t b p k   one-hit bricks (red, orange, yellow, green, teal, blue, purple, pink)
 //   2 3               steel bricks that take 2 or 3 hits
+//   x                 bomb bricks: one hit, and the blast hits every brick around
 //   #                 gold bricks, unbreakable
-// After the last map the levels loop with a faster ball.
+// A level's tip shows under its name the first time a new kind of brick
+// turns up. After the last map the levels loop with a faster ball.
+// Every breakable brick must be reachable through cells that are not gold,
+// and never only from the side: a brick with gold both above and below it is
+// nearly impossible to hit.
 
 export const LEVELS = [
   {
@@ -18,6 +23,7 @@ export const LEVELS = [
   },
   {
     name: 'Pyramid',
+    tip: 'Steel bricks take more than one hit',
     map: [
       '.....2.....',
       '....kkk....',
@@ -40,6 +46,20 @@ export const LEVELS = [
     ],
   },
   {
+    name: 'Hourglass',
+    tip: 'Bombs blow up every brick around them',
+    map: [
+      'ttttttttttt',
+      '.ttttttttt.',
+      '..bbbbbbb..',
+      '...bbxbb...',
+      '....pxp....',
+      '...pp2pp...',
+      '..kkkkkkk..',
+      '.kkkkkkkkk.',
+    ],
+  },
+  {
     name: 'Heart',
     map: [
       '.kkk...kkk.',
@@ -50,6 +70,19 @@ export const LEVELS = [
       '...yyyyy...',
       '....ggg....',
       '.....2.....',
+    ],
+  },
+  {
+    name: 'Smile',
+    tip: 'Gold bricks never break',
+    map: [
+      '...ooooo...',
+      '..oyyyyyo..',
+      '.oy#yyy#yo.',
+      '.oyyyyyyyo.',
+      '.oy2yyy2yo.',
+      '..oy222yo..',
+      '...ooooo...',
     ],
   },
   {
@@ -66,6 +99,31 @@ export const LEVELS = [
     ],
   },
   {
+    name: 'Chevron',
+    map: [
+      'k.........k',
+      'pk.......kp',
+      'bpk.....kpb',
+      'tbpk...kpbt',
+      'gtbpk.kpbtg',
+      '.gtbpxpbtg.',
+      '..gtb2btg..',
+      '...g222g...',
+    ],
+  },
+  {
+    name: 'Gates',
+    map: [
+      'rrrrrrrrrrr',
+      'ooxooooooxo',
+      'yyyyyyyyyyy',
+      '#2#2#2#2#2#',
+      '...........',
+      '.t.b.p.b.t.',
+      '.t.b.p.b.t.',
+    ],
+  },
+  {
     name: 'Fortress',
     map: [
       '22222222222',
@@ -74,6 +132,18 @@ export const LEVELS = [
       '3bbbbbbbbb3',
       '...........',
       '#...y.y...#',
+    ],
+  },
+  {
+    name: 'Target',
+    map: [
+      '..rrrrrrr..',
+      '.rooooooor.',
+      'rooy222yoor',
+      'roy23x32yor',
+      'rooy222yoor',
+      '.rooooooor.',
+      '..rrrrrrr..',
     ],
   },
   {
@@ -86,6 +156,30 @@ export const LEVELS = [
       '..#bbbbb#..',
       '.#.ttttt.#.',
       '...........',
+    ],
+  },
+  {
+    name: 'Vault',
+    map: [
+      '22#bxbxb#22',
+      '2k#.....#k2',
+      '2k###.###k2',
+      '2kkkkkkkkk2',
+      'pkkk3x3kkkp',
+      'pkkkkkkkkkp',
+      '.ppp...ppp.',
+    ],
+  },
+  {
+    name: 'Citadel',
+    map: [
+      '2#3#323#3#2',
+      'x2x22322x2x',
+      '.ppppppppp.',
+      '2pbbx3xbbp2',
+      '.ppppppppp.',
+      '2#.2#3#2.#2',
+      '.kxk...kxk.',
     ],
   },
 ];

@@ -37,6 +37,7 @@ export function createHud(root) {
   let shownWide = -1;
   let shownSlow = -1;
   let shownHint = null;
+  let shownMessage = null;
 
   return {
     score(value) {
@@ -77,9 +78,23 @@ export function createHud(root) {
       for (let i = 0; i < sides.length; i++) sides[i].hidden = !visible;
     },
 
-    // A big animated banner ("LEVEL 2"); a new element restarts the animation.
+    // A big animated banner ("CLEAR!"); a new element restarts the animation.
     banner(title, sub) {
       bannerEl.innerHTML = title ? `<div class="pop"><div class="big">${title}</div><div class="sub">${sub}</div></div>` : '';
+    },
+
+    // The card between levels: the number, the map's name, a tip the first
+    // time a new kind of brick turns up, and a pip per level of the set
+    // (done, this one, still to come).
+    levelCard(number, name, tip, index, total, loop) {
+      let pips = '';
+      for (let i = 0; i < total; i++) pips += `<i class="${i < index ? 'done' : i === index ? 'now' : ''}"></i>`;
+      bannerEl.innerHTML =
+        `<div class="pop card"><div class="kicker">LEVEL</div><div class="big">${number}</div>` +
+        `<div class="sub">${name}${loop > 0 ? ` <span class="loop">LOOP ${loop + 1} · FASTER</span>` : ''}</div>` +
+        `<div class="pips">${pips}</div>` +
+        (tip ? `<div class="tip">${tip}</div>` : '') +
+        `</div>`;
     },
 
     // A short callout for power-ups, in the power-up's color.
@@ -98,9 +113,13 @@ export function createHud(root) {
       flashEl.innerHTML = '<div class="hurt"></div>';
     },
 
-    // html is a fixed string from main.js; '' hides the message.
-    message(html) {
-      messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
+    // html is built from fixed strings in main.js; '' hides the message.
+    // Unchanged html leaves the DOM alone.
+    message(html, kind = '') {
+      const key = kind + html;
+      if (key === shownMessage) return;
+      shownMessage = key;
+      messageEl.innerHTML = html ? `<div class="panel ${kind}">${html}</div>` : '';
     },
   };
 }

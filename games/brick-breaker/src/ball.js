@@ -24,7 +24,8 @@ const STEP = 0.12; // longest move per sub-step, well under the ball radius
 const MIN_DZ = 0.34; // at least this share of the motion goes up or down the field
 const MIN_DX = Math.sqrt(1 - MIN_DZ * MIN_DZ);
 const MAX_ANGLE = 1.05; // radians off vertical at the paddle's very edge
-const IDLE_LIMIT = 9; // seconds without touching paddle or brick before a nudge
+const IDLE_LIMIT = 6; // seconds without touching paddle or brick before a nudge
+const IDLE_AGAIN = 2; // then a nudge every this many seconds
 const FALL_TIME = 0.8;
 const POP_TIME = 0.12;
 const TRAIL = 6;
@@ -113,7 +114,7 @@ export function createBalls(scene, bricks, paddle, events) {
     const len = Math.hypot(dx, dz);
     b.dx = dx / len;
     b.dz = dz / len;
-    b.idle = IDLE_LIMIT - 3;
+    b.idle = IDLE_LIMIT - IDLE_AGAIN;
   }
 
   function bounced(b) {
@@ -337,7 +338,13 @@ export function createBalls(scene, bricks, paddle, events) {
     },
 
     draw() {
-      for (let i = 0; i < SLOTS; i++) {
+      // Only slots up to the last active one are drawn.
+      let top = 0;
+      for (let i = 0; i < SLOTS; i++) if (list[i].active) top = i + 1;
+      ballMesh.count = top;
+      shadowMesh.count = top;
+      trailMesh.count = top * TRAIL;
+      for (let i = 0; i < top; i++) {
         const b = list[i];
         if (!b.active) {
           ballMesh.setMatrixAt(i, ZERO);

@@ -1,7 +1,8 @@
 // The brick grid: every brick is one instance of a single InstancedMesh,
 // colored per instance. Instance i always belongs to grid cell i; empty cells
-// get a zero-scale matrix. Matrices and colors are rewritten only for cells
-// that changed or are animating.
+// get a zero-scale matrix, and the draw count stops after the level's last
+// brick. Matrices and colors are rewritten only for cells that changed or are
+// animating.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -30,6 +31,11 @@ const COLORS = {
 };
 const STEEL = [0, 0xeef3fa, 0xa9b5c9, 0x6f7c96]; // by hits left: lighter as it cracks
 const GOLD = 0xf2b52a;
+// Bomb bricks glow between these two, so they read as live, and carry a dark
+// cap with a fuse on top.
+const BOMB_DIM = new THREE.Color(0x3a2440);
+const BOMB_HOT = new THREE.Color(0xff5a2a);
+const BOMB_PULSE = 7; // radians per second
 const GOLD_H = 1.9; // gold bricks stand taller and carry rivets so they read as different
 
 const POP_TIME = 0.16;
@@ -37,6 +43,7 @@ const FLASH_TIME = 0.14;
 const DIE_TIME = 0.09;
 const FALL_TIME = 0.45; // intro: each brick drops in from above
 const DROP_H = 9;
+const BLAST_DELAY = 0.09; // a bomb hits the bricks around it this long after it breaks
 
 // Body plus a slightly inset top plate. The vertex colors are grey and white
 // and get multiplied by the instance color, which gives a cheap bevel look.
@@ -57,7 +64,17 @@ function rivetGeometry() {
   return mergeGeometries(parts);
 }
 
-export function createBricks(scene) {
+// onBlast(cell, result) is called when a bomb's blast hits a brick, with
+// what hit() returned.
+// The dark cap and fuse on a bomb brick (sized like the rivets).
+function bombCapGeometry() {
+  return mergeGeometries([
+    box(0.84, 0.05, 0.34, 0, 0.5, 0, 0x1c1426),
+    box(0.16, 0.12, 0.16, 0, 0.56, 0, 0xffd84a),
+  ]);
+}
+
+export function createBricks(scene, onBlast) {
   const mesh = new THREE.InstancedMesh(
     brickGeometry(),
     new THREE.MeshLambertMaterial({ vertexColors: true }),
@@ -77,18 +94,30 @@ export function createBricks(scene) {
   shadows.frustumCulled = false;
   scene.add(shadows);
 
-  // Rivets: decoration for gold bricks, instance i on cell i like the bricks.
+  // Rivets: decoration for gold bricks, one instance per gold brick of the
+  // level (goldSlot maps a cell to its instance), so only those are drawn.
   const rivets = new THREE.InstancedMesh(rivetGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true }), CELLS);
   rivets.frustumCulled = false;
+  rivets.count = 0;
   scene.add(rivets);
+
+  // Bomb caps, one instance per bomb of the level in the same way.
+  const caps = new THREE.InstancedMesh(bombCapGeometry(), rivets.material, CELLS);
+  caps.frustumCulled = false;
+  caps.count = 0;
+  scene.add(caps);
 
   const hp = new Int8Array(CELLS); // 0 empty, -1 gold, otherwise hits left
   const maxHp = new Int8Array(CELLS);
+  const bomb = new Uint8Array(CELLS);
+  const goldSlot = new Int16Array(CELLS);
+  const bombSlot = new Int16Array(CELLS);
   const color = new Uint32Array(CELLS);
   const pop = new Float32Array(CELLS);
   const flash = new Float32Array(CELLS);
   const dying = new Float32Array(CELLS);
   const delay = new Float32Array(CELLS);
+  const blast = new Float32Array(CELLS); // seconds until a pending blast hits this cell
   const dirty = new Uint8Array(CELLS);
 
   const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -98,6 +127,10 @@ export function createBricks(scene) {
   let remaining = 0;
   let introT = 0;
   let introEnd = 0;
+  let bombs = 0; // bombs left, which glow every frame
+  let nextBomb = 0; // where nextBomb() looks first
+  let blasts = 0; // cells waiting for a blast
+  let pulse = 0;
 
   for (let i = 0; i < CELLS; i++) {
     mesh.setMatrixAt(i, ZERO);
@@ -110,10 +143,10 @@ export function createBricks(scene) {
   const cellZ = (i) => GRID_Z0 + (Math.floor(i / COLS) + 0.5) * CELL_D;
 
   function write(i, intro) {
+    if (bomb[i] && hp[i] === 0) caps.setMatrixAt(bombSlot[i], ZERO);
     if (hp[i] === 0 && dying[i] <= 0) {
       mesh.setMatrixAt(i, ZERO);
       shadows.setMatrixAt(i, ZERO);
-      rivets.setMatrixAt(i, ZERO);
       return;
     }
     const x = cellX(i);
@@ -128,9 +161,11 @@ export function createBricks(scene) {
     const sy = hp[i] < 0 ? GOLD_H * s : s;
     m.makeScale(s, sy, s).setPosition(x, y, z);
     mesh.setMatrixAt(i, m);
-    rivets.setMatrixAt(i, hp[i] < 0 ? m : ZERO);
+    if (hp[i] < 0) rivets.setMatrixAt(goldSlot[i], m);
+    else if (bomb[i] && hp[i] > 0) caps.setMatrixAt(bombSlot[i], m);
 
-    c.setHex(color[i]);
+    if (bomb[i] && hp[i] > 0) c.lerpColors(BOMB_DIM, BOMB_HOT, 0.5 + 0.5 * Math.sin(pulse));
+    else c.setHex(color[i]);
     if (dying[i] > 0) c.copy(WHITE);
     else if (flash[i] > 0) c.lerp(WHITE, flash[i] / FLASH_TIME);
     mesh.setColorAt(i, c);
@@ -152,9 +187,16 @@ export function createBricks(scene) {
     load(map) {
       remaining = 0;
       introEnd = 0;
+      bombs = 0;
+      blasts = 0;
+      nextBomb = 0;
+      let gold = 0;
+      let last = -1;
       for (let i = 0; i < CELLS; i++) {
         hp[i] = 0;
         maxHp[i] = 0;
+        bomb[i] = 0;
+        blast[i] = 0;
         pop[i] = 0;
         flash[i] = 0;
         dying[i] = 0;
@@ -168,6 +210,13 @@ export function createBricks(scene) {
           if (ch === '#') {
             hp[i] = -1;
             color[i] = GOLD;
+            goldSlot[i] = gold++;
+          } else if (ch === 'x') {
+            hp[i] = maxHp[i] = 1;
+            bomb[i] = 1;
+            color[i] = BOMB_HOT.getHex();
+            bombSlot[i] = bombs++;
+            remaining++;
           } else if (ch === '2' || ch === '3') {
             hp[i] = maxHp[i] = ch === '2' ? 2 : 3;
             color[i] = STEEL[hp[i]];
@@ -181,8 +230,13 @@ export function createBricks(scene) {
           }
           delay[i] = r * 0.07 + Math.abs(col - 5) * 0.03 + Math.random() * 0.05;
           introEnd = Math.max(introEnd, delay[i] + FALL_TIME);
+          last = i;
         }
       }
+      mesh.count = last + 1;
+      shadows.count = last + 1;
+      rivets.count = gold;
+      caps.count = bombs;
       introT = 0;
     },
 
@@ -201,6 +255,29 @@ export function createBricks(scene) {
 
     maxHp(i) {
       return maxHp[i];
+    },
+
+    // True for a brick that can still be hit and broken (not gold, not gone).
+    breakable(i) {
+      return hp[i] > 0;
+    },
+
+    isBomb(i) {
+      return bomb[i] === 1;
+    },
+
+    // The cell of a live bomb, a different one each call (for the fuse
+    // sparks), or -1 when none is left.
+    nextBomb() {
+      if (bombs === 0) return -1;
+      for (let k = 0; k < CELLS; k++) {
+        const i = (nextBomb + k) % CELLS;
+        if (bomb[i] && hp[i] > 0) {
+          nextBomb = i + 1;
+          return i;
+        }
+      }
+      return -1;
     },
 
     // The brick whose hit box overlaps a square of half size r around (x, z),
@@ -246,15 +323,47 @@ export function createBricks(scene) {
       }
       dying[i] = DIE_TIME;
       remaining--;
+      if (bomb[i]) {
+        bombs--;
+        // The blast reaches the eight cells around it a moment later.
+        const row = Math.floor(i / COLS);
+        const col = i % COLS;
+        for (let r = row - 1; r <= row + 1; r++) {
+          for (let cc = col - 1; cc <= col + 1; cc++) {
+            if (r < 0 || r >= ROWS || cc < 0 || cc >= COLS) continue;
+            const n = r * COLS + cc;
+            if (hp[n] > 0 && blast[n] <= 0) {
+              blast[n] = BLAST_DELAY;
+              blasts++;
+            }
+          }
+        }
+      }
       return 2;
     },
 
+    // True while a blast is still on its way to some brick.
+    blasting() {
+      return blasts > 0;
+    },
+
     update(dt) {
+      if (blasts > 0) {
+        for (let i = 0; i < CELLS; i++) {
+          if (blast[i] <= 0) continue;
+          blast[i] -= dt;
+          if (blast[i] > 0) continue;
+          blasts--;
+          if (hp[i] > 0) onBlast(i, this.hit(i));
+        }
+      }
       const intro = introT < introEnd;
       if (intro) introT += dt;
+      pulse = (pulse + dt * BOMB_PULSE) % (Math.PI * 2);
       let wrote = false;
-      for (let i = 0; i < CELLS; i++) {
-        let d = dirty[i] || intro;
+      const n = mesh.count;
+      for (let i = 0; i < n; i++) {
+        let d = dirty[i] || intro || (bombs > 0 && bomb[i] && hp[i] > 0);
         if (pop[i] > 0) {
           pop[i] = Math.max(0, pop[i] - dt);
           d = 1;
@@ -277,6 +386,7 @@ export function createBricks(scene) {
         mesh.instanceColor.needsUpdate = true;
         shadows.instanceMatrix.needsUpdate = true;
         rivets.instanceMatrix.needsUpdate = true;
+        caps.instanceMatrix.needsUpdate = true;
       }
     },
   };
