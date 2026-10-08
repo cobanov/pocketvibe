@@ -9,6 +9,7 @@ export function createHud(root) {
       <div><div id="score"></div><div id="best"></div></div>
       <div id="coins"></div>
     </div>
+    <div id="toast"></div>
     <div id="message"></div>`;
   const row = root.querySelector('.hud-row');
   const scoreEl = root.querySelector('#score');
@@ -17,6 +18,7 @@ export function createHud(root) {
   const flashEl = root.querySelector('#flash');
   const warnEl = root.querySelector('#warn');
   const messageEl = root.querySelector('#message');
+  const toastEl = root.querySelector('#toast');
 
   let shownScore = -1;
   let shownBest = -1;
@@ -24,6 +26,7 @@ export function createHud(root) {
   let shownWarn = false;
   let scorePop = false;
   let coinPop = false;
+  let toastPop = false;
 
   return {
     score(value) {
@@ -55,6 +58,14 @@ export function createHud(root) {
 
     showStats(visible) {
       row.hidden = !visible;
+      if (!visible) toastEl.className = '';
+    },
+
+    // A short cheer that pops up under the top of the screen and fades out.
+    toast(text) {
+      toastPop = !toastPop;
+      toastEl.textContent = text;
+      toastEl.className = toastPop ? 'show-a' : 'show-b';
     },
 
     // A red pulse at the screen edges: the hawk is coming.
@@ -70,7 +81,8 @@ export function createHud(root) {
     },
 
     // html is a fixed string from main.js; '' hides the message. 'high'
-    // places the panel near the top so the chicken stays in view.
+    // places the panel near the top so the chicken stays in view; 'dim'
+    // darkens the game behind it.
     message(html, place = '') {
       messageEl.className = place;
       messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';

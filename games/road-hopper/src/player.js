@@ -51,6 +51,8 @@ export function createPlayer(scene, world, shadowMaterial) {
     idle: 0, // seconds since the last hop
     maxRow: 0,
     landed: false, // true on the frame the chicken lands
+    hopped: false, // true on the frame a hop starts
+    bumped: false, // true on the frame a hop is blocked
     dead: false,
     death: '',
     deathT: 0,
@@ -74,6 +76,8 @@ export function createPlayer(scene, world, shadowMaterial) {
       this.idle = 0;
       this.maxRow = 0;
       this.landed = false;
+      this.hopped = false;
+      this.bumped = false;
       this.dead = false;
       this.death = '';
       mesh.visible = true;
@@ -93,12 +97,17 @@ export function createPlayer(scene, world, shadowMaterial) {
       this.sinceHop = 0;
       const toRow = this.row + DR[dir];
       // On the river the chicken keeps its offset; on land it snaps to the grid.
-      const toX =
-        world.rowType(toRow) === RIVER ? this.x + DX[dir] : clamp(Math.round(this.x), -HALF, HALF) + DX[dir];
-      if (world.blocked(toRow, toX)) {
+      const river = world.rowType(toRow) === RIVER;
+      const toX = river ? this.x + DX[dir] : clamp(Math.round(this.x), -HALF, HALF) + DX[dir];
+      // A log may carry the chicken a little past the edge columns; from
+      // there it can still hop on to the next river row.
+      const wide = river && toRow !== this.row && world.rowType(this.row) === RIVER;
+      if (world.blocked(toRow, toX, wide)) {
         this.bump = 1;
+        this.bumped = true;
         return false;
       }
+      this.hopped = true;
       this.hopping = true;
       this.t = 0;
       this.fromX = this.x;
@@ -121,6 +130,8 @@ export function createPlayer(scene, world, shadowMaterial) {
     // input is null when the game is not taking controls (title screen).
     update(dt, input) {
       this.landed = false;
+      this.hopped = false;
+      this.bumped = false;
       this.clock += dt;
       this.sinceHop += dt;
       this.idle += dt;
@@ -172,7 +183,9 @@ export function createPlayer(scene, world, shadowMaterial) {
         this.y = this.baseY;
       }
 
-      if (!this.hopping && input) {
+      // Not on the landing frame: the game first settles the landing (onto a
+      // log cell, say), and a buffered hop starts from there on the next.
+      if (!this.hopping && !this.landed && input) {
         let dir = this.queued;
         if (dir < 0 && this.sinceHop >= REPEAT) {
           const dp = input.dpad;

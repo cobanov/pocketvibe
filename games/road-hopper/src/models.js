@@ -1,5 +1,7 @@
 // Low-poly voxel models. Each is built once from colored boxes merged into a
 // single geometry (vertex colors), so a whole kind of object is one draw call.
+// The camera always looks down from high above, so faces pointing straight
+// down are never seen: solid() drops them (a sixth of every box).
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -8,13 +10,30 @@ import { LILY_Y, LOG_Y, box, paint, paintTop } from './shared.js';
 const DARK = 0x2a2a30;
 const WINDOW = 0x26323f;
 
+// Merges boxes into one geometry without the faces that point down.
+function solid(parts) {
+  const g = mergeGeometries(parts);
+  const normals = g.attributes.normal;
+  const index = g.index.array;
+  const kept = [];
+  for (let i = 0; i < index.length; i += 3) {
+    const a = index[i];
+    const b = index[i + 1];
+    const c = index[i + 2];
+    if (normals.getY(a) < -0.9 && normals.getY(b) < -0.9 && normals.getY(c) < -0.9) continue;
+    kept.push(a, b, c);
+  }
+  g.setIndex(kept);
+  return g;
+}
+
 // The chicken faces -z (forward). About one cell wide and tall.
 export function chickenGeometry() {
   const white = 0xf4f1ea;
   const top = 0xffffff;
   const orange = 0xff9f1c;
   const red = 0xff3b3b;
-  return mergeGeometries([
+  return solid([
     box(0.07, 0.2, 0.07, -0.12, 0.1, 0.03, orange), // legs
     box(0.07, 0.2, 0.07, 0.12, 0.1, 0.03, orange),
     box(0.13, 0.04, 0.18, -0.12, 0.02, -0.02, orange), // feet
@@ -36,11 +55,11 @@ export function chickenGeometry() {
 export function groundGeometry() {
   const g = new THREE.BoxGeometry(1, 1, 1);
   g.translate(0, -0.5, 0);
-  return paintTop(g, 0xffffff, 0x8a8a8a);
+  return solid([paintTop(g, 0xffffff, 0x8a8a8a)]);
 }
 
 export function treeGeometry() {
-  return mergeGeometries([
+  return solid([
     box(0.28, 0.36, 0.28, 0, 0.18, 0, 0x8b5a33),
     box(0.8, 0.62, 0.8, 0, 0.66, 0, 0x3f9e45, 0x58bd52),
     box(0.54, 0.34, 0.54, 0, 1.14, 0, 0x4aac4c, 0x6bcf5f),
@@ -48,7 +67,7 @@ export function treeGeometry() {
 }
 
 export function rockGeometry() {
-  return mergeGeometries([
+  return solid([
     box(0.74, 0.4, 0.64, 0, 0.2, 0, 0x8d96a3, 0xb3bcc7),
     box(0.42, 0.2, 0.38, 0.08, 0.5, -0.04, 0x8d96a3, 0xc2cad3),
   ]);
@@ -74,7 +93,7 @@ export function carGeometry() {
   for (let i = 0; i < 4; i++) {
     parts.push(box(0.28, 0.24, 0.08, i < 2 ? 0.38 : -0.38, 0.13, i % 2 ? 0.36 : -0.36, DARK));
   }
-  return mergeGeometries(parts);
+  return solid(parts);
 }
 
 export function truckGeometry(cab, cargo) {
@@ -89,7 +108,7 @@ export function truckGeometry(cab, cargo) {
     const x = i < 2 ? 0.78 : i < 4 ? -0.3 : -0.86;
     parts.push(box(0.3, 0.26, 0.08, x, 0.13, i % 2 ? 0.37 : -0.37, DARK));
   }
-  return mergeGeometries(parts);
+  return solid(parts);
 }
 
 // A log `len` cells long floating on the river, with grooves at the cell
@@ -101,7 +120,7 @@ export function logGeometry(len) {
     box(0.06, 0.26, 0.54, len / 2 - 0.03, LOG_Y - 0.15, 0, 0xe6b77d),
   ];
   for (let i = 1; i < len; i++) parts.push(box(0.06, 0.02, 0.63, -len / 2 + i, LOG_Y, 0, 0x7a4c28));
-  return mergeGeometries(parts);
+  return solid(parts);
 }
 
 export function lilyGeometry() {
@@ -112,7 +131,7 @@ export function lilyGeometry() {
 }
 
 export function engineGeometry() {
-  return mergeGeometries([
+  return solid([
     box(2.9, 0.22, 0.78, 0, 0.17, 0, DARK), // chassis
     box(2.8, 0.92, 0.74, -0.02, 0.73, 0, 0xe53f4b, 0xf05a63),
     box(2.82, 0.14, 0.76, -0.02, 0.5, 0, 0xffd23f), // stripe
@@ -124,7 +143,7 @@ export function engineGeometry() {
 }
 
 export function wagonGeometry() {
-  return mergeGeometries([
+  return solid([
     box(2.9, 0.22, 0.78, 0, 0.17, 0, DARK),
     box(2.76, 0.88, 0.74, 0, 0.7, 0, 0x3d7fe0, 0x5d98ef),
     box(2.4, 0.22, 0.76, 0, 0.82, 0, WINDOW),
@@ -132,16 +151,70 @@ export function wagonGeometry() {
   ]);
 }
 
-// Two rails and their sleepers across the whole width of a row.
-export function railGeometry(halfWidth) {
+// A stretch of track `width` long: two rails and their sleepers. A row's
+// track is a few of these side by side, so the ones out of view are skipped.
+export function railGeometry(width) {
   const parts = [
-    box(halfWidth * 2, 0.08, 0.08, 0, 0.06, -0.24, 0xd5dbe3, 0xf0f3f7),
-    box(halfWidth * 2, 0.08, 0.08, 0, 0.06, 0.24, 0xd5dbe3, 0xf0f3f7),
+    box(width, 0.08, 0.08, 0, 0.06, -0.24, 0xd5dbe3, 0xf0f3f7),
+    box(width, 0.08, 0.08, 0, 0.06, 0.24, 0xd5dbe3, 0xf0f3f7),
   ];
-  for (let x = -halfWidth + 0.4; x < halfWidth; x += 0.8) {
+  for (let x = -width / 2 + 0.4; x < width / 2; x += 0.8) {
     parts.push(box(0.22, 0.04, 0.84, x, 0.02, 0, 0x6e4a32));
   }
+  return solid(parts);
+}
+
+// Two tyre ruts along a farm track, across the whole width of a row.
+export function rutGeometry(halfWidth) {
+  const parts = [];
+  for (const z of [-0.21, 0.21]) {
+    const g = new THREE.PlaneGeometry(halfWidth * 2, 0.15);
+    g.rotateX(-Math.PI / 2);
+    g.translate(0, 0, z);
+    parts.push(paint(g, 0x7a5636));
+  }
   return mergeGeometries(parts);
+}
+
+// A tractor towing a trailer of hay bales, 3.4 cells long, pointing towards
+// +x like the cars.
+export function tractorGeometry() {
+  const red = 0xe2483d;
+  const redTop = 0xf06a55;
+  const hay = 0xd9ae45;
+  const hayTop = 0xf0cd68;
+  const parts = [
+    box(0.86, 0.38, 0.52, 1.22, 0.52, 0, red, redTop), // bonnet
+    box(0.5, 0.5, 0.64, 0.56, 0.84, 0, WINDOW), // cab windows
+    box(0.6, 0.08, 0.72, 0.56, 1.13, 0, red, redTop), // roof
+    box(0.56, 0.28, 0.6, 0.56, 0.45, 0, red, redTop), // cab base
+    box(0.06, 0.34, 0.06, 1.4, 0.86, -0.13, DARK), // exhaust
+    box(0.08, 0.06, 0.4, 1.68, 0.5, 0, 0xfff3b0), // grille lamps
+    box(0.32, 0.06, 0.08, 0.06, 0.26, 0, DARK), // hitch
+    box(1.66, 0.12, 0.8, -0.86, 0.34, 0, 0x8b5a33, 0xa86f40), // trailer bed
+    box(0.76, 0.42, 0.72, -1.26, 0.61, 0, hay, hayTop), // hay bales
+    box(0.76, 0.42, 0.72, -0.46, 0.61, 0, hay, hayTop),
+    box(0.72, 0.36, 0.66, -0.86, 1.0, 0, hay, hayTop),
+  ];
+  for (const side of [-1, 1]) {
+    parts.push(box(0.62, 0.62, 0.16, 0.52, 0.31, side * 0.4, DARK)); // big rear wheels
+    parts.push(box(0.22, 0.22, 0.02, 0.52, 0.31, side * 0.49, 0xffc21f)); // hubs
+    parts.push(box(0.34, 0.34, 0.12, 1.4, 0.17, side * 0.3, DARK)); // front wheels
+    parts.push(box(0.34, 0.3, 0.1, -0.86, 0.15, side * 0.38, DARK)); // trailer wheels
+  }
+  return solid(parts);
+}
+
+// The flag beside the row of the best run so far, flying out to -x (away
+// from the play area). Its post reaches down into the water, so it also
+// stands on a river row.
+export function flagGeometry() {
+  return solid([
+    box(0.09, 2.0, 0.09, 0, 0.6, 0, 0xf4f4f4, 0xffffff),
+    box(0.8, 0.46, 0.05, -0.44, 1.34, 0, 0xffc21f, 0xffd23f),
+    box(0.16, 0.46, 0.055, -0.76, 1.34, 0, 0xff5a3c),
+    box(0.16, 0.16, 0.16, 0, 1.66, 0, 0xffd23f),
+  ]);
 }
 
 // Dashed lane markings across the whole width of a row.
@@ -158,7 +231,7 @@ export function dashGeometry(halfWidth) {
 
 // The crossing signal; its two lamps are a separate mesh so they can flash.
 export function poleGeometry() {
-  return mergeGeometries([
+  return solid([
     box(0.1, 1.3, 0.1, 0, 0.65, 0, 0x7d838c),
     box(0.56, 0.3, 0.1, 0, 1.3, 0, 0x2b2b31),
     box(0.46, 0.1, 0.06, 0, 0.95, 0, 0xf4f4f4), // crossbuck bar

@@ -222,6 +222,15 @@ body.handheld #legend {
   padding-top: 26px;
 }
 
+/* The pause menu dims the frozen game behind it. */
+#message.dim {
+  background: rgba(10, 16, 28, 0.4);
+}
+
+#message.dim .panel {
+  background: rgba(20, 32, 56, 0.85);
+}
+
 .panel {
   display: flex;
   flex-direction: column;
@@ -255,6 +264,106 @@ body.handheld #legend {
 .panel .small {
   font-size: 18px;
   color: #dbe7f5;
+}
+
+/* Title: the best run and the coins collected, as two badges. */
+.panel .stats {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-size: 22px;
+}
+
+.panel .stats span {
+  padding: 2px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.panel .blink {
+  animation: blink 1.1s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Pause and options menus. */
+.panel .menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+
+.panel .item {
+  min-width: 220px;
+  padding: 3px 18px;
+  border-radius: 8px;
+  color: #e4ecf7;
+}
+
+.panel .item.sel {
+  background: #ffd23f;
+  color: #3a2508;
+  text-shadow: none;
+}
+
+/* A cheer under the score: NEW BEST! */
+#toast {
+  position: absolute;
+  top: 74px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 34px;
+  font-weight: 800;
+  color: #7dff8a;
+  text-shadow: 0 3px 0 #0d3b17, 0 0 6px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  opacity: 0;
+}
+
+#toast.show-a {
+  animation: toast-a 1.8s ease-out;
+}
+
+#toast.show-b {
+  animation: toast-b 1.8s ease-out;
+}
+
+@keyframes toast-a {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.5);
+  }
+  15% {
+    transform: translateX(-50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes toast-b {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.5);
+  }
+  15% {
+    transform: translateX(-50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .coin {

@@ -14,6 +14,7 @@ export const GRASS = 0;
 export const ROAD = 1;
 export const RIVER = 2;
 export const RAIL = 3;
+export const FARM = 4; // a dirt track with slow tractors
 
 // Heights of the surfaces the chicken can stand on.
 export const WATER_Y = -0.34;

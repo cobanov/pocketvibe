@@ -139,6 +139,19 @@ export function createFx(scene, shadowMaterial) {
       return hawk.position;
     },
 
+    // Shows the hawk and a particle at (x, z) for the loading frame, so their
+    // materials compile and geometries upload then; clear() hides them.
+    warmUp(x, z) {
+      placeHawk(x, 1.5, z, 0, -1, -1);
+      hawk.visible = true;
+      hawkShadow.visible = true;
+      dummy.position.set(x, 0.5, z);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(0, dummy.matrix);
+      mesh.count = 1;
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+
     clear() {
       for (let i = 0; i < MAX; i++) life[i] = 0;
       mesh.count = 0;
