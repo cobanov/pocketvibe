@@ -54,9 +54,10 @@ BUNDLED = APP / 'bundled'  # game zips a new install starts with (app/release.sh
 BUNDLED_DONE = HOME / '.bundled'  # they are unpacked once, never again
 DEFAULT_SETTINGS = {
     'language': 'en',
-    'music': True,
-    'musicVolume': 0.5,
-    'uiSounds': True,
+    'music': True,  # background music in the menus
+    'musicVolume': 0.8,
+    'uiSounds': True,  # sound effects
+    'sfxVolume': 0.8,
     'showFps': False,
     'stores': [DEFAULT_STORE],
 }
@@ -69,8 +70,6 @@ BUSY_FLAG = Path('/tmp/pocketvibe-busy')  # PocketVibe.sh waits for it to go bef
 WEB_DATA = RUNTIME / 'root' / '.local' / 'share' / 'wpe'  # WebKit's data; storage/ holds every game's saves
 BACKUPS = HOME / 'backups'
 BACKUP_NAME = re.compile(r'saves-\d{8}-\d{6}\.zip')
-AUDIO_CACHE = CACHE / 'audio'  # audio the launcher rendered once (menu music)
-AUDIO_NAME = re.compile(r'[a-z0-9-]{1,64}\.wav')
 # The game shell (see game_url) is served on each game's own port under this
 # path, so the game inside it keeps its origin and its saves.
 SHELL_PATH = '/__pocketvibe__/'
@@ -857,8 +856,8 @@ class LauncherHandler(SimpleHTTPRequestHandler):
     """The launcher's files and its /api. Games run on other 127.0.0.1 ports,
     and the browser lets their pages send requests here, so every /api call
     must carry the X-PocketVibe header: a page on another origin can only add
-    it after a CORS preflight, which this server never answers. Covers and
-    cached audio, which change nothing, are the exceptions. A Host check
+    it after a CORS preflight, which this server never answers. Covers,
+    which change nothing, are the exception. A Host check
     stops pages that point their own domain at 127.0.0.1."""
 
     def __init__(self, *args, **kwargs):
@@ -881,7 +880,7 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return True
         if self.headers.get('Origin') not in (None, f'http://127.0.0.1:{PORT}'):
             return False
-        if self.command == 'GET' and route.startswith(('/api/cover/', '/api/cache/')):
+        if self.command == 'GET' and route.startswith('/api/cover/'):
             return True
         return self.headers.get('X-PocketVibe') == '1'
 
@@ -919,17 +918,6 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return self.send_json(screens.layout() or {'screens': None, 'primary': 0})
         if route == '/api/saves':
             return self.send_json(list_backups())
-        if route.startswith('/api/cache/'):
-            path = AUDIO_CACHE / route.rsplit('/', 1)[1]
-            if not AUDIO_NAME.fullmatch(path.name) or not path.exists():
-                return self.send_json({'error': 'not cached'}, 404)
-            data = path.read_bytes()
-            self.send_response(200)
-            self.send_header('Content-Type', 'audio/wav')
-            self.send_header('Content-Length', str(len(data)))
-            self.end_headers()
-            self.wfile.write(data)
-            return None
         if route == '/api/update':
             try:
                 return self.send_json(check_update(force='force' in self.path))
@@ -962,18 +950,6 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return json.loads(self.rfile.read(length) or b'{}')
         except ValueError:
             return {}
-
-    def do_PUT(self):
-        if not self.allowed():
-            return self.refuse()
-        route = self.path.split('?', 1)[0]
-        name = route.rsplit('/', 1)[1]
-        length = int(self.headers.get('Content-Length') or 0)
-        if not route.startswith('/api/cache/') or not AUDIO_NAME.fullmatch(name) or not 0 < length <= 8 << 20:
-            return self.send_json({'error': 'not allowed'}, 400)
-        AUDIO_CACHE.mkdir(parents=True, exist_ok=True)
-        (AUDIO_CACHE / name).write_bytes(self.rfile.read(length))
-        return self.send_json({'ok': True})
 
     def do_POST(self):
         if not self.allowed():
@@ -1038,6 +1014,7 @@ def clean_up():
     package = HOME / '.app-update.zip'
     package.unlink(missing_ok=True)
     shutil.rmtree(HOME / '.app-update', ignore_errors=True)
+    shutil.rmtree(CACHE / 'audio', ignore_errors=True)  # menu music older launchers rendered and kept here
     if not GAMES.is_dir():
         return
     for path in GAMES.glob('.*'):

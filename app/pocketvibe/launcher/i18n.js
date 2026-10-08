@@ -66,9 +66,10 @@ const STRINGS = {
 
   // Settings
   sound: { en: 'Sound', tr: 'Ses' },
-  menuMusic: { en: 'Menu music', tr: 'Menü müziği' },
+  backgroundMusic: { en: 'Background music', tr: 'Arka plan müziği' },
   musicVolume: { en: 'Music volume', tr: 'Müzik sesi' },
-  uiSounds: { en: 'Button sounds', tr: 'Tuş sesleri' },
+  soundEffects: { en: 'Sound effects', tr: 'Ses efektleri' },
+  effectsVolume: { en: 'Effects volume', tr: 'Efekt sesi' },
   on: { en: 'On', tr: 'Açık' },
   off: { en: 'Off', tr: 'Kapalı' },
   stores: { en: 'Stores', tr: 'Mağazalar' },

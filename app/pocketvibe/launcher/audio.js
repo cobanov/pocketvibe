@@ -1,291 +1,312 @@
-// Menu music and button sounds, synthesized with Web Audio: no audio files,
-// nothing to license. The music is a calm eight-bar loop in A minor: a soft
-// pad, a bass line, an arpeggio, a short melody and light percussion.
+// The launcher's sounds: 16 UI sound effects and the menu music, played with
+// Web Audio through one AudioContext:
 //
-// Everything is rendered once, ahead of time, with an OfflineAudioContext.
-// Playing is then only looping one buffer and starting short ones, which
-// costs almost nothing: live synthesis was too heavy for the handheld and
-// made the music drop out and the button sounds lag.
+//   effect -> sfxGain ----------\
+//                                masterGain -> speakers
+//   music -> fade -> musicGain --/
+//
+// The effects are WAV files made by tools/sfx/make_sfx.py, all decoded into
+// memory as the launcher starts. They are WAV because the handheld's WebKit
+// decodes through GStreamer: a WAV takes about 60 ms there, an OGG about 1.5 s.
+// The music is one OGG (2.1 MB; about 5 s to decode on the handheld and 38 MB
+// once decoded), loaded in the background after the boot sound (back from a
+// game, right after the effects). Its intro plays once, then the rest loops
+// without a gap.
+//
+// Nothing here may break the launcher: without Web Audio, or when a file does
+// not load or decode, it simply stays silent.
 
-const BPM = 84;
-const STEPS_PER_BEAT = 2; // eighth notes
-const STEP = 60 / BPM / STEPS_PER_BEAT;
-const BARS = 8;
-const STEPS = BARS * 4 * STEPS_PER_BEAT;
-const LOOP_SECONDS = STEPS * STEP;
-const TAIL_SECONDS = 2; // notes ringing past the loop's end are folded back to its start
-const RATE = 44100; // button sounds
-// The music is low-passed at 2.4 kHz, so 22 kHz loses nothing and halves the
-// work. The rendered loop is cached by pocketvibed under this name; change
-// the name whenever the music changes.
-const MUSIC_RATE = 22050;
-const MUSIC_CACHE = '/api/cache/menu-music-v1.wav';
-
-// Chords as MIDI notes, one per two bars: Am, F, C, G.
-const CHORDS = [
-  [57, 60, 64],
-  [53, 57, 60],
-  [48, 52, 55],
-  [55, 59, 62],
+// boot comes first: the handheld decodes one file at a time, and boot plays first.
+const SOUNDS = [
+  'boot', 'nav_move', 'nav_scroll', 'nav_edge', 'confirm', 'back', 'error', 'tab_switch', 'menu_open',
+  'menu_close', 'toggle_on', 'toggle_off', 'key_type', 'notification', 'save_done', 'launch_game',
 ];
-// Melody, one entry per eighth note (null is a rest), A minor pentatonic.
-const MELODY = [
-  76, null, null, 81, 79, null, 76, null, 74, null, 76, null, null, null, null, null,
-  72, null, null, 77, 76, null, 72, null, 69, null, null, null, 72, null, null, null,
-  76, null, 79, null, 76, 74, 72, null, 74, null, null, null, null, null, 76, null,
-  74, null, null, 79, null, 74, 71, null, 69, null, null, null, null, null, null, null,
-];
-// Button sounds as (frequency, start, length) notes.
-const SOUNDS = {
-  move: [[880, 0, 0.04]],
-  tab: [[740, 0, 0.05]],
-  select: [[660, 0, 0.06], [990, 0.06, 0.06]],
-  back: [[660, 0, 0.06], [440, 0.06, 0.06]],
-  // A game finished downloading: a rising major arpeggio.
-  ready: [[523, 0, 0.14], [659, 0.09, 0.14], [784, 0.18, 0.14], [1047, 0.27, 0.5]],
+// Moving the focus: a new one of these stops the one before, so fast or held
+// presses never pile up.
+const NAV = new Set(['nav_move', 'nav_scroll', 'nav_edge']);
+const SAME_SOUND_GAP = 0.035; // s: the same sound never starts twice closer than this
+const MUSIC = {
+  url: 'music/menu_theme_full.ogg',
+  // The 30.33 s intro plays once, then loopStart to loopEnd (the file's end)
+  // loops. From the track's music.json, in samples at 48 kHz.
+  loopStart: 1455840 / 48000,
+  loopEnd: 4708204 / 48000,
 };
+const BOOT_WINDOW = 6000; // ms after the page loads that the boot sound may still play
+const BOOT_TO_MUSIC = 2.3; // s from the boot sound to the music
+const FADE_IN_OPEN = 1.5; // s, as the app opens or the music is switched on
+const FADE_IN_RETURN = 1.2; // s, back from a game
+const FADE_OUT = 0.8; // s, as a game starts or the music is switched off
+const LAUNCH_DELAY = 0.14; // s from the confirm sound to launch_game
 
-const midiToHz = (note) => 440 * 2 ** ((note - 69) / 12);
-
-// Schedules notes into any audio context (here always an offline one).
-class Synth {
-  constructor(ctx, out) {
-    this.ctx = ctx;
-    this.out = out;
-    this.noise = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
-    const data = this.noise.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  }
-
-  tone(freq, time, length, type, level, attack) {
-    const osc = this.ctx.createOscillator();
-    const env = this.ctx.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    env.gain.setValueAtTime(0, time);
-    env.gain.linearRampToValueAtTime(level, time + attack);
-    env.gain.setTargetAtTime(0, time + Math.max(length - 0.05, attack), 0.08);
-    osc.connect(env).connect(this.out);
-    osc.start(time);
-    osc.stop(time + length + 0.5);
-  }
-
-  kick(time) {
-    const osc = this.ctx.createOscillator();
-    const env = this.ctx.createGain();
-    osc.frequency.setValueAtTime(110, time);
-    osc.frequency.exponentialRampToValueAtTime(40, time + 0.12);
-    env.gain.setValueAtTime(0.12, time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
-    osc.connect(env).connect(this.out);
-    osc.start(time);
-    osc.stop(time + 0.25);
-  }
-
-  hat(time) {
-    const src = this.ctx.createBufferSource();
-    const filter = this.ctx.createBiquadFilter();
-    const env = this.ctx.createGain();
-    src.buffer = this.noise;
-    filter.type = 'highpass';
-    filter.frequency.value = 7000;
-    env.gain.setValueAtTime(0.025, time);
-    env.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
-    src.connect(filter).connect(env).connect(this.out);
-    src.start(time);
-    src.stop(time + 0.06);
-  }
-
-  step(step, time) {
-    const stepsPerBar = 4 * STEPS_PER_BEAT;
-    const bar = Math.floor(step / stepsPerBar);
-    const inBar = step % stepsPerBar;
-    const chord = CHORDS[Math.floor(bar / 2) % CHORDS.length];
-    if (step % (2 * stepsPerBar) === 0) {
-      for (const note of chord) this.tone(midiToHz(note), time, STEP * 16, 'triangle', 0.05, 1.2);
-    }
-    if (inBar % 4 === 0) this.tone(midiToHz(chord[0] - 12), time, STEP * 3, 'triangle', 0.16, 0.02);
-    const arp = chord[[0, 1, 2, 1][inBar % 4]] + 12;
-    this.tone(midiToHz(arp), time, STEP * 0.9, 'square', 0.018, 0.01);
-    const melody = MELODY[step % MELODY.length];
-    if (melody) this.tone(midiToHz(melody), time, STEP * 1.8, 'triangle', 0.07, 0.02);
-    if (inBar % 4 === 0) this.kick(time);
-    if (inBar % 2 === 1) this.hat(time);
-  }
-}
-
-async function renderMusic() {
-  const RATE = MUSIC_RATE;
-  const offline = new OfflineAudioContext(1, Math.ceil((LOOP_SECONDS + TAIL_SECONDS) * RATE), RATE);
-  const filter = offline.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = 2400;
-  filter.connect(offline.destination);
-  const synth = new Synth(offline, filter);
-  for (let step = 0; step < STEPS; step++) synth.step(step, step * STEP);
-  const rendered = await offline.startRendering();
-
-  // Fold the tail onto the start so the loop has no seam.
-  const loopLength = Math.round(LOOP_SECONDS * RATE);
-  const loop = new AudioBuffer({ length: loopLength, numberOfChannels: 1, sampleRate: RATE });
-  const source = rendered.getChannelData(0);
-  const target = loop.getChannelData(0);
-  target.set(source.subarray(0, loopLength));
-  for (let i = loopLength; i < source.length; i++) target[i - loopLength] += source[i];
-  return loop;
-}
-
-// 16-bit mono WAV, to store the rendered loop.
-function toWav(buffer) {
-  const samples = buffer.getChannelData(0);
-  const view = new DataView(new ArrayBuffer(44 + samples.length * 2));
-  const text = (offset, s) => [...s].forEach((c, i) => view.setUint8(offset + i, c.charCodeAt(0)));
-  text(0, 'RIFF');
-  view.setUint32(4, 36 + samples.length * 2, true);
-  text(8, 'WAVEfmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // mono
-  view.setUint32(24, buffer.sampleRate, true);
-  view.setUint32(28, buffer.sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  text(36, 'data');
-  view.setUint32(40, samples.length * 2, true);
-  for (let i = 0; i < samples.length; i++) view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, samples[i])) * 32767, true);
-  return view.buffer;
-}
-
-// The cached loop if there is one, else render it and cache it.
-async function loadMusic() {
+function createContext() {
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) return null;
   try {
-    const res = await fetch(MUSIC_CACHE);
-    if (res.ok) return await new OfflineAudioContext(1, 1, MUSIC_RATE).decodeAudioData(await res.arrayBuffer());
+    return new Context({ latencyHint: 'interactive' });
   } catch {
-    // Render it below.
+    try {
+      return new Context(); // an engine without the options
+    } catch {
+      return null;
+    }
   }
-  const music = await renderMusic();
-  fetch(MUSIC_CACHE, { method: 'PUT', headers: { 'X-PocketVibe': '1' }, body: toWav(music) }).catch(() => {});
-  return music;
 }
 
-async function renderSound(notes) {
-  const length = Math.max(...notes.map(([, at, len]) => at + len)) + 0.02;
-  const offline = new OfflineAudioContext(1, Math.ceil(length * RATE), RATE);
-  for (const [freq, at, len] of notes) {
-    const osc = offline.createOscillator();
-    const env = offline.createGain();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
-    env.gain.setValueAtTime(0, at);
-    env.gain.linearRampToValueAtTime(0.5, at + 0.004);
-    env.gain.exponentialRampToValueAtTime(0.001, at + len);
-    osc.connect(env).connect(offline.destination);
-    osc.start(at);
-    osc.stop(at + len + 0.01);
+// Glides an AudioParam from where it is now to `value`. The start is set
+// explicitly: a ramp otherwise starts at the param's last scheduled event,
+// which may be long past, and the level would jump.
+function ramp(ctx, param, value, seconds) {
+  const now = ctx.currentTime;
+  const current = param.value;
+  param.cancelScheduledValues(now);
+  param.setValueAtTime(current, now);
+  param.linearRampToValueAtTime(value, now + seconds);
+}
+
+// A file beside this module. A request the busy local service drops is tried
+// once more.
+async function fetchFile(path) {
+  const url = new URL(path, import.meta.url);
+  const res = await fetch(url).catch(() => fetch(url));
+  if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
+  return res.arrayBuffer();
+}
+
+// The audio calls that return promises can reject (the browser not allowing
+// audio yet, say); none of that matters to the launcher.
+function quietly(call) {
+  try {
+    call()?.catch?.(() => {});
+  } catch {
+    // Same.
   }
-  return offline.startRendering();
 }
 
 export class LauncherAudio {
   constructor() {
-    this.ctx = null;
-    this.musicOn = false;
-    this.volume = 0.5;
     this.soundsOn = true;
-    this.music = null; // the rendered loop
-    this.musicSource = null;
-    this.sounds = {}; // kind -> rendered buffer
-    this.soundSource = null;
-    this.ready = this.prepare();
-  }
-
-  // Render the music and the button sounds. No audio context is needed for
-  // this, so it starts right away, before audio is allowed to play.
-  async prepare() {
-    try {
-      const started = performance.now();
-      const entries = await Promise.all(Object.entries(SOUNDS).map(async ([kind, notes]) => [kind, await renderSound(notes)]));
-      this.sounds = Object.fromEntries(entries);
-      this.music = await loadMusic();
-      console.log(`PocketVibe audio ready in ${Math.round(performance.now() - started)} ms`);
-      if (this.musicOn) this.playMusic();
-    } catch (e) {
-      console.log(`PocketVibe audio could not be rendered: ${e.message}`);
-    }
-  }
-
-  // The context is created lazily and resumed on demand, because the browser
-  // only allows audio after a key press (see unlockAudio in launcher.js).
-  ensure() {
-    if (!this.ctx) {
-      const Context = window.AudioContext || window.webkitAudioContext;
-      if (!Context) return false;
-      this.ctx = new Context();
-      // Music and button sounds meet in a compressor, so together they never
-      // clip into a sudden loud burst.
-      this.output = this.ctx.createDynamicsCompressor();
-      this.output.threshold.value = -18;
-      this.output.ratio.value = 6;
-      this.output.connect(this.ctx.destination);
-      this.musicGain = this.ctx.createGain();
-      this.musicGain.gain.value = 0;
-      this.musicGain.connect(this.output);
-      this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = 0.3;
-      this.sfxGain.connect(this.output);
-    }
-    if (this.ctx.state === 'suspended') this.ctx.resume();
-    return true;
-  }
-
-  configure({ music, musicVolume, uiSounds }) {
-    this.soundsOn = uiSounds;
-    this.volume = musicVolume;
-    if (music && !this.musicOn) this.startMusic();
-    else if (!music && this.musicOn) this.stopMusic();
-    if (this.ctx && this.musicOn) this.musicGain.gain.setTargetAtTime(this.volume * 0.35, this.ctx.currentTime, 0.2);
-  }
-
-  startMusic() {
-    this.musicOn = true;
-    if (this.ensure()) this.playMusic();
-  }
-
-  playMusic() {
-    if (!this.music || !this.ctx || this.musicSource) return;
-    const source = this.ctx.createBufferSource();
-    source.buffer = this.music;
-    source.loop = true;
-    source.connect(this.musicGain);
-    source.start();
-    this.musicSource = source;
-    this.musicGain.gain.setTargetAtTime(this.volume * 0.35, this.ctx.currentTime, 0.8);
-  }
-
-  stopMusic() {
+    this.sfxVolume = 0.8;
     this.musicOn = false;
-    if (!this.ctx || !this.musicSource) return;
-    const source = this.musicSource;
-    this.musicSource = null;
-    this.musicGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
-    source.stop(this.ctx.currentTime + 1);
+    this.musicVolume = 0.8;
+    this.sounds = {}; // name -> decoded effect
+    this.started = {}; // name -> context time it last started
+    this.navVoice = null;
+    this.confirmedAt = -1;
+    this.music = null; // the decoded track
+    this.musicLoading = false;
+    this.musicFailed = false;
+    this.voice = null; // the music playing: { source, fade, timer }, never more than one
+    this.musicAt = 0; // context time the music may start at
+    this.fadeIn = FADE_IN_OPEN;
+    this.introDone = false;
+    this.paused = false; // suspended while the app is in the background
+    this.ctx = createContext();
+    if (!this.ctx) {
+      this.loaded = Promise.resolve();
+      return;
+    }
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.connect(this.ctx.destination);
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.value = this.sfxVolume;
+    this.sfxGain.connect(this.masterGain);
+    this.musicGain = this.ctx.createGain();
+    this.musicGain.gain.value = this.musicVolume;
+    this.musicGain.connect(this.masterGain);
+    this.loaded = this.loadSounds();
+    document.addEventListener('visibilitychange', () => this.pause(document.hidden));
   }
 
-  // Short sounds: 'move', 'select', 'back', 'tab', 'ready'. Only one plays at a
-  // time: a new one cuts the previous, so fast presses do not stack up.
-  sound(kind) {
-    const buffer = this.sounds[kind];
-    if (!this.soundsOn || !buffer || !this.ensure() || this.ctx.state !== 'running') return;
-    try {
-      this.soundSource?.stop();
-    } catch {
-      // Already finished.
+  get running() {
+    return this.ctx?.state === 'running';
+  }
+
+  // Every effect, decoded once. One file at a time: the handheld decodes one
+  // at a time anyway, and the launcher's other requests are not crowded out.
+  async loadSounds() {
+    const begin = performance.now();
+    for (const name of SOUNDS) {
+      try {
+        this.sounds[name] = await this.ctx.decodeAudioData(await fetchFile(`sounds/${name}.wav`));
+      } catch {
+        // This one stays silent.
+      }
     }
+    console.log(`PocketVibe sounds: ${Object.keys(this.sounds).length} ready in ${Math.round(performance.now() - begin)} ms`);
+  }
+
+  // Called on every key or button press. The browser starts audio only after
+  // a press: a trusted key press or touch, or one it already saw.
+  unlock(trusted = false) {
+    if (!this.ctx || this.ctx.state !== 'suspended' || this.paused) return;
+    // Nothing pressed yet: asking would only log a warning.
+    if (!trusted && navigator.userActivation?.hasBeenActive === false) return;
+    quietly(() => this.ctx.resume());
+  }
+
+  // The app went to the background, or came back: the audio clock stops
+  // there and runs again on return.
+  pause(hidden) {
+    if (!this.ctx) return;
+    if (hidden && this.ctx.state === 'running') {
+      this.paused = true;
+      quietly(() => this.ctx.suspend());
+    } else if (!hidden && this.paused) {
+      this.paused = false;
+      quietly(() => this.ctx.resume());
+    }
+  }
+
+  configure({ music, musicVolume = 0.8, uiSounds, sfxVolume = 0.8 }) {
+    this.soundsOn = Boolean(uiSounds);
+    this.sfxVolume = sfxVolume;
+    this.musicVolume = musicVolume;
+    if (!this.ctx) return;
+    this.setLevel(this.sfxGain.gain, sfxVolume);
+    this.setLevel(this.musicGain.gain, musicVolume);
+    if (music && !this.musicOn) {
+      this.musicOn = true;
+      // Switched on in Settings. At startup, start() brings the music in.
+      this.musicAt = 0;
+      this.fadeIn = FADE_IN_OPEN;
+      this.startMusic();
+    } else if (!music && this.musicOn) {
+      this.musicOn = false;
+      this.fadeOutMusic(FADE_OUT);
+    }
+  }
+
+  // A level change glides while audio plays, so it does not click.
+  setLevel(param, value) {
+    if (this.running) param.setTargetAtTime(value, this.ctx.currentTime, 0.02);
+    else param.value = value;
+  }
+
+  // Plays an effect now, or at a later context time. Effects asked for while
+  // audio cannot play are dropped, not saved up. Returns whether it played.
+  play(name, when = 0) {
+    const buffer = this.sounds[name];
+    if (!buffer || !this.soundsOn || this.sfxVolume <= 0 || !this.running) return false;
+    const at = Math.max(when, this.ctx.currentTime);
+    if (Math.abs(at - (this.started[name] ?? -1)) < SAME_SOUND_GAP) return false;
+    this.started[name] = at;
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(this.sfxGain);
-    source.start();
-    this.soundSource = source;
+    if (NAV.has(name)) {
+      quietly(() => this.navVoice?.stop(at));
+      this.navVoice = source;
+    }
+    source.start(at);
+    if (name === 'confirm') this.confirmedAt = at;
+    return true;
+  }
+
+  // The launcher has drawn. Opened anew: the boot sound, then the music
+  // 2.3 s later. Back from a game: no boot sound, and the music from its
+  // start. Both wait until audio may play (the first key press).
+  async start(returning) {
+    if (!this.ctx) return;
+    await this.loaded;
+    if (returning && this.musicOn) this.loadMusic(); // nothing to wait for
+    await new Promise((resolve) => {
+      const check = () => {
+        if (this.ctx.state !== 'running') return;
+        this.ctx.removeEventListener('statechange', check);
+        resolve();
+      };
+      this.ctx.addEventListener('statechange', check);
+      check();
+    });
+    // Audio that only starts at a later press (on the website) skips the boot sound.
+    const boot = !returning && performance.now() < BOOT_WINDOW && this.play('boot');
+    this.musicAt = this.ctx.currentTime + (boot ? BOOT_TO_MUSIC : 0);
+    this.fadeIn = returning ? FADE_IN_RETURN : FADE_IN_OPEN;
+    this.introDone = true;
+    this.startMusic();
+  }
+
+  // Decodes the music once, in the background, then starts it if it is still
+  // wanted. If it cannot be decoded the menu stays quiet.
+  loadMusic() {
+    if (this.music || this.musicLoading || this.musicFailed) return;
+    this.musicLoading = true;
+    const begin = performance.now();
+    fetchFile(MUSIC.url)
+      .then((data) => this.ctx.decodeAudioData(data))
+      .then((buffer) => {
+        console.log(`PocketVibe music ready in ${Math.round(performance.now() - begin)} ms`);
+        this.musicLoading = false;
+        if (!this.musicOn) return; // switched off meanwhile
+        this.music = buffer;
+        this.startMusic();
+      })
+      .catch((e) => {
+        console.log(`PocketVibe music could not be loaded: ${e?.message ?? e}`);
+        this.musicLoading = false;
+        this.musicFailed = true;
+      });
+  }
+
+  // Fades the music in from its start, loading it first if need be. Switched
+  // back on while it fades out, the same voice comes back instead.
+  startMusic() {
+    if (!this.musicOn || !this.introDone) return;
+    if (!this.music) {
+      this.loadMusic(); // which comes back here
+      return;
+    }
+    if (this.voice) {
+      if (!this.voice.timer) return; // playing already
+      clearTimeout(this.voice.timer);
+      this.voice.timer = 0;
+      ramp(this.ctx, this.voice.fade.gain, 1, this.fadeIn);
+      return;
+    }
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.music;
+    source.loop = true;
+    source.loopStart = MUSIC.loopStart;
+    source.loopEnd = MUSIC.loopEnd;
+    const fade = this.ctx.createGain();
+    const at = Math.max(this.musicAt, this.ctx.currentTime);
+    fade.gain.value = 0;
+    fade.gain.setValueAtTime(0, at);
+    fade.gain.linearRampToValueAtTime(1, at + this.fadeIn);
+    source.connect(fade).connect(this.musicGain);
+    source.start(at);
+    this.voice = { source, fade, timer: 0 };
+  }
+
+  // Fades the music out, then stops it.
+  fadeOutMusic(seconds) {
+    const voice = this.voice;
+    if (!voice || voice.timer) return;
+    ramp(this.ctx, voice.fade.gain, 0, seconds);
+    voice.timer = setTimeout(() => {
+      quietly(() => voice.source.stop());
+      voice.source.disconnect();
+      if (this.voice === voice) this.voice = null;
+      if (!this.musicOn) this.music = null; // off for good: let the 38 MB go
+    }, seconds * 1000 + 50);
+  }
+
+  // A game starts: launch_game 140 ms after the confirm sound, the music
+  // fading out from then. Resolves when the page can go to the game.
+  launch() {
+    if (!this.running) return Promise.resolve();
+    const now = this.ctx.currentTime;
+    const at = Math.max(now, this.confirmedAt + LAUNCH_DELAY);
+    const sound = this.play('launch_game', at);
+    if (!sound && !this.voice) return Promise.resolve();
+    const wait = (at - now) * 1000;
+    return new Promise((resolve) => {
+      setTimeout(() => this.fadeOutMusic(FADE_OUT), wait);
+      // The page goes in the middle of launch_game: take everything out over
+      // the last 50 ms rather than with a click.
+      setTimeout(() => ramp(this.ctx, this.masterGain.gain, 0, 0.05), wait + (FADE_OUT - 0.05) * 1000);
+      setTimeout(resolve, wait + FADE_OUT * 1000);
+    });
   }
 }

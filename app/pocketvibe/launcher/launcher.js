@@ -73,8 +73,11 @@ const state = {
   scroll: 0, // how far the current tab is scrolled, in px
   screens: null, // { screens: [{ x, y, width, height }], primary } from pocketvibed, or null for the window
   columns: 3, // cards per row
+  launching: false, // a game is starting and the page is about to go to it
 };
 state.focus.settings ??= 0;
+// Back from a game (play() leaves its id behind), rather than opened anew.
+const returning = load('played', null) !== null;
 
 function load(key, fallback) {
   try {
@@ -306,7 +309,7 @@ function celebrateNext() {
      <div class="celebrate-hints">${hint('A', t('playNow'))}${hint('B', t('later'))}</div>`,
     game,
   );
-  audio.sound('ready');
+  cue('save_done');
 }
 
 function stateHtml(game) {
@@ -416,9 +419,10 @@ function settingsSections() {
     {
       title: t('sound'),
       rows: [
-        { id: 'music', label: t('menuMusic'), value: onOff(s.music) },
-        { id: 'musicVolume', label: t('musicVolume'), value: volumeBar(s.musicVolume ?? 0.5) },
-        { id: 'uiSounds', label: t('uiSounds'), value: onOff(s.uiSounds) },
+        { id: 'music', label: t('backgroundMusic'), value: onOff(s.music) },
+        { id: 'musicVolume', label: t('musicVolume'), value: volumeBar(s.musicVolume ?? 0.8) },
+        { id: 'uiSounds', label: t('soundEffects'), value: onOff(s.uiSounds) },
+        { id: 'sfxVolume', label: t('effectsVolume'), value: volumeBar(s.sfxVolume ?? 0.8) },
       ],
     },
     {
@@ -517,9 +521,9 @@ async function updateSettings(changes) {
     state.settings = await api('/api/settings', 'POST', changes);
     applySettings();
     const { music, uiSounds } = state.settings;
-    if ((music || uiSounds) && audio.ctx?.state !== 'running') unlockAudio();
+    if ((music || uiSounds) && !audio.running) unlockAudio();
   } catch (e) {
-    toast(e.message);
+    toast(e.message, 'error');
   }
   render();
 }
@@ -537,23 +541,24 @@ function addStore() {
     value: 'https://',
     onDone: async (url) => {
       if (!/^https?:\/\/\S+$/.test(url) || /^https?:\/\/$/.test(url)) {
-        toast(t('badUrl'));
+        toast(t('badUrl'), 'error');
         return;
       }
       await updateSettings({ stores: [...state.settings.stores, url] });
       await refreshStore();
       render();
-      toast(t('storeAdded'));
+      toast(t('storeAdded'), 'save_done');
     },
     onCancel: () => renderHints(),
   });
+  cue('menu_open');
   renderHints();
 }
 
 async function pickBackup() {
-  const backups = await api('/api/saves');
+  const backups = await api('/api/saves').catch(() => []);
   if (!backups.length) {
-    toast(t('noBackups'));
+    toast(t('noBackups'), 'error');
     return;
   }
   openPicker(t('restoreSaves'), backups.map((b) => ({ label: b.name, value: sizeText(b.size) })), (item) => {
@@ -561,7 +566,7 @@ async function pickBackup() {
   });
 }
 
-function settingsAction(button) {
+function settingsAction(button, repeat) {
   const id = state.settingRows[state.focus.settings];
   const s = state.settings;
   if (!id || !s) return;
@@ -569,14 +574,28 @@ function settingsAction(button) {
   const step = button === 'LEFT' ? -1 : 1;
 
   if (id === 'music' || id === 'uiSounds' || id === 'showFps') {
-    if (button === 'A' || sideways) updateSettings({ [id]: !s[id] });
-  } else if (id === 'musicVolume') {
-    if (sideways) updateSettings({ musicVolume: Math.round(Math.min(1, Math.max(0, s.musicVolume + step * 0.1)) * 10) / 10 });
-    if (button === 'A') updateSettings({ musicVolume: s.musicVolume >= 1 ? 0.2 : Math.round((s.musicVolume + 0.2) * 10) / 10 });
+    if ((button === 'A' || sideways) && !repeat) {
+      const on = !s[id];
+      // Sound effects go on before their click and off after it, so it is heard either way.
+      if (id === 'uiSounds' && on) audio.configure({ ...s, uiSounds: true });
+      cue(on ? 'toggle_on' : 'toggle_off');
+      updateSettings({ [id]: on });
+    }
+  } else if (id === 'musicVolume' || id === 'sfxVolume') {
+    if (!sideways && button !== 'A') return;
+    const value = s[id] ?? 0.8;
+    const next = Math.round(Math.min(1, Math.max(0, sideways ? value + step * 0.1 : value >= 1 ? 0.2 : value + 0.2)) * 10) / 10;
+    if (next !== value) {
+      // So the click already sounds at the new level.
+      audio.configure({ ...s, [id]: next });
+      updateSettings({ [id]: next });
+    }
+    cueMove(next !== value, repeat);
   } else if (id === 'language') {
-    if (button === 'A' || sideways) {
+    if ((button === 'A' || sideways) && !repeat) {
       const codes = Object.keys(LANGUAGES);
       const next = codes[(codes.indexOf(getLanguage()) + (button === 'LEFT' ? -1 : 1) + codes.length) % codes.length];
+      cue('nav_move');
       updateSettings({ language: next });
     }
   } else if (id === 'addStore' && button === 'A') {
@@ -589,11 +608,12 @@ function settingsAction(button) {
       render();
     });
   } else if (id === 'backup' && button === 'A') {
+    cue('confirm');
     api('/api/saves/backup', 'POST')
-      .then(({ name }) => toast(t('backupDone', { name })))
-      .catch((e) => toast(e.message));
+      .then(({ name }) => toast(t('backupDone', { name }), 'save_done'))
+      .catch((e) => toast(e.message, 'error'));
   } else if (id === 'restore' && button === 'A') {
-    pickBackup();
+    pickBackup(); // its list opening (or the toast) is the sound
   } else if (id === 'update' && button === 'A') {
     if (state.update?.available) {
       showDialog(t('updateConfirm', { version: state.update.version }), async () => {
@@ -601,9 +621,11 @@ function settingsAction(button) {
         pollJobs();
       });
     } else {
+      cue('confirm');
       checkUpdate(true).then(() => {
         render();
-        toast(state.update.available ? t('updateAvailableToast', { version: state.update.version }) : t(state.update.error ? 'updateCheckFailed' : 'upToDate'));
+        const { available, error, version } = state.update;
+        toast(available ? t('updateAvailableToast', { version }) : t(error ? 'updateCheckFailed' : 'upToDate'), error ? 'error' : 'notification');
       });
     }
   }
@@ -848,7 +870,7 @@ function renderHints() {
     parts.push(hint('B', t('back')));
   } else if (state.tab === 'settings') {
     const id = state.settingRows[state.focus.settings] ?? '';
-    if (['music', 'uiSounds', 'showFps', 'musicVolume', 'language'].includes(id)) parts.push(hint('A', t('change')));
+    if (['music', 'uiSounds', 'showFps', 'musicVolume', 'sfxVolume', 'language'].includes(id)) parts.push(hint('A', t('change')));
     if (['addStore', 'backup', 'restore'].includes(id)) parts.push(hint('A', t('select')));
     if (id === 'update') parts.push(hint('A', state.update?.available ? t('update') : t('check')));
     if (id.startsWith('store:')) parts.push(hint('Y', t('remove')));
@@ -869,6 +891,7 @@ function showDialog(text, onYes) {
   state.dialog = { text, onYes };
   ui.dialog.innerHTML = `<div class="box"><p>${escapeHtml(text)}</p><span class="hint">A</span> ${t('yes')} &nbsp;&nbsp; <span class="hint">B</span> ${t('no')}</div>`;
   ui.dialog.hidden = false;
+  cue('menu_open');
   renderHints();
 }
 
@@ -881,6 +904,7 @@ function closeDialog() {
 function openPicker(title, list, onPick) {
   state.picker = { title, items: list, focus: 0, onPick };
   renderPicker();
+  cue('menu_open');
   renderHints();
 }
 
@@ -898,9 +922,11 @@ function renderPicker() {
 }
 
 let toastTimer = 0;
-function toast(text) {
+// sound: 'notification', or 'error' for a failure and 'save_done' for something saved or installed.
+function toast(text, sound = 'notification') {
   ui.toast.textContent = text;
   ui.toast.hidden = false;
+  cue(sound);
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (ui.toast.hidden = true), 4500);
 }
@@ -953,15 +979,15 @@ async function pollJobs() {
       // ended before the launcher loaded was reported back then.
       const changed = before[id] && before[id].state !== job.state;
       if (id === '__app__') {
-        if (changed && job.state === 'error') toast(t('updateFailed', { error: job.error }));
+        if (changed && job.state === 'error') toast(t('updateFailed', { error: job.error }), 'error');
         continue;
       }
       if (changed && job.state === 'done') {
         await Promise.all([refreshLibrary(), refreshStore()]);
         const game = state.store.games.find((g) => g.id === id);
-        if (!downloads.has(id)) toast(t('readyToPlay', { title: game?.title ?? id }));
+        if (!downloads.has(id)) toast(t('readyToPlay', { title: game?.title ?? id }), 'save_done');
       }
-      if (changed && job.state === 'error') toast(t('downloadFailed', { error: job.error }));
+      if (changed && job.state === 'error') toast(t('downloadFailed', { error: job.error }), 'error');
     }
     if (!keyboard.active) render();
     const active = Object.values(state.jobs).some((j) => ACTIVE_JOB.includes(j.state));
@@ -974,6 +1000,8 @@ async function pollJobs() {
 // ---------- Actions ----------
 
 async function play(game) {
+  if (state.launching) return;
+  state.launching = true;
   try {
     const { url } = await api(`/api/launch/${game.id}`, 'POST');
     save();
@@ -982,9 +1010,12 @@ async function play(game) {
     } catch {
       // The focus may then land on another game; nothing else is lost.
     }
+    // The launch sound starts and the music fades out, then the page goes.
+    await audio.launch();
     location.href = url;
   } catch (e) {
-    toast(t('cannotStart', { error: e.message }));
+    state.launching = false;
+    toast(t('cannotStart', { error: e.message }), 'error');
   }
 }
 
@@ -1001,7 +1032,7 @@ async function install(game) {
     downloads.delete(game.id);
     delete state.jobs[game.id];
     render();
-    toast(t('cannotDownload', { error: e.message }));
+    toast(t('cannotDownload', { error: e.message }), 'error');
   }
 }
 
@@ -1022,46 +1053,88 @@ function setFocus(next) {
   scrollToFocus();
   renderHints();
   renderCompanion();
-  audio.sound('move');
 }
 
 // Up and down move between rows (skipping section titles), keeping the
 // column where possible; left and right step through the games in order.
+// Returns whether the focus moved.
 function moveRow(delta) {
   const focus = state.focus[state.tab];
   const row = state.rows.findIndex((r) => r.includes(focus));
   const target = state.rows[row + delta];
-  if (!target) return;
+  if (!target) return false;
   const column = state.rows[row].indexOf(focus);
   setFocus(target[Math.min(column, target.length - 1)]);
+  return true;
 }
 
 function switchTab(delta) {
   state.tab = TABS[(TABS.indexOf(state.tab) + delta + TABS.length) % TABS.length];
   state.scroll = 0;
   save();
-  audio.sound('tab');
+  cue('tab_switch');
   render();
   if (state.tab === 'store') refreshStore().then(render);
   if (state.tab === 'settings') Promise.all([refreshInfo(), refreshStore()]).then(render);
 }
 
-function onButton(button) {
-  audio.ensure();
-  if (keyboard.handle(button)) {
-    audio.sound(button === 'B' ? 'back' : button === 'A' ? 'select' : 'move');
+// ---------- Sounds ----------
+
+// A button press plays one sound. What the press does cues a sound and the
+// last cue wins, so a press that opens a dialog plays only the dialog's
+// sound. A cue outside a press (a toast, a finished download) plays at once.
+// Focus that code moves (a screen opening, a restored selection) is silent.
+let pressing = false;
+let cued = null;
+
+function cue(name) {
+  if (pressing) cued = name;
+  else audio.play(name);
+}
+
+// Moving the focus: a press ticks, a held direction ticks more quietly, and
+// hitting an edge thuds once, not on every repeat while held against it.
+let atEdge = false;
+function cueMove(moved, repeat) {
+  if (moved) cue(repeat ? 'nav_scroll' : 'nav_move');
+  else if (!repeat || !atEdge) cue('nav_edge');
+  atEdge = !moved;
+}
+
+// ---------- Buttons ----------
+
+// repeat: a held direction's auto-repeat, not a press.
+function onButton(button, repeat = false) {
+  audio.unlock();
+  if (state.launching) return; // the page is about to go to the game
+  pressing = true;
+  cued = null;
+  try {
+    handleButton(button, repeat);
+  } finally {
+    pressing = false;
+    if (cued) audio.play(cued);
+  }
+}
+
+function handleButton(button, repeat) {
+  const used = keyboard.handle(button);
+  if (used) {
+    const sound = { move: repeat ? 'nav_scroll' : 'nav_move', key: 'key_type', done: 'confirm', cancel: 'menu_close' }[used];
+    // What the typed text led to (an error toast, say) has already cued its own.
+    if (sound && !cued) cue(sound);
     if (!keyboard.active) renderHints();
     return;
   }
 
   if (celebration.active) {
     if (button === 'A') {
-      audio.sound('select');
+      cue('confirm');
       const game = celebration.hide();
       state.detail = null;
       play(game);
     } else if (button === 'B') {
-      audio.sound('back');
+      cue('menu_close');
       celebration.hide();
       render();
       celebrateNext();
@@ -1073,11 +1146,11 @@ function onButton(button) {
     if (button === 'A') {
       const { onYes } = state.dialog;
       closeDialog();
-      audio.sound('select');
+      cue('confirm');
       onYes();
     } else if (button === 'B') {
       closeDialog();
-      audio.sound('back');
+      cue('menu_close');
     }
     return;
   }
@@ -1085,19 +1158,20 @@ function onButton(button) {
   if (state.picker) {
     const p = state.picker;
     if (button === 'UP' || button === 'DOWN') {
-      p.focus = Math.max(0, Math.min(p.items.length - 1, p.focus + (button === 'UP' ? -1 : 1)));
+      const next = Math.max(0, Math.min(p.items.length - 1, p.focus + (button === 'UP' ? -1 : 1)));
+      cueMove(next !== p.focus, repeat);
+      p.focus = next;
       renderPicker();
-      audio.sound('move');
     } else if (button === 'A') {
       state.picker = null;
       renderPicker();
-      audio.sound('select');
+      cue('confirm');
       p.onPick(p.items[p.focus]);
     } else if (button === 'B') {
       state.picker = null;
       renderPicker();
       renderHints();
-      audio.sound('back');
+      cue('menu_close');
     }
     return;
   }
@@ -1107,11 +1181,14 @@ function onButton(button) {
     const installed = state.library.some((l) => l.id === g?.id);
     if (button === 'B') {
       state.detail = null;
-      audio.sound('back');
+      cue('back');
       render();
     } else if (button === 'A' && g) {
-      audio.sound('select');
-      if (downloading(g.id)) return;
+      if (downloading(g.id)) {
+        cue('error');
+        return;
+      }
+      cue('confirm');
       if (!installed || g.update) install(g);
       else play(g);
     } else if (button === 'Y' && g && installed && !downloading(g.id)) {
@@ -1125,18 +1202,13 @@ function onButton(button) {
     return;
   }
   if (button === 'B') {
-    audio.sound('back');
     showDialog(t('quitConfirm'), () => api('/api/quit', 'POST'));
     return;
   }
 
   if (state.tab === 'settings') {
-    if (button === 'UP') moveRow(-1);
-    else if (button === 'DOWN') moveRow(1);
-    else {
-      if (button === 'A') audio.sound('select');
-      settingsAction(button);
-    }
+    if (button === 'UP' || button === 'DOWN') cueMove(moveRow(button === 'UP' ? -1 : 1), repeat);
+    else settingsAction(button, repeat);
     return;
   }
 
@@ -1147,19 +1219,19 @@ function onButton(button) {
   switch (button) {
     case 'LEFT':
       if (focus > 0) setFocus(focus - 1);
+      cueMove(focus > 0, repeat);
       break;
     case 'RIGHT':
       if (focus < list.length - 1) setFocus(focus + 1);
+      cueMove(focus < list.length - 1, repeat);
       break;
     case 'UP':
-      moveRow(-1);
-      break;
     case 'DOWN':
-      moveRow(1);
+      cueMove(moveRow(button === 'UP' ? -1 : 1), repeat);
       break;
     case 'A':
       if (!game) break;
-      audio.sound('select');
+      cue('confirm');
       if (state.tab === 'store') {
         state.detail = game.id;
         render();
@@ -1170,7 +1242,7 @@ function onButton(button) {
     case 'X':
       if (state.tab === 'library' && game) {
         state.detail = game.id;
-        audio.sound('select');
+        cue('confirm');
         render();
       } else if (state.tab === 'store') {
         // The store refreshes itself whenever the tab opens, so X filters it.
@@ -1178,7 +1250,7 @@ function onButton(button) {
         state.focus.store = 0;
         state.scroll = 0;
         save();
-        audio.sound('tab');
+        cue(state.hideInstalled ? 'toggle_on' : 'toggle_off');
         render();
       }
       break;
@@ -1188,14 +1260,14 @@ function onButton(button) {
       state.focus[state.tab] = 0;
       state.scroll = 0;
       save();
-      audio.sound('tab');
+      cue('tab_switch');
       render();
       break;
     }
     case 'SELECT':
       state.layout[state.tab] = state.layout[state.tab] === 'grid' ? 'list' : 'grid';
       save();
-      audio.sound('tab');
+      cue('tab_switch');
       render();
       break;
   }
@@ -1209,7 +1281,7 @@ const keys = new Set();
 const tapped = new Set();
 addEventListener('keydown', (e) => {
   // Any real key press lets the page start audio (see unlockAudio).
-  audio.ensure();
+  audio.unlock(e.isTrusted);
   const b = KEYMAP[e.code];
   if (b) {
     keys.add(b);
@@ -1218,6 +1290,11 @@ addEventListener('keydown', (e) => {
   }
 });
 addEventListener('keyup', (e) => keys.delete(KEYMAP[e.code]));
+// So does a touch or a click (Android, the website).
+addEventListener('pointerdown', (e) => audio.unlock(e.isTrusted));
+// Back from the browser's page cache after starting a game (Back on the
+// website): the page had faded its sound out and stopped taking buttons.
+addEventListener('pageshow', (e) => e.persisted && state.launching && location.reload());
 
 const held = new Map(); // button -> time it was first held
 const repeatAt = new Map(); // button -> time of the next repeat
@@ -1245,7 +1322,7 @@ function poll(now) {
       if (now > readyAt) onButton(b);
     } else if (REPEAT.has(b) && now >= repeatAt.get(b)) {
       repeatAt.set(b, now + 110);
-      onButton(b);
+      onButton(b, true);
     }
   }
   requestAnimationFrame(poll);
@@ -1257,7 +1334,7 @@ function poll(now) {
 // keyboard can take a moment to appear.
 async function unlockAudio() {
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (audio.ctx?.state === 'running') return;
+    if (audio.running) return;
     await api('/api/unlock-audio', 'POST').catch(() => {});
     await new Promise((r) => setTimeout(r, 1200));
   }
@@ -1278,6 +1355,9 @@ async function unlockAudio() {
   addEventListener('resize', applyScreens);
   refreshScreens();
   render();
+  // The boot sound (or, back from a game, the music) as soon as audio may play.
+  audio.start(returning);
+  if (state.settings?.music || state.settings?.uiSounds) unlockAudio();
   // Buttons work from the start. The store may need the network, so it fills
   // in when it answers instead of holding up the launcher.
   requestAnimationFrame(poll);
@@ -1296,13 +1376,12 @@ async function unlockAudio() {
   }
   render();
   const { notice } = await api('/api/notice').catch(() => ({}));
-  if (notice === 'restored') toast(t('restored'));
+  if (notice === 'restored') toast(t('restored'), 'save_done');
   else if (notice?.startsWith('updated:')) toast(t('updatedTo', { version: notice.slice(8) }));
-  else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }));
+  else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }), 'error');
   else if (state.info?.gpu === 'libmali') toast(t('gpuToast'));
   else if (state.info?.platform === 'android' && webviewVersion() < 94) toast(t('webviewOld'));
   pollJobs();
-  if (state.settings?.music || state.settings?.uiSounds) unlockAudio();
   await checkUpdate();
   renderTabs();
   if (state.tab === 'settings') render();

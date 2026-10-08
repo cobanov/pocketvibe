@@ -45,7 +45,6 @@ class PocketVibe private constructor(private val context: Context) {
         }
 
         private val GAME_ID = Regex("[a-z0-9][a-z0-9-]{0,63}")
-        private val AUDIO_NAME = Regex("[a-z0-9-]{1,64}\\.wav")
         private val STORE_URL = Regex("https?://\\S+")
         private const val SHELL_PATH = "/__pocketvibe__/"
         private val SHELL_FILES = setOf("play.html", "play.css", "play.js", "i18n.js", "screens.js")
@@ -134,15 +133,17 @@ class PocketVibe private constructor(private val context: Context) {
                 path.deleteRecursively()
             }
         }
+        File(cache, "audio").deleteRecursively() // menu music older launchers rendered and kept here
     }
 
     // ---------- Settings and plays ----------
 
     private fun defaultSettings() = JSONObject()
         .put("language", if (Locale.getDefault().language == "tr") "tr" else "en")
-        .put("music", true)
-        .put("musicVolume", 0.5)
-        .put("uiSounds", true)
+        .put("music", true) // background music in the menus
+        .put("musicVolume", 0.8)
+        .put("uiSounds", true) // sound effects
+        .put("sfxVolume", 0.8)
         .put("showFps", false)
         .put("stores", JSONArray().put(defaultStore))
 
@@ -161,7 +162,7 @@ class PocketVibe private constructor(private val context: Context) {
             val value = changes.get(key)
             when {
                 default is Boolean && value is Boolean -> settings.put(key, value)
-                key == "musicVolume" && value is Number -> settings.put(key, value.toDouble().coerceIn(0.0, 1.0))
+                default is Double && value is Number -> settings.put(key, value.toDouble().coerceIn(0.0, 1.0))
                 default is String && value is String -> settings.put(key, value)
                 key == "stores" && value is JSONArray -> {
                     val urls = LinkedHashSet<String>()
@@ -528,14 +529,14 @@ class PocketVibe private constructor(private val context: Context) {
     private fun launcherOrigin() = "http://127.0.0.1:${launcher.port}"
 
     /** The page this app opened, and only it: right host, right origin, the
-     *  session cookie, and (but for covers and cached audio) the header pages
-     *  on other origins cannot send without a preflight. */
+     *  session cookie, and (but for covers) the header pages on other origins
+     *  cannot send without a preflight. */
     private fun allowed(request: Request): Boolean {
         if (request.header("host") !in setOf("127.0.0.1:${launcher.port}", "localhost:${launcher.port}")) return false
         if (!request.path.startsWith("/api/")) return true
         if (request.header("origin") !in setOf(null, launcherOrigin())) return false
         if (request.cookie("pv") != token) return false
-        if (request.method == "GET" && (request.path.startsWith("/api/cover/") || request.path.startsWith("/api/cache/"))) return true
+        if (request.method == "GET" && request.path.startsWith("/api/cover/")) return true
         return request.header("x-pocketvibe") == "1"
     }
 
@@ -546,7 +547,6 @@ class PocketVibe private constructor(private val context: Context) {
             return when (request.method) {
                 "GET" -> apiGet(path, request)
                 "POST" -> apiPost(path, request)
-                "PUT" -> apiPut(path, request)
                 else -> Response.error("not allowed", 405)
             }
         }
@@ -574,11 +574,6 @@ class PocketVibe private constructor(private val context: Context) {
         path == "/api/update" -> Response.json(JSONObject().put("current", version).put("available", false))
         path == "/api/notice" -> Response.json(JSONObject().put("notice", notice ?: JSONObject.NULL)).also { notice = null }
         path == "/api/jobs" -> Response.json(synchronized(jobs) { JSONObject().apply { for ((gid, job) in jobs) put(gid, JSONObject(job.toString())) } })
-        path.startsWith("/api/cache/") -> {
-            val file = File(cache, "audio/${path.substringAfterLast('/')}")
-            if (!AUDIO_NAME.matches(file.name) || !file.exists()) Response.error("not cached", 404)
-            else Response(200, "audio/wav", file = file)
-        }
         path.startsWith("/api/cover/") -> {
             val gid = path.substringAfterLast('/')
             val file = if (GAME_ID.matches(gid)) cover(gid) else null
@@ -586,14 +581,6 @@ class PocketVibe private constructor(private val context: Context) {
             else Response(200, imageType(file), file = file)
         }
         else -> Response.error("unknown", 404)
-    }
-
-    private fun apiPut(path: String, request: Request): Response {
-        val name = path.substringAfterLast('/')
-        if (!path.startsWith("/api/cache/") || !AUDIO_NAME.matches(name) || request.body.isEmpty()) return Response.error("not allowed", 400)
-        File(cache, "audio").mkdirs()
-        File(cache, "audio/$name").writeBytes(request.body)
-        return Response.json(JSONObject().put("ok", true))
     }
 
     private fun apiPost(path: String, request: Request): Response {

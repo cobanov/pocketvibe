@@ -9,6 +9,8 @@ const STATE_KEY = '/__demo/state';
 const DOWNLOAD_MS = 2200; // how long a pretend download takes
 const INSTALL_MS = 700; // then unpacking
 const FIRST_GAMES = 5; // installed on a first visit, so the Library has games
+// The service's settings; the demo starts without music.
+const SETTINGS = { language: 'en', music: false, musicVolume: 0.8, uiSounds: true, sfxVolume: 0.8, showFps: false, stores: [STORE] };
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
@@ -57,11 +59,13 @@ async function getState() {
   if (state) return state;
   const saved = await (await caches.open(CACHE)).match(STATE_KEY);
   state = saved ? await saved.json() : null;
+  // Settings added since the visitor's last visit get their defaults.
+  if (state) state.settings = { ...SETTINGS, ...state.settings };
   if (!state) {
     const { games, online } = await getCatalog();
     const popular = [...games].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, FIRST_GAMES);
     state = {
-      settings: { language: 'en', music: false, musicVolume: 0.5, uiSounds: true, showFps: false, stores: [STORE] },
+      settings: { ...SETTINGS },
       installed: Object.fromEntries(popular.map((g) => [g.id, { version: g.version, last: 0, plays: 0 }])),
       jobs: {},
       backups: [],
@@ -119,16 +123,6 @@ function stamp(date) {
 async function handle(request, path) {
   const method = request.method;
   await getState();
-
-  // Audio the launcher renders once (menu music) and saves.
-  if (path.startsWith('/api/cache/')) {
-    const cache = await caches.open(CACHE);
-    if (method === 'PUT') {
-      await cache.put(path, new Response(await request.arrayBuffer(), { headers: { 'Content-Type': 'audio/wav' } }));
-      return json({ ok: true });
-    }
-    return (await cache.match(path)) ?? json({ error: 'not cached' }, 404);
-  }
 
   const { name, games, online } = await getCatalog();
   if (path.startsWith('/api/cover/')) {

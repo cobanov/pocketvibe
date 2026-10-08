@@ -64,7 +64,9 @@ export class Keyboard {
     this.onDone?.(value);
   }
 
-  // Returns true when the keyboard used the button.
+  // While open the keyboard takes every button, and says what it did (for the
+  // sound): 'move', 'key' (typed or deleted), 'done', 'cancel' or 'none'.
+  // Returns false when it is closed.
   handle(button) {
     if (!this.active) return false;
     const rowLength = () => ROWS[this.row].length;
@@ -83,23 +85,25 @@ export class Keyboard {
         this.col = Math.min(rowLength() - 1, Math.floor(ratio * rowLength()));
         break;
       }
-      case 'A':
-        this.press(ROWS[this.row][this.col]);
-        return true;
+      case 'A': {
+        const key = ROWS[this.row][this.col];
+        this.press(key);
+        return key === 'DONE' ? 'done' : 'key';
+      }
       case 'B':
         this.press('DEL');
-        return true;
+        return 'key';
       case 'START':
         this.finish();
-        return true;
+        return 'done';
       case 'SELECT':
         this.close();
         this.onCancel?.();
-        return true;
+        return 'cancel';
       default:
-        return true;
+        return 'none';
     }
     this.render();
-    return true;
+    return 'move';
   }
 }
