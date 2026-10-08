@@ -1,6 +1,6 @@
 :root {
   /* One left and right edge for the bars and the content, and bar heights
-     that leave room for exactly two rows of cards. */
+     that leave room for exactly two rows of cards on a 720x480 screen. */
   --gutter: 24px;
   --header: 48px;
   --footer: 36px;
@@ -21,8 +21,8 @@
 html,
 body {
   margin: 0;
-  width: 720px;
-  height: 480px;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
@@ -30,8 +30,23 @@ body {
   cursor: none;
 }
 
+/* The launcher fills its screen: the window, or the main screen of a
+   handheld with two (launcher.js places it, and enlarges it on a big one). */
+#app {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  transform-origin: 0 0;
+}
+
 /* Three columns with equal sides, so the tabs sit in the middle of the screen. */
 header {
+  flex: none;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -39,6 +54,20 @@ header {
   height: var(--header);
   padding: 0 var(--gutter);
   background: var(--panel);
+}
+
+/* A narrow screen keeps the tabs and the status, not the name, and has
+   narrower edges. */
+.narrow {
+  --gutter: 16px;
+}
+
+.narrow header {
+  grid-template-columns: auto 1fr;
+}
+
+.narrow .brand {
+  display: none;
 }
 
 .brand {
@@ -109,7 +138,8 @@ nav {
 /* The gap under the header is a margin, not padding, so rows scrolled past
    the top are clipped at the gap instead of showing in it. */
 main {
-  height: calc(480px - var(--header) - var(--footer) - 10px);
+  flex: 1;
+  min-height: 0;
   margin-top: 10px;
   padding: 0 var(--gutter);
   overflow: hidden;
@@ -152,11 +182,11 @@ main {
 }
 
 #scrollbar {
-  position: fixed;
+  position: absolute;
   top: calc(var(--header) + 10px);
+  bottom: calc(var(--footer) + 10px);
   right: 9px;
   width: 5px;
-  height: calc(480px - var(--header) - var(--footer) - 20px);
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.08);
 }
@@ -178,11 +208,12 @@ main {
   color: var(--muted);
 }
 
-/* Library: a grid of cards */
+/* Library: a grid of cards, as many columns as the screen's width holds
+   (launcher.js sets --columns: three on 640 to 720 pixels) */
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(var(--columns, 3), 1fr);
   gap: 12px 24px;
 }
 
@@ -338,7 +369,7 @@ main {
 /* A finished download: the cover in the middle, a glow and fireworks */
 
 #celebrate {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 20;
   display: flex;
@@ -626,7 +657,7 @@ main {
 
 .detail .cover-wrap {
   flex: none;
-  width: 300px;
+  width: min(300px, 45%);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -674,6 +705,7 @@ main {
 }
 
 footer {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -691,15 +723,25 @@ footer b {
 #hints {
   display: flex;
   gap: 18px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.narrow #hints {
+  gap: 12px;
 }
 
 #position {
+  flex: none;
+  margin-left: 12px;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 700;
 }
 
 #dialog {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
@@ -715,7 +757,7 @@ footer b {
 }
 
 #dialog .box {
-  width: 420px;
+  width: min(420px, calc(100% - 2 * var(--gutter)));
   padding: 24px;
   border-radius: 12px;
   background: var(--panel);
@@ -729,11 +771,11 @@ footer b {
 }
 
 #toast {
-  position: fixed;
+  position: absolute;
   left: 50%;
   bottom: 48px;
   z-index: 10;
-  max-width: 640px;
+  max-width: min(640px, calc(100% - 2 * var(--gutter)));
   padding: 12px 20px;
   border-radius: 10px;
   background: var(--accent);
@@ -820,7 +862,7 @@ footer b {
 /* Picker (e.g. choosing a backup) */
 
 #picker {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
@@ -829,8 +871,8 @@ footer b {
 }
 
 #picker .box {
-  width: 460px;
-  max-height: 380px;
+  width: min(460px, calc(100% - 2 * var(--gutter)));
+  max-height: min(380px, calc(100% - 40px));
   padding: 20px;
   overflow: hidden;
   border-radius: 12px;
@@ -859,7 +901,7 @@ footer b {
 /* On-screen keyboard */
 
 #keyboard {
-  position: fixed;
+  position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
@@ -868,7 +910,7 @@ footer b {
 }
 
 .keyboard {
-  width: 660px;
+  width: min(660px, calc(100% - 24px));
   padding: 16px;
   border-radius: 12px;
   background: var(--panel);
@@ -975,4 +1017,56 @@ footer b {
 
 .row .state.progress {
   width: 170px;
+}
+
+/* The second screen, on handhelds that have one: the focused game in full,
+   or the clock when no game is focused. */
+
+#companion {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 20px var(--gutter);
+  overflow: hidden;
+  background: var(--bg);
+  transform-origin: 0 0;
+}
+
+#companion[hidden] {
+  display: none;
+}
+
+#companion .description {
+  -webkit-line-clamp: 6;
+}
+
+#companion .controls td:first-child {
+  white-space: nowrap;
+}
+
+.companion-idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.companion-idle .brand {
+  font-size: 34px;
+}
+
+.companion-idle .clock {
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.companion-idle .sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--muted);
 }

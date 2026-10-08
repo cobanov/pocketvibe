@@ -1,5 +1,6 @@
 // Drives the launcher in headless Chrome with key presses and saves screenshots.
 // Usage: node ui-shots.mjs <url> <outDir> <step>...   step = "key:KeyW" | "shot:name" | "wait:ms"
+// SIZE=640x480 sets the window (default 720x480); CDP_PORT another debugging port.
 // FONTS=<dir> loads DejaVuSans.ttf and DejaVuSans-Bold.ttf from that folder (copy
 // them from the handheld's runtime, usr/share/fonts/truetype/dejavu) so text
 // takes the same space as on the handheld.
@@ -9,10 +10,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const [url, outDir, ...steps] = process.argv.slice(2);
-const port = 9334;
+const port = Number(process.env.CDP_PORT || 9334);
+const [width, height] = (process.env.SIZE || '720x480').split('x').map(Number);
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
   '--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars',
-  '--window-size=720,480', `--remote-debugging-port=${port}`,
+  `--window-size=${width},${height}`, `--remote-debugging-port=${port}`,
   `--user-data-dir=${mkdtempSync(join(tmpdir(), 'ui-'))}`, 'about:blank',
 ], { stdio: 'ignore' });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -33,7 +35,7 @@ ws.onmessage = (ev) => {
 const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
 await send('Runtime.enable');
 await send('Page.enable');
-await send('Emulation.setDeviceMetricsOverride', { width: 720, height: 480, deviceScaleFactor: 1, mobile: false });
+await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
 if (process.env.FONTS) {
   const face = (file, weight) =>
     `@font-face { font-family: 'DejaVu Sans'; font-weight: ${weight}; src: url(data:font/ttf;base64,${readFileSync(join(process.env.FONTS, file)).toString('base64')}); }`;

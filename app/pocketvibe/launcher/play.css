@@ -1,0 +1,138 @@
+/* The game shell (play.js). Colors as in launcher.css. */
+
+:root {
+  --gutter: 24px;
+  --bg: #0f1016;
+  --panel: #1a1c26;
+  --text: #f2f2f5;
+  --muted: #9a9db0;
+  --accent: #ffc83d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: var(--text);
+  font: 18px/1.3 'DejaVu Sans', Verdana, sans-serif;
+  cursor: none;
+}
+
+#game,
+#side {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+}
+
+#game {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+/* Always 720x480 inside, like the handheld it was made for; scaled to fit. */
+#game iframe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: 720px;
+  height: 480px;
+  border: 0;
+  transform-origin: 0 0;
+}
+
+#side {
+  background: var(--bg);
+}
+
+#side[hidden] {
+  display: none;
+}
+
+.side-inner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px var(--gutter);
+  transform-origin: 0 0;
+}
+
+.side-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.side-cover {
+  flex: none;
+  width: 200px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: var(--panel) center / cover;
+}
+
+.side-title {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.side-meta {
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.side-heading {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.controls {
+  border-collapse: collapse;
+  font-size: 16px;
+}
+
+.controls td {
+  padding: 3px 16px 3px 0;
+  vertical-align: top;
+}
+
+.controls td:first-child {
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--accent);
+}
+
+.leave {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.hint {
+  min-width: 24px;
+  padding: 0 5px;
+  border: 2px solid var(--muted);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}

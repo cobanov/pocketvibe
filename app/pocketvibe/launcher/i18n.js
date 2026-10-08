@@ -95,6 +95,12 @@ const STRINGS = {
   storage: { en: 'Storage', tr: 'Depolama' },
   storageValue: { en: 'Games {games} · {free} free', tr: 'Oyunlar {games} · {free} boş' },
   ipAddress: { en: 'IP address', tr: 'IP adresi' },
+  gpuDriver: { en: 'GPU driver', tr: 'GPU sürücüsü' },
+  gpuSlow: { en: 'libmali: games run slowly', tr: 'libmali: oyunlar yavaş çalışır' },
+  gpuToast: {
+    en: 'Games run slowly with the libmali GPU driver. Choose Panfrost in the ROCKNIX system settings and restart.',
+    tr: "libmali GPU sürücüsüyle oyunlar yavaş çalışır. ROCKNIX sistem ayarlarından Panfrost'u seçip yeniden başlat.",
+  },
   about: { en: 'About', tr: 'Hakkında' },
   version: { en: 'Version', tr: 'Sürüm' },
   madeBy: { en: 'Made by', tr: 'Yapan' },
@@ -114,6 +120,10 @@ const STRINGS = {
   delete: { en: 'Delete', tr: 'Sil' },
   done: { en: 'Done', tr: 'Tamam' },
   cancel: { en: 'Cancel', tr: 'Vazgeç' },
+
+  // Game shell, on the second screen
+  controls: { en: 'Controls', tr: 'Kontroller' },
+  holdToLeave: { en: 'Hold to go back to PocketVibe', tr: "PocketVibe'a dönmek için basılı tut" },
 };
 
 let language = 'en';

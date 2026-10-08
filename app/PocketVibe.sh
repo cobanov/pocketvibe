@@ -37,7 +37,10 @@ fi
 
 python3 "$APP/pocketvibed.py" >/tmp/pocketvibed.log 2>&1 &
 DAEMON=$!
-trap 'kill $DAEMON 2>/dev/null' EXIT
+# On a handheld with two screens, PocketVibe turns the second one on while it
+# runs (see screens.py); it goes off again on the way out.
+SCREENS="python3 $APP/screens.py restore"
+trap 'kill $DAEMON 2>/dev/null; $SCREENS 2>/dev/null' EXIT
 trap 'exit 1' INT TERM
 
 # Wait until the local service answers, up to 15 s on a slow card.
@@ -68,7 +71,7 @@ done
   pkill -KILL -x cog
 ) &
 WATCH=$!
-trap 'kill $DAEMON $WATCH 2>/dev/null' EXIT
+trap 'kill $DAEMON $WATCH 2>/dev/null; $SCREENS 2>/dev/null' EXIT
 
 # The browser is reopened on the launcher whenever it closes, unless the app
 # was quit on purpose: pocketvibed closes it to leave a game it cannot reach,

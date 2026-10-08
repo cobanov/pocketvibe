@@ -33,11 +33,13 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import screens
+
 APP = Path(__file__).resolve().parent
 HOME = Path(os.environ.get('POCKETVIBE_HOME', '/storage/pocketvibe'))
 GAMES = HOME / 'games'
 CACHE = HOME / 'cache'
-PORT = 8730
+PORT = int(os.environ.get('POCKETVIBE_PORT', 8730))  # another port only to test beside a running copy
 CONFIG = json.loads((APP / 'config.json').read_text())
 VERSION = CONFIG.get('version', '0.1.0')
 # Where new versions of the app are announced: GitHub's "latest release" API.
@@ -67,6 +69,10 @@ BACKUPS = HOME / 'backups'
 BACKUP_NAME = re.compile(r'saves-\d{8}-\d{6}\.zip')
 AUDIO_CACHE = CACHE / 'audio'  # audio the launcher rendered once (menu music)
 AUDIO_NAME = re.compile(r'[a-z0-9-]{1,64}\.wav')
+# The game shell (see game_url) is served on each game's own port under this
+# path, so the game inside it keeps its origin and its saves.
+SHELL_PATH = '/__pocketvibe__/'
+SHELL_FILES = ('play.html', 'play.css', 'play.js', 'i18n.js', 'screens.js')  # from the launcher's folder
 
 EV_SYN, EV_KEY = 0, 1
 BTN_SELECT, BTN_START = 314, 315
@@ -387,10 +393,19 @@ def network_address():
         return None
 
 
+def gpu_driver():
+    """'libmali' when the GPU runs Arm's own driver, else None. ROCKNIX picks
+    it by default on some Rockchip handhelds (the RG DS). The browser runtime
+    draws with Mesa, which needs Panfrost: with libmali it falls back to the
+    CPU. The kernel side of libmali is the only one with /dev/mali0. (ROCKNIX's
+    gpudriver tool would say too, but it writes a default setting when asked.)"""
+    return 'libmali' if Path('/dev/mali0').exists() else None
+
+
 def device_info():
     usage = shutil.disk_usage(HOME if HOME.exists() else '/')
     games_size = sum(f.stat().st_size for f in GAMES.rglob('*') if f.is_file()) if GAMES.exists() else 0
-    return {'version': VERSION, 'free': usage.free, 'total': usage.total, 'games': games_size, 'ip': network_address()}
+    return {'version': VERSION, 'free': usage.free, 'total': usage.total, 'games': games_size, 'ip': network_address(), 'gpu': gpu_driver()}
 
 
 def list_backups():
@@ -490,7 +505,7 @@ def cover_path(gid):
 
 
 class GameHandler(SimpleHTTPRequestHandler):
-    """Serves one game's files."""
+    """Serves one game's files, and the game shell under SHELL_PATH."""
 
     def log_message(self, *args):
         pass
@@ -498,6 +513,12 @@ class GameHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Cache-Control', 'no-cache')
         super().end_headers()
+
+    def translate_path(self, path):
+        route = urllib.parse.urlsplit(path).path
+        if route.startswith(SHELL_PATH) and route[len(SHELL_PATH):] in SHELL_FILES:
+            return str(APP / 'launcher' / route[len(SHELL_PATH):])
+        return super().translate_path(path)
 
 
 def version_tuple(text):
@@ -640,7 +661,21 @@ def game_url(gid):
             threading.Thread(target=server.serve_forever, daemon=True).start()
             game_servers[gid] = (server, port)
         port = game_servers[gid][1]
-    perf = '&perf' if load_settings()['showFps'] else ''
+    settings = load_settings()
+    current = screens.layout()
+    if screens.needs_shell(current):
+        # Games are made for one 720x480 screen. On any other screen, or on
+        # two, the shell shows the game at that size, fitted to the main
+        # screen, and the game's controls on the second.
+        query = urllib.parse.urlencode({
+            'entry': meta['entry'],
+            'perf': int(settings['showFps']),
+            'lang': settings['language'],
+            'screens': ';'.join(f'{s["x"]},{s["y"]},{s["width"]},{s["height"]}' for s in current['screens']),
+            'primary': current['primary'],
+        })
+        return f'http://127.0.0.1:{port}{SHELL_PATH}play.html?{query}'
+    perf = '&perf' if settings['showFps'] else ''
     return f'http://127.0.0.1:{port}/{meta["entry"]}?handheld{perf}'
 
 
@@ -840,6 +875,9 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return self.send_json(load_settings())
         if route == '/api/info':
             return self.send_json(device_info())
+        if route == '/api/screens':
+            screens.span()
+            return self.send_json(screens.layout() or {'screens': None, 'primary': 0})
         if route == '/api/saves':
             return self.send_json(list_backups())
         if route.startswith('/api/cache/'):

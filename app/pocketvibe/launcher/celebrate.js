@@ -4,7 +4,8 @@
 
 const COLORS = ['#ffc83d', '#ffe08a', '#fff6d8', '#ffffff', '#8fe3ff'];
 const GRAVITY = 90; // px/s²
-// Rockets as (launch delay s, burst x, burst y), on a 720×480 screen.
+// Rockets as (launch delay s, burst x, burst y), on a 720×480 screen; other
+// screens move them to the same places.
 const ROCKETS = [
   [0.1, 170, 130],
   [0.45, 560, 110],
@@ -48,7 +49,17 @@ export class Celebration {
 
   start() {
     cancelAnimationFrame(this.frame);
-    const rockets = ROCKETS.map(([delay, x, y]) => ({ delay, x, y, fromX: x + (Math.random() - 0.5) * 80, done: false }));
+    // The canvas takes the screen's size, and the rockets their places on it.
+    const width = this.root.clientWidth || 720;
+    const height = this.root.clientHeight || 480;
+    if (this.canvas.width !== width || this.canvas.height !== height) {
+      this.canvas.width = width;
+      this.canvas.height = height;
+    }
+    const rockets = ROCKETS.map(([delay, x, y]) => {
+      [x, y] = [(x * width) / 720, (y * height) / 480];
+      return { delay, x, y, fromX: x + (Math.random() - 0.5) * 80, done: false };
+    });
     const sparks = [];
     const begin = performance.now();
     let last = begin;
@@ -67,7 +78,7 @@ export class Celebration {
         const k = Math.min((time - r.delay) / 0.4, 1);
         const ease = 1 - (1 - k) ** 2;
         const x = r.fromX + (r.x - r.fromX) * ease;
-        const y = 480 + (r.y - 480) * ease;
+        const y = height + (r.y - height) * ease;
         ctx.strokeStyle = 'rgba(255, 230, 170, 0.8)';
         ctx.lineWidth = 2;
         ctx.beginPath();

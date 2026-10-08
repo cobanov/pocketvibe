@@ -5,6 +5,7 @@ import { LANGUAGES, getLanguage, setLanguage, t } from './i18n.js';
 import { LauncherAudio } from './audio.js';
 import { Keyboard } from './keyboard.js';
 import { Celebration } from './celebrate.js';
+import { fitScreens, parseScreens, place, uiScale } from './screens.js';
 
 const PADMAP = { 0: 'B', 1: 'A', 2: 'X', 3: 'Y', 4: 'L', 5: 'R', 8: 'SELECT', 9: 'START', 12: 'UP', 13: 'DOWN', 14: 'LEFT', 15: 'RIGHT' };
 const KEYMAP = {
@@ -20,7 +21,9 @@ const VIEWS = {
   library: ['recent', 'az', 'categories'],
   store: ['latest', 'popular', 'az', 'categories'],
 };
-const COLUMNS = 3; // cards per row in the card layout
+// Cards per row: as many of this width (with the 24px gap) as the screen
+// holds, which is three on 640 to 720 pixels.
+const CARD_WIDTH = 176;
 // A download's ring fills smoothly and takes at least this long, so even a
 // small game that downloads in a blink shows its progress.
 const MIN_DOWNLOAD_MS = 1600;
@@ -28,6 +31,8 @@ const RING = 2 * Math.PI * 17; // circumference of the progress ring
 const CREDITS = 'Mert Cobanov · cobanov.dev\nmertcobanov@gmail.com · github.com/cobanov · x.com/mertcobanov';
 
 const ui = {
+  app: document.getElementById('app'),
+  companion: document.getElementById('companion'),
   main: document.querySelector('main'),
   content: document.getElementById('content'),
   hints: document.getElementById('hints'),
@@ -66,6 +71,8 @@ const state = {
   rows: [], // rows of item indices as laid out on screen, for up/down
   settingRows: [], // the focusable rows of the settings tab, in order
   scroll: 0, // how far the current tab is scrolled, in px
+  screens: null, // { screens: [{ x, y, width, height }], primary } from pocketvibed, or null for the window
+  columns: 3, // cards per row
 };
 state.focus.settings ??= 0;
 
@@ -188,15 +195,16 @@ function coverHtml(game) {
   return `<div class="cover" style="${p.style}"><span>${escapeHtml(p.initials)}</span></div>`;
 }
 
+// Covers on both screens: the content and the companion.
 function loadCovers() {
-  for (const el of ui.content.querySelectorAll('[data-id] .cover')) {
+  for (const el of document.querySelectorAll('[data-id] .cover')) {
     const id = el.closest('[data-id]').dataset.id;
     if (covers.has(id)) continue;
     covers.set(id, 'loading');
     const img = new Image();
     img.onload = () => {
       covers.set(id, 'ok');
-      for (const c of ui.content.querySelectorAll(`[data-id="${id}"] .cover`)) {
+      for (const c of document.querySelectorAll(`[data-id="${id}"] .cover`)) {
         c.style.backgroundImage = `url(/api/cover/${id})`;
         c.textContent = '';
       }
@@ -444,6 +452,7 @@ function settingsSections() {
       rows: [
         { id: 'storage', label: t('storage'), value: info.free ? t('storageValue', { games: sizeText(info.games) || '0 KB', free: sizeText(info.free) }) : '' },
         { id: 'ip', label: t('ipAddress'), value: info.ip ?? '' },
+        ...(info.gpu === 'libmali' ? [{ id: 'gpu', label: t('gpuDriver'), value: `<span class="update-badge">${t('gpuSlow')}</span>` }] : []),
       ],
     },
     {
@@ -600,11 +609,82 @@ function settingsAction(button) {
 
 // ---------- Rendering ----------
 
+function batteryText(s) {
+  return s.battery !== null ? `${s.charging ? '⚡' : ''}${s.battery}%` : '';
+}
+
 function renderStatus() {
   const s = state.status;
   if (!s) return;
-  const battery = s.battery !== null ? `${s.charging ? '⚡' : ''}${s.battery}%` : '';
-  ui.status.innerHTML = `<i class="wifi ${s.wifi ? 'on' : 'off'}" title="Wi-Fi"></i>${escapeHtml(s.time)}<span>${escapeHtml(battery)}</span>`;
+  ui.status.innerHTML = `<i class="wifi ${s.wifi ? 'on' : 'off'}" title="Wi-Fi"></i>${escapeHtml(s.time)}<span>${escapeHtml(batteryText(s))}</span>`;
+  if (ui.companion.dataset.idle) renderCompanion();
+}
+
+// ---------- Screens ----------
+
+// For trying layouts in a desktop browser: ?screens=0,0,640,480;640,0,640,480
+const screensParam = new URLSearchParams(location.search).get('screens');
+
+async function refreshScreens() {
+  if (screensParam) {
+    state.screens = { screens: parseScreens(screensParam), primary: 0 };
+  } else {
+    try {
+      // Also asks pocketvibed to spread the window over both screens.
+      state.screens = await api('/api/screens');
+    } catch {
+      // The window is the screen.
+    }
+  }
+  applyScreens();
+}
+
+// Place the launcher on the main screen and the companion on the second, and
+// fit the cards to the width. Runs again when the window changes size.
+function applyScreens() {
+  const { main, other } = fitScreens(state.screens?.screens, state.screens?.primary ?? 0, innerWidth, innerHeight);
+  const scale = uiScale(main);
+  const width = main.width / scale;
+  place(ui.app, main, scale);
+  ui.app.classList.toggle('narrow', width < 600);
+  ui.companion.hidden = !other;
+  if (other) place(ui.companion, other, uiScale(other));
+  const columns = Math.max(2, Math.min(6, Math.floor((width - 24) / (CARD_WIDTH + 24))));
+  ui.app.style.setProperty('--columns', columns);
+  const changed = columns !== state.columns;
+  state.columns = columns;
+  // Rows, scrolling and what is cut at the bottom all depend on the size.
+  if (changed || ui.app.dataset.size !== `${width}x${main.height / scale}`) {
+    ui.app.dataset.size = `${width}x${main.height / scale}`;
+    render();
+  }
+}
+
+// The game the second screen shows: the open detail, or the focused card.
+function companionGame() {
+  if (state.detail) return detailGame();
+  if (state.tab === 'settings' || (state.tab === 'store' && !state.storeLoaded)) return null;
+  return items()[state.focus[state.tab]] ?? null;
+}
+
+function renderCompanion() {
+  if (ui.companion.hidden) return;
+  const game = companionGame();
+  if (game) {
+    delete ui.companion.dataset.idle;
+    ui.companion.innerHTML = detailHtml(game);
+    loadCovers();
+    return;
+  }
+  ui.companion.dataset.idle = '1';
+  const s = state.status;
+  const sub = s ? `<i class="wifi ${s.wifi ? 'on' : 'off'}"></i>${escapeHtml(batteryText(s))}` : '';
+  ui.companion.innerHTML = `
+    <div class="companion-idle">
+      <div class="brand">PocketVibe</div>
+      <div class="clock">${escapeHtml(s?.time ?? '')}</div>
+      <div class="sub">${sub}</div>
+    </div>`;
 }
 
 function renderTabs() {
@@ -619,6 +699,11 @@ function renderTabs() {
 }
 
 function render() {
+  renderMain();
+  renderCompanion();
+}
+
+function renderMain() {
   renderTabs();
   renderStatus();
   if (state.detail) {
@@ -659,7 +744,7 @@ function render() {
         : `<div class="empty">${!state.store.online ? t('storeOffline') : state.store.games.length ? t('allInstalled') : t('storeEmpty')}</div>`;
   } else {
     const grid = state.layout[state.tab] === 'grid';
-    const perRow = grid ? COLUMNS : 1;
+    const perRow = grid ? state.columns : 1;
     let index = 0;
     let html = '';
     for (const section of groups) {
@@ -923,6 +1008,7 @@ function setFocus(next) {
   ui.content.querySelector(`[data-index="${next}"]`)?.classList.add('focus');
   scrollToFocus();
   renderHints();
+  renderCompanion();
   audio.sound('move');
 }
 
@@ -1170,6 +1256,9 @@ async function unlockAudio() {
   }
   refreshStatus();
   setInterval(refreshStatus, 20000);
+  applyScreens();
+  addEventListener('resize', applyScreens);
+  refreshScreens();
   render();
   // Buttons work from the start. The store may need the network, so it fills
   // in when it answers instead of holding up the launcher.
@@ -1181,6 +1270,7 @@ async function unlockAudio() {
   if (notice === 'restored') toast(t('restored'));
   else if (notice?.startsWith('updated:')) toast(t('updatedTo', { version: notice.slice(8) }));
   else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }));
+  else if (state.info?.gpu === 'libmali') toast(t('gpuToast'));
   pollJobs();
   if (state.settings?.music || state.settings?.uiSounds) unlockAudio();
   await checkUpdate();
