@@ -569,6 +569,18 @@ class GameHandler(SimpleHTTPRequestHandler):
             return str(APP / 'launcher' / route[len(SHELL_PATH):])
         return super().translate_path(path)
 
+    def do_POST(self):
+        # A game asks for a key press so it may start its sound (see AudioKey);
+        # the key goes to the game's frame, which the shell keeps focused.
+        if urllib.parse.urlsplit(self.path).path != f'{SHELL_PATH}unlock-audio':
+            return self.send_error(404)
+        body = json.dumps({'ok': audio_key.tap()}).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
 
 def version_tuple(text):
     return tuple(int(n) for n in re.findall(r'\d+', text or '')[:3])

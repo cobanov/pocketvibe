@@ -67,7 +67,7 @@ if (existsSync(join(target, 'package.json'))) {
 // One headless Chrome; a free debugging port, so several runs can go at once.
 const profile = mkdtempSync(join(tmpdir(), 'game-shots-'));
 const chrome = spawn(CHROME, [
-  '--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars',
+  '--headless=new', '--mute-audio', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars',
   '--autoplay-policy=no-user-gesture-required', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank',
 ], { stdio: 'ignore' });
 children.push(chrome);

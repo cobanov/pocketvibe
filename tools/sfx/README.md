@@ -34,3 +34,38 @@ ACE-Step 1.5 XL-SFT (nu-jazz, 84 BPM, C minor, instrumental), 48 kHz stereo, mas
 so it sits under the UI sounds. A 30.33 s intro plays once, then 30.33 s to the end loops; the
 loop points are in `audio.js`. It ships as OGG because one 2.1 MB file decodes in about 5 s in the
 background, while the WAV would be 19 MB.
+
+## The games' sounds
+
+The five games PocketVibe ships with (Brick Breaker, Turbo Circuit, Jet Rush, Tower Stack, Road
+Hopper) get their sound from here too.
+
+- `sound.js` is the games' sound module: each game has an unchanged copy in `src/sound.js`. It loads
+  the effects and the music, plays them through Web Audio, saves the player's Sound and Music
+  choices, and starts audio on the handheld: WebKit wants a key press first and gamepad buttons do
+  not count, so the game asks pocketvibed (`POST /__pocketvibe__/unlock-audio` on the game's own
+  port) to tap the virtual key the launcher also uses.
+- `synth.py` holds the building blocks, `games/<id>.py` each game's effects. A recipe writes 48 kHz
+  mono WAVs to `games/<id>/public/sfx/`, the same files byte for byte on every run:
+
+  ```sh
+  uv run --no-project --with numpy --with scipy --with soundfile python tools/sfx/games/<id>.py
+  ```
+
+- The music (`games/<id>/public/music/theme.ogg`) was generated with ACE-Step 1.5 XL-SFT by
+  `game_music_acestep.py`, which holds the prompts (three takes per game, 90 s each), and cut into
+  a seamless loop by `make_music_loop.py`: whole bars from after the intro, the end crossfaded into
+  the start, -16 LUFS (sound.js plays it at 0.55, under the effects), Ogg Vorbis.
+
+| Game | Take | Style | Loop |
+|---|---|---|---|
+| Turbo Circuit | seed 7101 | eurobeat / synthwave, A minor, 150 BPM | 24 bars, 38.9 s |
+| Jet Rush | seed 7103 | electro funk with a chiptune lead, E minor, 128 BPM | 24 bars, 45.0 s |
+| Brick Breaker | seed 7103 | 1980s arcade electro, D minor, 118 BPM | 24 bars, 49.0 s |
+| Tower Stack | seed 7103 | dreamy lo-fi, F major, 86 BPM | 16 bars, 44.7 s |
+| Road Hopper | seed 7102 | bouncy cartoon (marimba, pizzicato, ukulele), C major, 112 BPM | 24 bars, 51.4 s |
+
+```sh
+uv run --no-project --with numpy --with scipy --with soundfile --with librosa --with pyloudnorm \
+  python tools/sfx/make_music_loop.py <take.flac> <bpm> <bars> <game-id>
+```

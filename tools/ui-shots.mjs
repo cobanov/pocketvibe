@@ -13,7 +13,7 @@ const [url, outDir, ...steps] = process.argv.slice(2);
 const port = Number(process.env.CDP_PORT || 9334);
 const [width, height] = (process.env.SIZE || '720x480').split('x').map(Number);
 const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
-  '--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars',
+  '--headless=new', '--mute-audio', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--hide-scrollbars',
   `--window-size=${width},${height}`, `--remote-debugging-port=${port}`,
   `--user-data-dir=${mkdtempSync(join(tmpdir(), 'ui-'))}`, 'about:blank',
 ], { stdio: 'ignore' });
