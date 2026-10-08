@@ -161,8 +161,14 @@ function sections(games, tab = state.tab) {
     .map(([name, list]) => ({ name, games: list.sort(byTitle) }));
 }
 
+// The installed games, each marked when the store has a newer version.
+function libraryGames() {
+  const newer = new Set(state.store.games.filter((g) => g.update).map((g) => g.id));
+  return state.library.map((g) => (newer.has(g.id) ? { ...g, update: true } : g));
+}
+
 function tabGames(tab = state.tab) {
-  if (tab === 'library') return state.library;
+  if (tab === 'library') return libraryGames();
   if (tab !== 'store') return [];
   if (!state.hideInstalled) return state.store.games;
   // Updates still need getting, and a download stays until its ring is full.
@@ -225,8 +231,12 @@ function sizeText(bytes) {
 
 // ---------- Downloads ----------
 
-// Downloads started here, as shown on screen: game id -> { started, shown }.
+// Downloads started here, as shown on screen: game id -> { started, shown,
+// update, quiet }. Quiet ones (Update all games) skip the celebration.
 const downloads = new Map();
+// Games to start as soon as their update is in: A on a game in the Library.
+const playAfter = new Set();
+let quietDone = 0; // games a quiet batch has updated so far
 
 function downloading(id) {
   return downloads.has(id) || ACTIVE_JOB.includes(state.jobs[id]?.state);
@@ -272,6 +282,9 @@ function tickDownloads(now) {
     const job = state.jobs[id];
     if (job?.state === 'error') {
       downloads.delete(id);
+      // The update could not be had: the installed version still plays.
+      if (playAfter.delete(id) && startsNow(id)) play(state.library.find((g) => g.id === id));
+      if (d.quiet) quietBatchDone();
       render();
       continue;
     }
@@ -286,10 +299,32 @@ function tickDownloads(now) {
     for (const el of document.querySelectorAll(`[data-ring-label="${id}"]`)) el.textContent = downloadLabel(id);
     if (job?.state === 'done' && d.shown >= 1) {
       downloads.delete(id);
-      celebrations.push({ id, update: d.update });
-      if (!celebration.active) celebrateNext();
+      if (playAfter.delete(id) && startsNow(id)) {
+        play(state.library.find((g) => g.id === id) ?? { id });
+      } else if (d.quiet) {
+        quietDone++;
+        quietBatchDone();
+        render();
+      } else {
+        celebrations.push({ id, update: d.update });
+        if (!celebration.active) celebrateNext();
+      }
     }
   }
+}
+
+// Once the last game of Update all games is in (or has failed), one toast.
+function quietBatchDone() {
+  if ([...downloads.values()].some((d) => d.quiet)) return;
+  if (quietDone) toast(t('gamesUpdated', { count: quietDone }), 'save_done');
+  quietDone = 0;
+}
+
+// A game waiting for its update still starts if the player is where they
+// asked for it: on it in the Library, with nothing open over it.
+function startsNow(id) {
+  return state.tab === 'library' && !state.detail && !state.dialog && !state.picker && !keyboard.active && !celebration.active
+    && items()[state.focus.library]?.id === id;
 }
 
 function celebrateNext() {
@@ -338,7 +373,7 @@ function cardHtml(game, index, focused) {
   const meta = store ? [game.author, sizeText(game.size)] : [game.author, game.version && `v${game.version}`];
   return `
     <div class="card${focused ? ' focus' : ''}" data-id="${game.id}" data-index="${index}">
-      <div class="cover-wrap">${coverHtml(game)}${store ? badgeHtml(game) : ''}</div>
+      <div class="cover-wrap">${coverHtml(game)}${store || game.update || downloading(game.id) ? badgeHtml(game) : ''}</div>
       <div class="title">${escapeHtml(game.title)}</div>
       <div class="meta">${escapeHtml(meta.filter(Boolean).join(' · '))}</div>
     </div>`;
@@ -353,7 +388,7 @@ function rowHtml(game, index, focused) {
         <div class="title">${escapeHtml(game.title)}</div>
         <div class="meta">${escapeHtml(meta.filter(Boolean).join(' · '))}</div>
       </div>
-      ${state.tab === 'store' ? stateHtml(game) : ''}
+      ${state.tab === 'store' || game.update || downloading(game.id) ? stateHtml(game) : ''}
     </div>`;
 }
 
@@ -426,6 +461,10 @@ function settingsSections() {
       ],
     },
     {
+      title: t('games'),
+      rows: [{ id: 'updateGames', label: t('updateAllGames'), value: gamesUpdateValue() }],
+    },
+    {
       title: t('stores'),
       rows: [
         ...stores.map((store) => ({
@@ -470,6 +509,15 @@ function settingsSections() {
       ],
     },
   ];
+}
+
+function gamesUpdateValue() {
+  const busy = state.library.filter((g) => downloading(g.id)).length;
+  if (busy) return t('updatingGames', { count: busy });
+  const count = gameUpdates().length;
+  if (count) return `<span class="update-badge">${escapeHtml(t('gameUpdates', { count }))}</span>`;
+  if (!state.storeLoaded) return '';
+  return state.store.online === false ? t('storeOfflineShort') : t('upToDate');
 }
 
 function updateValue() {
@@ -598,6 +646,8 @@ function settingsAction(button, repeat) {
       cue('nav_move');
       updateSettings({ language: next });
     }
+  } else if (id === 'updateGames' && button === 'A' && !repeat) {
+    updateAllGames();
   } else if (id === 'addStore' && button === 'A') {
     addStore();
   } else if (id.startsWith('store:') && button === 'Y') {
@@ -876,13 +926,14 @@ function renderHints() {
     const id = state.settingRows[state.focus.settings] ?? '';
     if (['music', 'uiSounds', 'showFps', 'musicVolume', 'sfxVolume', 'language'].includes(id)) parts.push(hint('A', t('change')));
     if (['addStore', 'backup', 'restore'].includes(id)) parts.push(hint('A', t('select')));
+    if (id === 'updateGames') parts.push(hint('A', t('update')));
     if (id === 'update') parts.push(hint('A', state.update?.available ? t('update') : t('check')));
     if (id === 'gpu') parts.push(hint('A', t('gpuSwitch')));
     if (id.startsWith('store:')) parts.push(hint('Y', t('remove')));
     parts.push(hint('B', t('quit')));
   } else {
     const game = items()[state.focus[state.tab]];
-    if (game) parts.push(hint('A', state.tab === 'library' ? t('play') : t('open')));
+    if (game) parts.push(hint('A', state.tab === 'store' ? t('open') : game.update ? t('updateAndPlay') : t('play')));
     if (game && state.tab === 'library') parts.push(hint('X', t('info')));
     if (state.tab === 'store') parts.push(hint('X', t(state.hideInstalled ? 'showInstalled' : 'hideInstalled')));
     if (game) parts.push(hint('Y', t(state.view[state.tab])));
@@ -1037,21 +1088,52 @@ async function play(game) {
   }
 }
 
-async function install(game) {
-  if (downloading(game.id)) return;
+async function install(game, { quiet = false } = {}) {
+  if (downloading(game.id)) return true;
   // Show the ring right away, before the service answers.
-  downloads.set(game.id, { started: performance.now(), shown: 0, update: Boolean(game.update) });
+  downloads.set(game.id, { started: performance.now(), shown: 0, update: Boolean(game.update), quiet });
   state.jobs = { ...state.jobs, [game.id]: { state: 'queued', progress: 0, error: null } };
   render();
   try {
     await api(`/api/install/${game.id}`, 'POST');
     pollJobs();
+    return true;
   } catch (e) {
     downloads.delete(game.id);
     delete state.jobs[game.id];
     render();
     toast(t('cannotDownload', { error: e.message }), 'error');
+    return false;
   }
+}
+
+// A in the Library: a game with a newer version in the store is updated
+// first and starts when it is in. If the update cannot start, the installed
+// version plays.
+async function updateThenPlay(game) {
+  playAfter.add(game.id);
+  if (downloading(game.id)) return;
+  if (!(await install(game))) {
+    playAfter.delete(game.id);
+    play(game);
+  }
+}
+
+// Settings > Update all games.
+function gameUpdates() {
+  return libraryGames().filter((g) => g.update && !downloading(g.id));
+}
+
+function updateAllGames() {
+  const list = gameUpdates();
+  if (!list.length) {
+    cue('confirm');
+    toast(t(state.store.online === false ? 'cannotCheckGames' : 'gamesUpToDate'));
+    return;
+  }
+  cue('confirm');
+  quietDone = 0;
+  for (const game of list) install(game, { quiet: true });
 }
 
 function confirmRemove(game) {
@@ -1253,6 +1335,8 @@ function handleButton(button, repeat) {
       if (state.tab === 'store') {
         state.detail = game.id;
         render();
+      } else if (game.update || downloading(game.id)) {
+        updateThenPlay(game);
       } else {
         play(game);
       }
