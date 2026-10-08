@@ -1,4 +1,4 @@
-# PocketVibe: devir notu (2026-10-08 gece; handheld 0.6.8, Android 0.6.7)
+# PocketVibe: devir notu (2026-10-08 gece; handheld 0.6.9, Android 0.6.7)
 
 Önce bunu, sonra `docs/plan.md` ve `docs/development.md`'yi oku; memory'de `pocketvibe-project.md`,
 `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` var. Eski devir notları git
@@ -6,7 +6,9 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Durum
 
-- **Handheld 0.6.8** (GitHub `v0.6.8`, "Latest"): her oyun her cihazda kabukta (`play.html`)
+- **Handheld 0.6.9** (GitHub `v0.6.9`, "Latest"): 0.6.9, iki ekran kullanan bir oyunda ana ekran alttaysa
+  (EmulationStation RG DS'in alt ekranında) oyunun üst ekranı kendi ilk ekranı olarak almasını sağlıyor;
+  bir oyuncu bildirdi. 0.6.8'den beri: her oyun her cihazda kabukta (`play.html`)
   açılıyor; kabuk oyun ilk karelerini çizene kadar kapak, ad ve yükleme çubuğu gösteriyor.
   Turbo Circuit RG34XX'te doğrudan 58, kabukta 57 fps; kayıtlar iki yolda da aynı (denendi).
 - **Android 0.6.7** (`android-v0.6.7`, latest değil): APK'da 5 hazır oyun, Ayarlar > Uygulama
