@@ -35,8 +35,8 @@ header {
 }
 
 .brand {
-  width: 140px;
-  font-size: 22px;
+  width: 125px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--accent);
@@ -45,11 +45,12 @@ header {
 nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .tab {
-  padding: 6px 16px;
+  padding: 6px 12px;
+  font-size: 17px;
   border-radius: 999px;
   font-weight: 700;
   color: var(--muted);
@@ -58,6 +59,12 @@ nav {
 .tab.active {
   background: var(--accent);
   color: #1a1400;
+}
+
+.tab .count {
+  margin-left: 2px;
+  font-size: 14px;
+  opacity: 0.75;
 }
 
 .hint {
@@ -72,7 +79,7 @@ nav {
 }
 
 #status {
-  width: 170px;
+  width: 150px;
   white-space: pre;
   font-size: 14px;
   text-align: right;
@@ -83,6 +90,57 @@ main {
   height: 388px;
   padding: 12px 24px 0;
   overflow: hidden;
+}
+
+#content {
+  position: relative;
+  transition: transform 120ms ease-out;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.section-title span {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.grid,
+.list {
+  margin-bottom: 16px;
+}
+
+#scrollbar {
+  position: fixed;
+  top: 68px;
+  right: 7px;
+  width: 5px;
+  height: 360px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+#scrollbar[hidden] {
+  display: none;
+}
+
+#scrollbar .thumb {
+  width: 100%;
+  border-radius: 3px;
+  background: var(--muted);
+  transition: transform 120ms ease-out;
 }
 
 .empty {
@@ -312,7 +370,7 @@ main {
 footer {
   display: flex;
   align-items: center;
-  gap: 18px;
+  justify-content: space-between;
   height: 36px;
   padding: 0 20px;
   background: var(--panel);
@@ -322,6 +380,16 @@ footer {
 
 footer b {
   margin-right: 6px;
+}
+
+#hints {
+  display: flex;
+  gap: 18px;
+}
+
+#position {
+  font-size: 14px;
+  font-weight: 700;
 }
 
 #dialog {
@@ -334,6 +402,8 @@ footer b {
 }
 
 #dialog[hidden],
+#picker[hidden],
+#keyboard[hidden],
 #toast[hidden] {
   display: none;
 }
@@ -362,4 +432,196 @@ footer b {
   border-radius: 8px;
   background: var(--panel-2);
   font-size: 16px;
+}
+
+/* Settings */
+
+.setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  margin-bottom: 8px;
+  padding: 7px 14px;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.setting.focus {
+  border-color: var(--accent);
+}
+
+.setting .label {
+  min-width: 0;
+  font-weight: 700;
+}
+
+.setting .sub {
+  max-width: 400px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.setting .value {
+  flex: none;
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.value .on {
+  font-weight: 700;
+  color: var(--good);
+}
+
+.volume i {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  margin-left: 3px;
+  border-radius: 2px;
+  background: var(--panel-2);
+}
+
+.volume i.lit {
+  background: var(--accent);
+}
+
+.note {
+  margin: -2px 4px 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Picker (e.g. choosing a backup) */
+
+#picker {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+#picker .box {
+  width: 460px;
+  max-height: 380px;
+  padding: 20px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+#picker .box p {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.pick {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.pick.focus {
+  border-color: var(--accent);
+}
+
+/* On-screen keyboard */
+
+#keyboard {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.keyboard {
+  width: 660px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.kb-title {
+  margin-bottom: 8px;
+  font-weight: 800;
+}
+
+.kb-value {
+  min-height: 40px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  border-radius: 8px;
+  background: var(--bg);
+  font: 18px ui-monospace, 'DejaVu Sans Mono', monospace;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 20px;
+  margin-left: 1px;
+  vertical-align: middle;
+  background: var(--accent);
+  animation: blink 1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.keys {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.key {
+  min-width: 52px;
+  padding: 6px 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-weight: 700;
+  text-align: center;
+}
+
+.key.wide {
+  min-width: 84px;
+  padding: 6px 8px;
+}
+
+.key.focus {
+  border-color: var(--accent);
+  background: #34384a;
+}
+
+.kb-hints {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.kb-hints b {
+  margin-right: 6px;
 }

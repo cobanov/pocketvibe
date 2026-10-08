@@ -1,7 +1,7 @@
 // Packs a game project into the store: builds it, zips dist/ with its
 // pocketvibe.json (and cover), and adds or updates its entry in catalog.json.
 //
-//   node store/publish.mjs <game-project-dir> [--base <url>]
+//   node store/publish.mjs <game-project-dir> [--base <url>] [--name <store name>]
 //
 // Output goes to store/public/, which is what the store serves. --base is
 // the public address of that folder; download and cover links in the
@@ -63,6 +63,9 @@ if (cover) {
 
 const catalogPath = join(out, 'catalog.json');
 const catalog = existsSync(catalogPath) ? JSON.parse(readFileSync(catalogPath, 'utf8')) : { games: [] };
+// The store's name, shown in the handheld's settings.
+const nameIndex = args.indexOf('--name');
+catalog.name = nameIndex >= 0 ? args[nameIndex + 1] : (catalog.name ?? 'PocketVibe Store');
 const entry = {
   id: manifest.id,
   title: manifest.title,

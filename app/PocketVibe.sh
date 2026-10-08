@@ -29,9 +29,11 @@ while :; do
   sh "$HOME_DIR/debian-chroot.sh" run sh -c "
     export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 COG_PLATFORM_WL_VIEW_FULLSCREEN=1
     exec cog -P wl --gamepad=manette --enable-write-console-messages-to-stdout=true \
-      --bg-color=black http://127.0.0.1:8730/
+      --media-playback-requires-user-gesture=false --bg-color=black http://127.0.0.1:8730/
   " >>/tmp/pocketvibe-cog.log 2>&1
   [ -e "$QUIT_FLAG" ] && break
+  # pocketvibed may close the browser to restore saved data; wait for it.
+  while [ -e /tmp/pocketvibe-busy ]; do sleep 0.2; done
   if [ $(($(date +%s) - started)) -lt 5 ]; then
     quick=$((quick + 1))
     [ $quick -ge 2 ] && break

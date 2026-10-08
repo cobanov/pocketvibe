@@ -1,3 +1,4 @@
 {
+  "version": "0.2.0",
   "store_url": "http://192.168.8.110:8800/catalog.json"
 }
