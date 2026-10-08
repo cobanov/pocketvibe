@@ -349,3 +349,109 @@ body.handheld #legend {
   left: 50%;
   transform: translateX(-50%);
 }
+
+/* Two screens: the second shows the stats and a large map, and the first
+   only the race. The second screen is 720x540 on the RG DS. */
+#second {
+  background: radial-gradient(circle at 30% 60%, #1c2c4c, #0c1424 75%);
+  color: #fff;
+  font-family: inherit;
+}
+
+#brand {
+  position: absolute;
+  top: 116px;
+  right: 24px;
+  width: 232px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 1px;
+  color: #ffd23f;
+}
+
+#stats.dual #pos {
+  top: 6px;
+  left: 24px;
+}
+
+#stats.dual #lapbox {
+  top: 16px;
+  right: 24px;
+  font-size: 30px;
+}
+
+#stats.dual #time {
+  font-size: 28px;
+}
+
+#stats.dual #map {
+  left: 24px;
+  top: 104px;
+  bottom: auto;
+  width: 416px;
+  height: 416px;
+  border-radius: 18px;
+  background: rgba(10, 20, 40, 0.45);
+}
+
+#stats.dual .dot {
+  width: 14px;
+  height: 14px;
+  margin: -8px 0 0 -8px;
+  border-width: 2px;
+}
+
+#stats.dual .dot.me {
+  width: 18px;
+  height: 18px;
+  margin: -11px 0 0 -11px;
+  border-width: 3px;
+}
+
+#stats.dual #speed {
+  top: 180px;
+  right: 24px;
+  bottom: auto;
+  width: 232px;
+  text-align: center;
+  font-size: 22px;
+}
+
+#stats.dual #kmh {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 72px;
+}
+
+#best {
+  position: absolute;
+  top: 330px;
+  right: 24px;
+  width: 232px;
+  text-align: center;
+  font-weight: 800;
+  text-shadow: 0 2px 0 #000;
+}
+
+#best span {
+  display: block;
+  font-size: 18px;
+  color: #9fb3d9;
+}
+
+#best b {
+  font-size: 34px;
+  color: #ffd23f;
+  font-variant-numeric: tabular-nums;
+}
+
+#best[hidden],
+#stats.dual #pos[hidden],
+#stats.dual #lapbox[hidden],
+#stats.dual #speed[hidden] {
+  display: none;
+}

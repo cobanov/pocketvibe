@@ -91,6 +91,19 @@ function chooseScreen() {
   return { ...SCREEN };
 }
 
+// A second screen, below or beside the first (the Anbernic RG DS has one).
+// The PocketVibe game shell gives it to games that say they use it
+// ("screens": 2 in pocketvibe.json) as ?second=WxH&layout=right; in the
+// desktop browser the "DS" link under the screen shows one below.
+function chooseSecond() {
+  const size = /^(\d+)x(\d+)$/.exec(params.get('second') ?? '');
+  if (!size) return null;
+  const width = Number(size[1]);
+  const height = Number(size[2]);
+  if (width < SCREEN.width || height < SCREEN.height || width > 1440 || height > 1440) return null;
+  return { width, height, layout: params.get('layout') === 'right' ? 'right' : 'below' };
+}
+
 function createInput() {
   const keys = new Set(); // buttons held on the keyboard
   // Keys pressed since the last frame, even if already let go: a tap shorter
@@ -175,6 +188,7 @@ function createPerfOverlay(parent, renderer) {
   let last = windowStart;
   let worst = 0;
   return {
+    el,
     // Called once per frame after the game rendered.
     frame(now) {
       const { calls, triangles } = renderer.info.render;
@@ -218,23 +232,30 @@ function fitScreen(frame, screen, size) {
 }
 
 // In the desktop browser, links under the screen switch between the shapes
-// of handheld screens.
-function addShapeLinks(size) {
+// of handheld screens, and "DS" adds a second screen below a 4:3 one.
+function addShapeLinks(size, second) {
   const legend = document.getElementById('legend');
   if (!legend || onDevice) return;
   legend.append(' · Screen');
+  const link = (text, active, set) => {
+    const a = document.createElement('a');
+    const url = new URL(location.href);
+    url.searchParams.delete('second');
+    url.searchParams.delete('layout');
+    for (const [key, value] of Object.entries(set)) url.searchParams.set(key, value);
+    a.href = url.href;
+    a.textContent = text;
+    a.style.marginLeft = '6px';
+    a.style.color = active ? '#fff' : '#888';
+    a.style.fontWeight = active ? '700' : '400';
+    legend.append(a);
+  };
   for (const [name, aspect] of Object.entries(ASPECTS)) {
     const { width, height } = screenSize(aspect);
-    const link = document.createElement('a');
-    const url = new URL(location.href);
-    url.searchParams.set('aspect', name);
-    link.href = url.href;
-    link.textContent = name;
-    link.style.marginLeft = '6px';
-    link.style.color = width === size.width && height === size.height ? '#fff' : '#888';
-    link.style.fontWeight = width === size.width && height === size.height ? '700' : '400';
-    legend.append(link);
+    link(name, !second && width === size.width && height === size.height, { aspect: name });
   }
+  const ds = screenSize(4 / 3);
+  link('DS', Boolean(second), { aspect: '4:3', second: `${ds.width}x${ds.height}` });
 }
 
 // resolution: 0.5 draws the 3D scene at half the screen's size and stretches
@@ -248,31 +269,102 @@ export function createHandheld({ clearColor = 0x000000, resolution = 1 } = {}) {
   const size = chooseScreen();
   const { width, height } = size;
   const aspect = width / height;
-  screen.style.width = `${width}px`;
-  screen.style.height = `${height}px`;
+  const secondSize = chooseSecond();
+  // With a second screen, #screen holds both and the canvas covers both; the
+  // first screen is the top left part.
+  const box = !secondSize
+    ? { width, height }
+    : secondSize.layout === 'right'
+      ? { width: width + secondSize.width, height: Math.max(height, secondSize.height) }
+      : { width: Math.max(width, secondSize.width), height: height + secondSize.height };
+  screen.style.width = `${box.width}px`;
+  screen.style.height = `${box.height}px`;
   screen.style.setProperty('--screen-width', `${width}px`);
   screen.style.setProperty('--screen-height', `${height}px`);
+  hud.style.right = 'auto';
+  hud.style.bottom = 'auto';
+  hud.style.width = `${width}px`;
+  hud.style.height = `${height}px`;
 
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(1);
-  // false: the canvas keeps the screen's CSS size, set below.
-  renderer.setSize(Math.round(width * resolution), Math.round(height * resolution), false);
-  renderer.domElement.style.width = `${width}px`;
-  renderer.domElement.style.height = `${height}px`;
+  // false: the canvas keeps the screens' CSS size, set below.
+  renderer.setSize(Math.round(box.width * resolution), Math.round(box.height * resolution), false);
+  renderer.domElement.style.width = `${box.width}px`;
+  renderer.domElement.style.height = `${box.height}px`;
   renderer.setClearColor(clearColor);
   // Count draw calls over the whole frame, even if the game renders twice.
   renderer.info.autoReset = false;
   screen.insertBefore(renderer.domElement, hud);
 
-  fitScreen(frame, screen, size);
-  addShapeLinks(size);
+  // Where each screen is in the canvas, in its pixels (y counts from the
+  // bottom, as WebGL does), for drawing on one screen at a time.
+  const area = (x, y, w, h) => new THREE.Vector4(x, box.height - y - h, w, h).multiplyScalar(resolution);
+  const mainArea = area(0, 0, width, height);
+  let second = null;
+  if (secondSize) {
+    const x = secondSize.layout === 'right' ? width : 0;
+    const y = secondSize.layout === 'right' ? 0 : height;
+    const el = document.createElement('div');
+    el.id = 'second';
+    Object.assign(el.style, { position: 'absolute', left: `${x}px`, top: `${y}px`, width: `${secondSize.width}px`, height: `${secondSize.height}px`, overflow: 'hidden', pointerEvents: 'none' });
+    screen.appendChild(el);
+    const secondArea = area(x, y, secondSize.width, secondSize.height);
+    renderer.setScissorTest(true);
+    const use = (rect) => {
+      renderer.setViewport(rect);
+      renderer.setScissor(rect);
+    };
+    use(mainArea);
+    second = {
+      // The second screen's HTML, like hud: its coordinate space is
+      // second.width x second.height.
+      hud: el,
+      width: secondSize.width,
+      height: secondSize.height,
+      aspect: secondSize.width / secondSize.height,
+      // Draws a three.js view on the second screen (renderer.render draws on
+      // the first). Each view costs its own draw calls and triangles.
+      render(scene, camera) {
+        use(secondArea);
+        renderer.render(scene, camera);
+        use(mainArea);
+      },
+      // As fitCamera, for a camera shown on the second screen.
+      fitCamera: (camera, options) => fitCameraTo(camera, secondSize.width / secondSize.height, options),
+    };
+  }
+
+  fitScreen(frame, screen, box);
+  addShapeLinks(size, secondSize);
   const input = createInput();
   const perf = createPerfOverlay(screen, renderer);
+  if (secondSize) perf.el.style.right = `${box.width - width + 6}px`;
 
   // How much taller than designed the view must be here, so that a part of
   // it `minAspect` wide (width / height) stays in view: 1 on screens at least
   // that wide, more on narrower ones.
-  const viewScale = (minAspect = SCREEN.width / SCREEN.height) => Math.max(1, minAspect / aspect);
+  const viewScale = (minAspect = SCREEN.width / SCREEN.height, shape = aspect) => Math.max(1, minAspect / shape);
+
+  function fitCameraTo(camera, shape, { fov, height: viewHeight, center, minAspect } = {}) {
+    const design = (camera.userData.design ??= camera.isOrthographicCamera
+      ? { height: camera.top - camera.bottom, center: (camera.top + camera.bottom) / 2, middle: (camera.left + camera.right) / 2 }
+      : { fov: camera.fov });
+    const scale = viewScale(minAspect, shape);
+    if (camera.isOrthographicCamera) {
+      const half = ((viewHeight ?? design.height) * scale) / 2;
+      const y = center ?? design.center;
+      camera.top = y + half;
+      camera.bottom = y - half;
+      camera.left = design.middle - half * shape;
+      camera.right = design.middle + half * shape;
+    } else {
+      const tan = Math.tan(THREE.MathUtils.degToRad(fov ?? design.fov) / 2) * scale;
+      camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tan));
+      camera.aspect = shape;
+    }
+    camera.updateProjectionMatrix();
+  }
 
   return {
     renderer,
@@ -285,6 +377,11 @@ export function createHandheld({ clearColor = 0x000000, resolution = 1 } = {}) {
     aspect,
     onDevice,
     viewScale,
+    // The second screen, or null: only on handhelds with two screens, for
+    // games with "screens": 2 in pocketvibe.json. Show there what helps (a
+    // map, the standings), and keep it on the first screen's HUD when there
+    // is no second screen.
+    second,
 
     // Sets a camera for this screen. Give the view as designed for the
     // 720x480 screen: a perspective camera's vertical `fov` in degrees, an
@@ -294,25 +391,7 @@ export function createHandheld({ clearColor = 0x000000, resolution = 1 } = {}) {
     // taller ones more above and below. `minAspect` narrows the part that
     // must stay visible (e.g. 1.1 for a board), so that taller screens zoom
     // in on it instead. Call it again whenever the designed view changes.
-    fitCamera(camera, { fov, height: viewHeight, center, minAspect } = {}) {
-      const design = (camera.userData.design ??= camera.isOrthographicCamera
-        ? { height: camera.top - camera.bottom, center: (camera.top + camera.bottom) / 2, middle: (camera.left + camera.right) / 2 }
-        : { fov: camera.fov });
-      const scale = viewScale(minAspect);
-      if (camera.isOrthographicCamera) {
-        const half = ((viewHeight ?? design.height) * scale) / 2;
-        const y = center ?? design.center;
-        camera.top = y + half;
-        camera.bottom = y - half;
-        camera.left = design.middle - half * aspect;
-        camera.right = design.middle + half * aspect;
-      } else {
-        const tan = Math.tan(THREE.MathUtils.degToRad(fov ?? design.fov) / 2) * scale;
-        camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tan));
-        camera.aspect = aspect;
-      }
-      camera.updateProjectionMatrix();
-    },
+    fitCamera: (camera, options) => fitCameraTo(camera, aspect, options),
 
     // Runs update(dt) once per frame. dt is in seconds and capped, so a long
     // pause (loading, a hitch) does not make objects jump.

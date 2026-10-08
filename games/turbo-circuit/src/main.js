@@ -37,7 +37,7 @@ const trackMeshes = createTrackMeshes(scene, track);
 const fx = createFx(scene);
 const scenery = createScenery(scene, track);
 const race = createRace(scene, track, fx, scenery);
-const hud = createHud(hh.hud, track, CAR_COLORS);
+const hud = createHud(hh.hud, track, CAR_COLORS, hh.second);
 const { player, events } = race;
 
 let state = 'title'; // title | countdown | race | paused | finish
@@ -242,6 +242,7 @@ hh.run((dt) => {
       hud.place(race.placeOf(player));
       hud.lap(Math.max(1, Math.min(LAPS, player.laps + 1)));
       hud.time(race.clock);
+      hud.best(player.bestLap);
       if (race.leaderFinished()) finishLeft -= dt;
       updateAlert(dt);
       if (events.finished) finish(false);

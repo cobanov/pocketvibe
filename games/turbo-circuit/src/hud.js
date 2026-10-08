@@ -1,16 +1,20 @@
 // HUD and menus as HTML on top of the canvas. The DOM is touched only when a
-// value changes.
+// value changes. On a handheld with two screens the race stats and a large
+// map go to the second screen, and the first shows only the race.
 
 import { LAPS, formatTime, ordinal } from './shared.js';
 
 const MAP = 112; // minimap size in px
+const BIG_MAP = 416; // the map on the second screen
 const PAD = 9;
 
-// "0px" .. "200px", built once so moving the minimap dots allocates nothing.
+// "0px" .. "420px", built once so moving the minimap dots allocates nothing.
 const PX = [];
-for (let i = 0; i <= 200; i++) PX.push(`${i}px`);
+for (let i = 0; i <= BIG_MAP + 4; i++) PX.push(`${i}px`);
 
-export function createHud(root, track, colors) {
+export function createHud(root, track, colors, second = null) {
+  const size = second ? BIG_MAP : MAP;
+  const pad = second ? PAD * 2 : PAD;
   // Minimap: the circuit as an SVG path, fitted into a square.
   let minX = Infinity;
   let maxX = -Infinity;
@@ -22,9 +26,9 @@ export function createHud(root, track, colors) {
     minZ = Math.min(minZ, track.pz[i]);
     maxZ = Math.max(maxZ, track.pz[i]);
   }
-  const scale = (MAP - PAD * 2) / Math.max(maxX - minX, maxZ - minZ);
-  const ox = PAD + ((MAP - PAD * 2) - (maxX - minX) * scale) / 2 - minX * scale;
-  const oz = PAD + ((MAP - PAD * 2) - (maxZ - minZ) * scale) / 2 - minZ * scale;
+  const scale = (size - pad * 2) / Math.max(maxX - minX, maxZ - minZ);
+  const ox = pad + ((size - pad * 2) - (maxX - minX) * scale) / 2 - minX * scale;
+  const oz = pad + ((size - pad * 2) - (maxZ - minZ) * scale) / 2 - minZ * scale;
   let path = '';
   for (let i = 0; i <= track.n; i += 3) {
     const k = i % track.n;
@@ -33,30 +37,39 @@ export function createHud(root, track, colors) {
   path += 'Z';
   const dots = colors.map((c, i) => `<i class="dot${i === 0 ? ' me' : ''}" style="background:${c.css}"></i>`).join('');
 
-  root.innerHTML = `
-    <div id="stats">
+  const width = second ? 14 : 8;
+  const stats = `
+    <div id="stats"${second ? ' class="dual"' : ''}>
       <div id="pos"></div>
       <div id="lapbox"><div id="lap"></div><div id="time"></div></div>
       <div id="map">
-        <svg width="${MAP}" height="${MAP}" viewBox="0 0 ${MAP} ${MAP}">
-          <path d="${path}" fill="none" stroke="rgba(10,20,40,0.75)" stroke-width="8" stroke-linejoin="round"/>
-          <path d="${path}" fill="none" stroke="#f4f1ea" stroke-width="3.5" stroke-linejoin="round"/>
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+          <path d="${path}" fill="none" stroke="rgba(10,20,40,0.75)" stroke-width="${width}" stroke-linejoin="round"/>
+          <path d="${path}" fill="none" stroke="#f4f1ea" stroke-width="${width * 0.45}" stroke-linejoin="round"/>
         </svg>${dots}
       </div>
       <div id="speed"><b id="kmh">0</b><span>km/h</span></div>
-    </div>
+      ${second ? '<div id="best"><span>BEST LAP</span><b id="bestlap">--</b></div>' : ''}
+    </div>`;
+  root.innerHTML = `
+    ${second ? '' : stats}
     <div id="alert"></div>
     <div id="banner"></div>
     <div id="message"></div>`;
-  const statsEl = root.querySelector('#stats');
-  const posEl = root.querySelector('#pos');
-  const lapEl = root.querySelector('#lap');
-  const timeEl = root.querySelector('#time');
-  const kmhEl = root.querySelector('#kmh');
+  if (second) second.hud.innerHTML = `<div id="brand">TURBO CIRCUIT</div>${stats}`;
+  const statsRoot = second ? second.hud : root;
+  const statsEl = statsRoot.querySelector('#stats');
+  const numbers = statsRoot.querySelectorAll('#pos, #lapbox, #speed, #best');
+  const posEl = statsRoot.querySelector('#pos');
+  const lapEl = statsRoot.querySelector('#lap');
+  const timeEl = statsRoot.querySelector('#time');
+  const kmhEl = statsRoot.querySelector('#kmh');
+  const bestEl = statsRoot.querySelector('#bestlap');
   const alertEl = root.querySelector('#alert');
   const bannerEl = root.querySelector('#banner');
   const messageEl = root.querySelector('#message');
-  const dotEls = root.querySelectorAll('.dot');
+  const dotEls = statsRoot.querySelectorAll('.dot');
+  let shownBest = -1;
 
   let shownPlace = 0;
   let shownLap = 0;
@@ -69,8 +82,18 @@ export function createHud(root, track, colors) {
   const dotY = new Int16Array(dotEls.length).fill(-1);
 
   return {
+    // On two screens the map stays (it shows the title's race too) and only
+    // the numbers go.
     showStats(visible) {
-      statsEl.hidden = !visible;
+      if (second) for (const el of numbers) el.hidden = !visible;
+      else statsEl.hidden = !visible;
+    },
+
+    // The player's best lap so far, on the second screen only (0: none yet).
+    best(seconds) {
+      if (!bestEl || seconds === shownBest) return;
+      shownBest = seconds;
+      bestEl.textContent = seconds > 0 ? formatTime(seconds) : '--';
     },
 
     reset() {
@@ -119,11 +142,11 @@ export function createHud(root, track, colors) {
         const y = Math.round(cars[i].z * scale + oz);
         if (x !== dotX[i]) {
           dotX[i] = x;
-          dotEls[i].style.left = PX[Math.max(0, Math.min(200, x))];
+          dotEls[i].style.left = PX[Math.max(0, Math.min(PX.length - 1, x))];
         }
         if (y !== dotY[i]) {
           dotY[i] = y;
-          dotEls[i].style.top = PX[Math.max(0, Math.min(200, y))];
+          dotEls[i].style.top = PX[Math.max(0, Math.min(PX.length - 1, y))];
         }
       }
     },

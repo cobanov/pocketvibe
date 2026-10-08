@@ -36,6 +36,16 @@ The game is designed for a 720×480 screen (3:2, the RG34XX SP), but PocketVibe 
 - Gameplay must not depend on the shape: a wider screen may show more of the level, but must not let the player see or reach what a 3:2 screen hides in a way that changes the game.
 - Try every shape in the browser with the links under the screen (or `?aspect=4:3`, `16:9`, `1:1`). When the game works on all four, set `"responsive": true` in `pocketvibe.json`; without it, PocketVibe shows the game at 720×480 with black bars on other screens.
 
+## Two screens
+
+Some handhelds have two screens, like a Nintendo DS (the Anbernic RG DS: two 4:3 screens, one above the other). A game can use the second one for what helps without being in the way: a large map, the standings, an inventory, a menu.
+
+- Say so in `pocketvibe.json` with `"screens": 2` (the game must also be `"responsive": true`). Without it, PocketVibe shows the game's controls on the second screen.
+- `hh.second` is the second screen, or `null` on handhelds with one screen and in the desktop browser's normal view. Always keep the game complete without it: what goes on the second screen must otherwise stay on the first screen's HUD.
+- `hh.second.hud` is an HTML element like `hud`, `hh.second.width` x `hh.second.height` pixels (720x540 on the RG DS). Put HTML there; style it in the game's CSS under `#second`.
+- `hh.second.render(scene, camera)` draws a three.js view on the second screen (`renderer.render` draws on the first). Set its camera up with `hh.second.fitCamera(camera)`. A second view costs its own draw calls and triangles: prefer HTML (or a simple orthographic view) there.
+- Try it in the browser with the "DS" link under the screen: the second screen shows below the first.
+
 ## Input
 
 - Read buttons only through `input`. Buttons: `UP`, `DOWN`, `LEFT`, `RIGHT`, `A`, `B`, `X`, `Y`, `L`, `R`, `START`, `SELECT`.
@@ -107,6 +117,7 @@ The first use of anything new costs a long frame, so do it all while the game lo
 - `genre`: one of `Arcade`, `Shooter`, `Racing`, `Puzzle`, `Platformer`, `Sports`. The store groups games by it.
 - `controls`: what each button does, e.g. `{ "D-pad": "Move", "A": "Jump", "START": "Pause" }`.
 - `responsive`: `true` once the game works on every screen shape (see Screen shapes).
+- `screens`: `2` if the game uses a second screen (see Two screens).
 
 Add a `cover.png` (480×270) at the project root; a screenshot of the title screen works well.
 

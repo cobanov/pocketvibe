@@ -20,9 +20,31 @@ const frame = document.getElementById('frame');
 const side = document.getElementById('side');
 const inner = side.querySelector('.side-inner');
 let size = NATIVE; // the game's screen
+let second = null; // { width, height, layout } when the game uses the second screen too
+
+// Where the second screen is, seen from the first: the game lays its two
+// screens out the same way, so one frame covers both.
+function secondLayout(main, other) {
+  if (other.x >= main.x + main.width && Math.abs(other.y - main.y) < 2 && other.height === main.height) return 'right';
+  if (other.y >= main.y + main.height && Math.abs(other.x - main.x) < 2 && other.width === main.width) return 'below';
+  return null;
+}
 
 function layout() {
   const { main, other } = fitScreens(screens, primary, innerWidth, innerHeight);
+  if (second && other) {
+    // One frame over both screens, scaled as one.
+    const right = second.layout === 'right';
+    const box = right
+      ? { width: size.width + second.width, height: size.height }
+      : { width: size.width, height: size.height + second.height };
+    place(game, { x: main.x, y: main.y, width: right ? other.x + other.width - main.x : main.width, height: right ? main.height : other.y + other.height - main.y });
+    frame.style.width = `${box.width}px`;
+    frame.style.height = `${box.height}px`;
+    frame.style.transform = `scale(${main.width / size.width})`;
+    side.hidden = true;
+    return;
+  }
   place(game, main);
   frame.style.width = `${size.width}px`;
   frame.style.height = `${size.height}px`;
@@ -86,12 +108,16 @@ addEventListener('resize', layout);
 
 const meta = await manifest();
 if (meta.responsive === true) {
-  const { main } = fitScreens(screens, primary, innerWidth, innerHeight);
+  const { main, other } = fitScreens(screens, primary, innerWidth, innerHeight);
   size = gameSize(main.width / main.height);
+  // A game that uses two screens ("screens": 2) gets the second one too,
+  // instead of the controls card, when it sits beside or below the first.
+  const where = meta.screens === 2 && other ? secondLayout(main, other) : null;
+  if (where) second = { ...gameSize(other.width / other.height), layout: where };
 }
 layout();
 let entry = new URL(params.get('entry') || 'index.html', `${location.origin}/`);
 if (entry.origin !== location.origin) entry = new URL('/index.html', location.origin); // a game runs on its own port only
-entry.search = `?handheld${params.get('perf') === '1' ? '&perf' : ''}${size === NATIVE ? '' : `&screen=${size.width}x${size.height}`}`;
+entry.search = `?handheld${params.get('perf') === '1' ? '&perf' : ''}${size === NATIVE ? '' : `&screen=${size.width}x${size.height}`}${second ? `&second=${second.width}x${second.height}&layout=${second.layout}` : ''}`;
 frame.src = entry.href;
 fillSide(meta);

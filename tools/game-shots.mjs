@@ -16,7 +16,9 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const SHAPES = { '3:2': [720, 480], '4:3': [720, 540], '16:9': [854, 480], '1:1': [720, 720] };
+// ds is a 4:3 screen with a second one below it, as the RG DS gives games
+// that use two screens ("screens": 2).
+const SHAPES = { '3:2': [720, 480], '4:3': [720, 540], '16:9': [854, 480], '1:1': [720, 720], ds: [720, 1080] };
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -111,7 +113,8 @@ for (const shape of shapes) {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
   const url = new URL(base);
   url.searchParams.set('handheld', '');
-  url.searchParams.set('screen', `${width}x${height}`);
+  url.searchParams.set('screen', shape === 'ds' ? '720x540' : `${width}x${height}`);
+  if (shape === 'ds') url.searchParams.set('second', '720x540');
   if (process.env.PERF) url.searchParams.set('perf', ''); // the overlay: draw calls and triangles
   await send('Page.navigate', { url: url.href });
   await sleep(2500);
