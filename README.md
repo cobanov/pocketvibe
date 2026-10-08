@@ -30,7 +30,9 @@ porting needed: unzip it once and it keeps itself up to date.
 
 ## Your game, in your hands.
 
-- **Get games from the store.** Pick one, watch it download, and play. Updates show up on their own.
+- **Get games from the store.** PocketVibe starts with five games, and the store has more: pick one, watch it download, and play. Updates show up on their own.
+- **Fits every screen.** Games fill 3:2, 4:3, 16:9 and square screens, and on the two-screen Anbernic RG DS a game can use both, like Turbo Circuit's map and standings below the race.
+- **Feels like a console.** Menus have their own sounds and music, and everything works with the handheld's buttons.
 - **Start from a project that knows the handheld.** `npm create pocketvibe` sets up Vite and three.js with an `AGENTS.md` that teaches your AI tool the screen, the buttons and the performance budget.
 - **Keep it at 60 fps.** WPE WebKit draws with the handheld's GPU. Scenes that follow the rules ran at 60 fps on the H700; the same scenes written the usual way stayed under 6.
 - **Publish with one command.** `npx pocketvibe publish` builds your game and sends it to the store. You sign in with GitHub.
@@ -42,11 +44,17 @@ porting needed: unzip it once and it keeps itself up to date.
 Just curious? The [website](https://pocketvibe.cobanov.dev) runs the real launcher with the
 store's games in your browser.
 
-On your handheld:
+On your handheld, with ROCKNIX, Wi-Fi and about 1 GB free on the SD card:
 
-1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix).
-2. Unzip it into `roms/ports` on the handheld's SD card.
-3. Restart the handheld and open **Ports**, then **PocketVibe**. The first start downloads the game engine, about 150 MB, over Wi-Fi.
+1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix) (5 MB).
+2. Unzip it into `roms/ports` on the handheld's SD card, with a card reader or over the handheld's network share.
+3. Restart the handheld (or update the game lists) and open **Ports**, then **PocketVibe**.
+
+The first start downloads PocketVibe's game engine (about 150 MB) and installs it, with a
+progress bar for each step: about a minute and a half over Wi-Fi, once. Then it opens with
+five games, and updates itself from Settings from then on. If the handheld uses the libmali
+graphics driver, PocketVibe offers to switch to Panfrost with one press, so games run at
+full speed.
 
 On an Android handheld, download the newest APK from
 [pocketvibe.cobanov.dev/download/android](https://pocketvibe.cobanov.dev/download/android) and
@@ -62,7 +70,9 @@ On Android it runs on the Anbernic RG Rotate. Other handhelds may work, but are 
 ## Want to tinker?
 
 On the handheld, a small Python service and an HTML launcher run WPE WebKit and Cog from a
-Debian root. The store is a Cloudflare Worker with D1 and R2; the website is static.
+Debian root. The store is a Cloudflare Worker with D1 and R2; the website is static. The app
+and its engine are GitHub releases, downloaded through `pocketvibe.cobanov.dev/download/`, so
+where they are hosted can change without a new app.
 
 [Development](docs/development.md) ·
 [Rules for AI tools](template/AGENTS.md) ·

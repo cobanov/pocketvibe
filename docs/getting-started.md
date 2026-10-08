@@ -7,16 +7,19 @@ on your computer. You can use either one without the other.
 
 You need a handheld running [ROCKNIX](https://rocknix.org) with Wi-Fi, and about 1 GB free on
 its SD card. PocketVibe is made on an Anbernic RG34XX SP and also runs on the two-screen
-Anbernic RG DS; other ROCKNIX handhelds may work. On a handheld that lets you choose its GPU
-driver (the RG DS does), choose Panfrost in the system settings: with libmali, games run slowly.
+Anbernic RG DS; other ROCKNIX handhelds may work. On a handheld that uses the libmali GPU
+driver (the RG DS does by default), PocketVibe offers to switch to Panfrost the first time it
+opens: with libmali, games run slowly.
 
-1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix).
+1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix) (5 MB).
 2. Unzip it into the `roms/ports` folder of the handheld's SD card. Put the card in your computer,
    or copy the files over the handheld's network share.
 3. Restart the handheld, open **Ports** and start **PocketVibe**.
 
-The first start downloads PocketVibe's game engine (WPE WebKit, about 150 MB) and sets it up.
-Over Wi-Fi this takes about two minutes, and it happens only once.
+The first start downloads PocketVibe's game engine (WPE WebKit, about 150 MB) and installs it,
+with a progress bar for each step. Over Wi-Fi this takes about a minute and a half, and it
+happens only once; if the connection drops, opening PocketVibe again picks up where it
+stopped. Then PocketVibe opens with five games.
 
 <p align="center">
   <img src="screenshots/first-run.png" alt="The first start downloading the game engine, with a progress bar" width="360">
