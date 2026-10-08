@@ -8,7 +8,7 @@
 # another key cannot update one already installed.
 #
 # With --publish it also creates the GitHub release android-v<version>
-# (NOTES="..." for notes). It is never marked latest, so the handhelds'
+# (NOTES="..." or NOTES_FILE=<file> for notes). It is never marked latest, so the handhelds'
 # releases/latest/download/PocketVibe.zip keeps pointing at the handheld app.
 set -e
 
@@ -33,6 +33,7 @@ echo "$APK"
 echo "sha256: $SHA"
 
 if [ "$1" = "--publish" ]; then
+  [ -n "$NOTES_FILE" ] && NOTES=$(cat "$NOTES_FILE")
   gh release create "android-v$VERSION" "$APK" --repo cobanov/pocketvibe \
     --target "$(git -C "$REPO" rev-parse HEAD)" --latest=false \
     --title "PocketVibe $VERSION for Android" \
