@@ -41,6 +41,8 @@ geçmişinde (`git log -- docs/handoff.md`).
 5. Starter projenin örnek oyunu hâlâ Coin Rush (yalnızca mağaza ve siteden kaldırıldı).
 6. Kurulum pürüzleri (belgelere yazıldı): yeni ROCKNIX'te Samba kapalı geliyor; tek kartta `roms`
    ext4, Mac ve Windows açamıyor.
+7. RG34XX'te kurulum testinden kalan Mac gizli dosyaları (`._*`, `.DS_Store`) `roms/ports`'ta var mı
+   bakılmadı (cihaz uykudaydı); varsa ES'de sahte port olarak görünebilir.
 
 ## Cihazlar
 
@@ -80,7 +82,16 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Tanıtım (2026-10-08)
 
-Tweet (TR ve EN), Reddit (r/handheldsTR, r/SBCGaming, r/vibecoding) atıldı. r/SBCGaming ve
-r/handheldsTR gönderiyi kaldırdı (SBCGaming: AI içeriği kuralı, AI beyanı şart); kullanıcı
-moderatörlere yazdı. Tanıtım videosu MacBook'ta `~/workspace/pocketvibe/` (sessiz kopya
-`pocketvibe_promo_sessiz.mp4`).
+- Tweet (TR ve EN) atıldı. Reddit: r/handheldsTR ve r/SBCGaming gönderiyi kaldırdı (SBCGaming: önce
+  subreddit'te katılım, sonra AI beyanıyla tekrar; kullanıcı moderatörlere istisna için yazdı).
+  r/vibecoding ve r/threejs ayakta, r/ANBERNIC'e atılacak (AI yasağı yok). r/SideProject gönderisi
+  Reddit'in spam filtresine takıldı (kısa sürede çok yerde aynı linkler); modmail ile onay istendi.
+  Bundan sonra günde en fazla bir iki yer, aralarda yorum.
+- r/linux_gaming: AI destekli projeler için 2 ay geliştirme geçmişi şartı var; Aralık'tan önce ya da
+  yalnızca teknik bir yazıyla.
+- Sırada: three.js forumu (Showcase), Show HN (metinler sohbette hazırlandı), ROCKNIX ve Retro
+  Handhelds Discord'ları.
+- Tanıtım videosu MacBook'ta `~/workspace/pocketvibe/` (sessiz kopya `pocketvibe_promo_sessiz.mp4`).
+- GitHub: açıklama ve 18 etiket ayarlandı, README ve CONTRIBUTING.md yenilendi. Reponun paylaşım
+  görseli (Settings > Social preview) kullanıcı tarafından yüklenecek; dosya Mac mini'de
+  `~/Desktop/pocketvibe-github-preview.png` (1280x640).
