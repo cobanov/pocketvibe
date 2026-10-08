@@ -1,0 +1,7 @@
+{
+  "id": "lane-runner",
+  "title": "Lane Runner",
+  "author": "cobanov",
+  "version": "1.0.0",
+  "description": "Endless runner on a three-lane road. Jump hurdles, slide under bars, dodge walls and collect coins."
+}

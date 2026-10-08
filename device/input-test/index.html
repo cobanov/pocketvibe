@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Input test</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #000;
+        color: #fff;
+        font: 22px/1.4 monospace;
+      }
+      #pad {
+        color: #7fd;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Press each button: A, B, X, Y, L, R, Start, Select, then the d-pad up, down, left, right.</p>
+    <p id="pad">no gamepad yet (press any button)</p>
+    <p id="key">no key yet</p>
+    <script>
+      // Shows and logs what the browser engine receives from the handheld's
+      // buttons: Gamepad API state and keyboard events.
+      const padEl = document.getElementById('pad');
+      const keyEl = document.getElementById('key');
+      let last = '';
+
+      addEventListener('keydown', (e) => {
+        console.log(`KEY ${e.code}`);
+        keyEl.textContent = `key: ${e.code}`;
+      });
+      addEventListener('gamepadconnected', (e) => {
+        const p = e.gamepad;
+        console.log(`PAD connected id="${p.id}" mapping="${p.mapping}" buttons=${p.buttons.length} axes=${p.axes.length}`);
+      });
+
+      function loop() {
+        const pads = [...(navigator.getGamepads?.() ?? [])].filter(Boolean);
+        const state = pads
+          .map((p) => {
+            const pressed = p.buttons.flatMap((b, i) => (b.pressed ? [i] : []));
+            const axes = p.axes.map((a) => a.toFixed(1)).join(',');
+            return `[${p.mapping || 'raw'}] buttons:${pressed.join(',') || '-'} axes:${axes}`;
+          })
+          .join(' | ');
+        if (state && state !== last) {
+          last = state;
+          console.log(`PAD ${state}`);
+          padEl.textContent = state;
+        }
+        requestAnimationFrame(loop);
+      }
+      loop();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "id": "snake",
+  "title": "Snake",
+  "description": "Classic snake on a 3D toy board: eat apples, grab golden stars before they vanish, and don't bite your own tail.",
+  "genre": "Arcade",
+  "controls": {
+    "D-pad": "Steer",
+    "A": "Start / play again",
+    "B": "Back to title (paused or game over)",
+    "START": "Pause / resume"
+  }
+}

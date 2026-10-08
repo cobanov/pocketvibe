@@ -1,0 +1,28 @@
+{
+  "name": "create-pocketvibe",
+  "version": "0.1.0",
+  "description": "Start a three.js game for PocketVibe handhelds: npm create pocketvibe@latest",
+  "type": "module",
+  "bin": {
+    "create-pocketvibe": "index.js"
+  },
+  "files": [
+    "index.js",
+    "template"
+  ],
+  "scripts": {
+    "prepack": "node scripts/copy-template.js"
+  },
+  "keywords": [
+    "pocketvibe",
+    "three.js",
+    "handheld",
+    "rocknix",
+    "anbernic",
+    "game"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

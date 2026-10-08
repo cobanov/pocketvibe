@@ -1,0 +1,384 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is always 720x480
+   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: 720px;
+  height: 480px;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 720px;
+  height: 480px;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+/* Game HUD */
+
+#hud {
+  --ink: #18284a;
+  --gold: #ffd23f;
+  color: #fff;
+}
+
+/* Thick dark outline around white text, readable over sky and pipes. */
+#score,
+#toast,
+.logo {
+  text-shadow:
+    -3px -3px 0 var(--ink), 3px -3px 0 var(--ink), -3px 3px 0 var(--ink), 3px 3px 0 var(--ink),
+    0 -3px 0 var(--ink), 0 3px 0 var(--ink), -3px 0 0 var(--ink), 3px 0 0 var(--ink), 0 6px 0 var(--ink);
+}
+
+#score {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 64px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+#score[hidden] {
+  display: none;
+}
+
+#score.pop-a {
+  animation: pop-a 0.3s ease-out;
+}
+
+#score.pop-b {
+  animation: pop-b 0.3s ease-out;
+}
+
+@keyframes pop-a {
+  0% { transform: scale(1.45); color: var(--gold); }
+  100% { transform: scale(1); color: #fff; }
+}
+
+@keyframes pop-b {
+  0% { transform: scale(1.45); color: var(--gold); }
+  100% { transform: scale(1); color: #fff; }
+}
+
+#toast {
+  position: absolute;
+  top: 96px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  opacity: 0;
+}
+
+#toast.show-a {
+  animation: toast-a 1.6s ease-out both;
+}
+
+#toast.show-b {
+  animation: toast-b 1.6s ease-out both;
+}
+
+@keyframes toast-a {
+  0% { opacity: 0; transform: scale(0.5); }
+  12% { opacity: 1; transform: scale(1.2); }
+  22% { transform: scale(1); }
+  75% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+@keyframes toast-b {
+  0% { opacity: 0; transform: scale(0.5); }
+  12% { opacity: 1; transform: scale(1.2); }
+  22% { transform: scale(1); }
+  75% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+#toast.bronze { color: #ffb878; }
+#toast.silver { color: #e4ebf2; }
+#toast.gold { color: var(--gold); }
+
+#flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+}
+
+#flash.on-a {
+  animation: flash-a 0.35s ease-out;
+}
+
+#flash.on-b {
+  animation: flash-b 0.35s ease-out;
+}
+
+@keyframes flash-a {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+@keyframes flash-b {
+  0% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+/* Title and get-ready: text at the top and bottom, the bird in between. */
+#message.split {
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 34px 0 30px;
+}
+
+.logo {
+  font-size: 66px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--gold);
+  animation: drop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.logo.ready {
+  font-size: 54px;
+  color: #ff9a3c;
+}
+
+@keyframes drop {
+  from { transform: translateY(-80px); }
+  to { transform: none; }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 34px 18px;
+  border-radius: 14px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  background: rgba(20, 40, 80, 0.62);
+  font-size: 24px;
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000;
+  animation: rise 0.35s ease-out both;
+}
+
+#message.late .panel {
+  animation-delay: 0.3s;
+}
+
+@keyframes rise {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.panel .title {
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--gold);
+}
+
+.panel .big {
+  font-size: 30px;
+}
+
+.panel .small {
+  font-size: 18px;
+  color: #d6e6f6;
+}
+
+.panel .best {
+  font-size: 22px;
+  color: var(--gold);
+}
+
+/* The A button, drawn like the one on the handheld. */
+.btn {
+  display: inline-block;
+  width: 38px;
+  height: 38px;
+  line-height: 38px;
+  border-radius: 50%;
+  background: #e8453c;
+  box-shadow: 0 3px 0 #8e1f1a;
+  text-shadow: none;
+  font-size: 24px;
+  vertical-align: 2px;
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 2px 0;
+}
+
+.nums {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 26px;
+}
+
+.nums b {
+  color: var(--gold);
+}
+
+.new {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: #e8453c;
+  font-size: 18px;
+  text-shadow: none;
+  vertical-align: 3px;
+}
+
+.medal {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 4px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  text-shadow: none;
+}
+
+.medal.none {
+  border: 4px dashed rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.medal.bronze {
+  background: radial-gradient(circle at 35% 30%, #ffd9b0, #d88a4a 55%, #9a5523);
+  border-color: #7a3f16;
+  color: #ffe2c2;
+}
+
+.medal.silver {
+  background: radial-gradient(circle at 35% 30%, #ffffff, #c9d2dc 55%, #8f9aa6);
+  border-color: #6b7580;
+  color: #ffffff;
+}
+
+.medal.gold {
+  background: radial-gradient(circle at 35% 30%, #fff6b0, #ffcc1f 55%, #d99a00);
+  border-color: #a86f00;
+  color: #fff6c0;
+}
+
+.medal-name {
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+.medal-name.bronze { color: #ffb878; }
+.medal-name.silver { color: #e4ebf2; }
+.medal-name.gold { color: var(--gold); }
+
+/* The score sits top center, so the perf overlay goes bottom right. */
+#perf {
+  top: auto;
+  bottom: 6px;
+}

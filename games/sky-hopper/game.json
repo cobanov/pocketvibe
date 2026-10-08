@@ -1,0 +1,12 @@
+{
+  "id": "sky-hopper",
+  "title": "Sky Hopper",
+  "description": "Flap a low-poly bird through endless gaps between pipes high above the clouds and chase the gold medal.",
+  "genre": "arcade",
+  "controls": {
+    "A": "Flap / confirm",
+    "UP": "Flap",
+    "B": "Back to title",
+    "START": "Pause"
+  }
+}

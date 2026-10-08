@@ -1,0 +1,309 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is always 720x480
+   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: 720px;
+  height: 480px;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 720px;
+  height: 480px;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+/* Game HUD */
+
+.side {
+  position: absolute;
+  top: 14px;
+  width: 140px;
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000, 0 0 5px #000;
+}
+
+.side[hidden] {
+  display: none;
+}
+
+.side.left {
+  left: 16px;
+}
+
+.side.right {
+  right: 16px;
+  text-align: right;
+}
+
+.side .label {
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: #ff9fd6;
+}
+
+.side .value {
+  margin-bottom: 12px;
+  font-size: 30px;
+  color: #fff;
+}
+
+.side .value.dim {
+  font-size: 22px;
+  color: #d8d2ff;
+}
+
+.side .lives {
+  font-size: 26px;
+  letter-spacing: 2px;
+  color: #8fe9ff;
+}
+
+.power {
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+.power.wide {
+  color: #7fb8ff;
+}
+
+.power.slow {
+  color: #8dff86;
+}
+
+#banner,
+#callout {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  font-weight: 800;
+  text-shadow: 0 3px 0 #000, 0 0 8px #000;
+}
+
+#banner {
+  top: 170px;
+}
+
+#callout {
+  top: 300px;
+  font-size: 28px;
+}
+
+#banner .pop {
+  animation: banner 1.7s ease-out forwards;
+}
+
+#banner .big {
+  font-size: 48px;
+  letter-spacing: 3px;
+  color: #ffd84a;
+}
+
+#banner .sub {
+  font-size: 22px;
+  color: #fff;
+}
+
+#callout .pop {
+  animation: callout 1.2s ease-out forwards;
+}
+
+@keyframes banner {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  22% {
+    transform: scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes callout {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  25% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+#hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 330px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 5px #000;
+}
+
+#flash .hurt {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 70px 18px rgba(255, 40, 80, 0.85);
+  animation: hurt 0.6s ease-out forwards;
+}
+
+@keyframes hurt {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 34px;
+  border-radius: 12px;
+  background: rgba(16, 10, 48, 0.62);
+  box-shadow: 0 0 0 3px rgba(255, 111, 174, 0.55);
+  font-size: 24px;
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000;
+}
+
+.panel .title {
+  font-size: 44px;
+  letter-spacing: 2px;
+  color: #ffd84a;
+}
+
+.panel .small {
+  font-size: 18px;
+  color: #d8d2ff;
+}
+
+/* The right column holds the level and lives, so the perf overlay goes bottom right. */
+#perf {
+  top: auto;
+  bottom: 6px;
+}

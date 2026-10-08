@@ -1,0 +1,300 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is always 720x480
+   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: 720px;
+  height: 480px;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 720px;
+  height: 480px;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+/* Game HUD */
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 18px;
+  font-size: 24px;
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000;
+}
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 30px;
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000;
+}
+
+/* Game HUD */
+
+#screen {
+  background: #05031a;
+}
+
+.side {
+  position: absolute;
+  top: 14px;
+  width: 178px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+.side[hidden] {
+  display: none;
+}
+
+.side.left {
+  left: 16px;
+}
+
+.side.right {
+  right: 16px;
+  bottom: 14px;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.label {
+  font-size: 18px;
+  letter-spacing: 2px;
+  color: #b9a8ff;
+}
+
+.value {
+  margin-bottom: 10px;
+  font-size: 32px;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 10px #2de2ff, 0 0 3px #2de2ff;
+}
+
+.value.best {
+  font-size: 24px;
+  text-shadow: 0 2px 0 #000, 0 0 10px #ff3fd2;
+}
+
+.balls {
+  margin-bottom: 10px;
+  font-size: 26px;
+  letter-spacing: 4px;
+}
+
+.balls span {
+  color: #3a2a6a;
+}
+
+.balls span.now {
+  color: #fff;
+  text-shadow: 0 0 8px #2de2ff, 0 2px 0 #000;
+}
+
+.balls span.used {
+  color: #3a2a6a;
+  text-shadow: none;
+}
+
+.balls span:not(.used):not(.now) {
+  color: #e9eeff;
+}
+
+.mult {
+  font-size: 22px;
+  color: #ffe14a;
+  text-shadow: 0 2px 0 #000, 0 0 8px #ffb000;
+}
+
+#event {
+  margin-top: 18px;
+  min-height: 34px;
+  font-size: 28px;
+  opacity: 0;
+}
+
+#event.pop {
+  animation: pop 2s ease-out forwards;
+}
+
+#event.cyan {
+  color: #2de2ff;
+  text-shadow: 0 2px 0 #000, 0 0 12px #2de2ff;
+}
+
+#event.yellow {
+  color: #ffe14a;
+  text-shadow: 0 2px 0 #000, 0 0 12px #ffb000;
+}
+
+#event.lime {
+  color: #7dff4f;
+  text-shadow: 0 2px 0 #000, 0 0 12px #3fdc1f;
+}
+
+#event.red {
+  color: #ff3b6b;
+  text-shadow: 0 2px 0 #000, 0 0 12px #ff3b6b;
+}
+
+@keyframes pop {
+  0% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+  12% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+#hint {
+  margin-top: auto;
+  font-size: 18px;
+  line-height: 1.35;
+  color: #ffd2a6;
+}
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 600px;
+  padding: 22px 30px;
+  border: 2px solid rgba(255, 63, 210, 0.7);
+  border-radius: 12px;
+  background: rgba(8, 4, 30, 0.82);
+  box-shadow: 0 0 18px rgba(255, 63, 210, 0.45), inset 0 0 14px rgba(45, 226, 255, 0.2);
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+}
+
+.panel .title {
+  font-size: 46px;
+  letter-spacing: 3px;
+  color: #ffe9fb;
+  text-shadow: 0 2px 0 #000, 0 0 10px #ff3fd2, 0 0 22px #ff3fd2;
+}
+
+.panel .small {
+  font-size: 18px;
+  color: #c9d8ff;
+}
+
+/* The score sits top left, so the perf overlay goes bottom left. */
+#perf {
+  top: auto;
+  right: auto;
+  bottom: 6px;
+  left: 6px;
+}

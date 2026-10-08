@@ -1,0 +1,24 @@
+{
+  "name": "pocketvibe",
+  "version": "0.0.1",
+  "description": "Web games (three.js, Phaser, Wasm) on handheld consoles running ROCKNIX. Start a game with: npm create pocketvibe@latest",
+  "type": "module",
+  "bin": {
+    "pocketvibe": "cli.js"
+  },
+  "files": [
+    "cli.js"
+  ],
+  "keywords": [
+    "pocketvibe",
+    "three.js",
+    "handheld",
+    "rocknix",
+    "anbernic",
+    "game"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

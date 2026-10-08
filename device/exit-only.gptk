@@ -1,0 +1,3 @@
+deadzone_y = 2100
+deadzone_x = 1900
+deadzone_triggers = 3000

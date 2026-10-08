@@ -1,0 +1,222 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is always 720x480
+   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: 720px;
+  height: 480px;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 720px;
+  height: 480px;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+/* Game HUD */
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 18px;
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.stat small {
+  font-size: 18px;
+  color: #d6f5d0;
+}
+
+.stat b {
+  display: inline-block;
+  min-width: 2ch;
+  font-size: 28px;
+  color: #fff;
+}
+
+#score {
+  color: #ffd23f;
+}
+
+#score.bump {
+  animation: bump 0.25s ease-out;
+}
+
+@keyframes bump {
+  0% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Floating "+10" over the board. */
+.popup {
+  position: absolute;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+  pointer-events: none;
+}
+
+.popup.gold {
+  font-size: 30px;
+  color: #ffd23f;
+}
+
+.popup.show {
+  animation: rise 0.8s ease-out forwards;
+}
+
+@keyframes rise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -30%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -80%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -190%) scale(1);
+  }
+}
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 34px;
+  border-radius: 12px;
+  background: rgba(16, 40, 34, 0.68);
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+}
+
+.panel .title {
+  font-size: 48px;
+  letter-spacing: 3px;
+  color: #7cf07a;
+}
+
+.panel .small {
+  font-size: 18px;
+  color: #d6f0e2;
+}
+
+.hud-row[hidden] {
+  display: none;
+}
+
+/* The length counter sits top right, so the perf overlay goes bottom right. */
+#perf {
+  top: auto;
+  bottom: 6px;
+}
