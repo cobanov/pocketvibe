@@ -1027,6 +1027,39 @@ def clean_up():
             path.unlink(missing_ok=True)
 
 
+# Gamepads whose buttons WebKit (libmanette) names wrongly, by the device
+# tree's model. The Anbernic RG DS reports its A button as BTN_EAST, where the
+# RG34XX SP reports BTN_SOUTH, and libmanette's mapping for its GUID swaps A
+# and B. ROCKNIX's own database has the right line; libmanette reads a user
+# file over its own, so PocketVibe writes the line there. Checked on the
+# RG DS with a button test page.
+PAD_MAPPINGS = {
+    'Anbernic RG DS': '190000004b4800000111000000010000,retrogame_joypad (RG DS),'
+                      'a:b0,b:b1,x:b2,y:b3,back:b8,guide:b10,start:b9,dpleft:b15,dpdown:b14,'
+                      'dpright:b16,dpup:b13,leftshoulder:b4,lefttrigger:b6,rightshoulder:b5,'
+                      'righttrigger:b7,leftstick:b11,rightstick:b12,leftx:a0,lefty:a1,'
+                      'rightx:a2,righty:a3,platform:Linux,',
+}
+PAD_MAPPING_FILE = RUNTIME / 'root' / '.config' / 'libmanette' / 'gamecontrollerdb'
+
+
+def fix_pad_mapping():
+    try:
+        model = Path('/proc/device-tree/model').read_text().strip('\x00 \n')
+    except OSError:
+        return
+    line = next((m for name, m in PAD_MAPPINGS.items() if model.startswith(name)), None)
+    try:
+        if line:
+            if not PAD_MAPPING_FILE.exists() or PAD_MAPPING_FILE.read_text() != line + '\n':
+                PAD_MAPPING_FILE.parent.mkdir(parents=True, exist_ok=True)
+                PAD_MAPPING_FILE.write_text(line + '\n')
+        elif PAD_MAPPING_FILE.exists() and 'RG DS' in PAD_MAPPING_FILE.read_text():
+            PAD_MAPPING_FILE.unlink()
+    except OSError as e:
+        print(f'gamepad mapping not written: {e}', file=sys.stderr)
+
+
 def main():
     global launcher_server, notice
     saved_notice = HOME / 'notice'
@@ -1036,6 +1069,7 @@ def main():
     GAMES.mkdir(parents=True, exist_ok=True)
     QUIT_FLAG.unlink(missing_ok=True)
     clean_up()
+    fix_pad_mapping()
     install_bundled()
     threading.Thread(target=watch_buttons, daemon=True).start()
     audio_key.open()
