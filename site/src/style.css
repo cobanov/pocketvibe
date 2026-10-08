@@ -89,7 +89,8 @@ kbd {
   text-decoration: none;
 }
 
-.bar nav a:hover {
+.bar nav a:hover,
+.bar nav a[aria-current='page'] {
   color: var(--text);
 }
 
@@ -187,6 +188,10 @@ h1 span {
   margin: 20px 0 0;
   color: var(--muted);
   font-size: 15px;
+}
+
+.small a {
+  color: var(--text);
 }
 
 /* The handheld sets the column's width; the help under it wraps to fit. */
@@ -1054,6 +1059,11 @@ h2 {
   background: var(--panel);
 }
 
+.steps li > div {
+  flex: 1;
+  min-width: 0;
+}
+
 .steps li > kbd {
   flex: none;
   margin-top: 1px;
@@ -1075,6 +1085,171 @@ h2 {
   margin: 0;
   color: var(--muted);
   font-size: 16px;
+}
+
+.steps p + p,
+.steps p + .code,
+.steps .code + p {
+  margin-top: 10px;
+}
+
+.steps .code {
+  margin: 10px 0 0;
+  background: var(--panel-2);
+}
+
+.steps .copy {
+  background: var(--panel-2);
+}
+
+/* The two downloads at the top of Install. */
+.downloads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
+}
+
+.download {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 22px;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background: var(--panel);
+  text-decoration: none;
+}
+
+.download:hover,
+.download:focus-visible {
+  border-color: var(--accent);
+}
+
+.download > kbd {
+  flex: none;
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.download strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.download small {
+  display: block;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* Using it: each button and what it does. */
+.buttons {
+  margin: 0 0 18px;
+  padding: 6px 22px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.buttons div {
+  display: grid;
+  grid-template-columns: 8.5em minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--panel-2);
+}
+
+.buttons div:first-child {
+  border-top: 0;
+}
+
+.buttons dt {
+  color: var(--accent);
+  font-size: 18px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.buttons dd {
+  margin: 0;
+  color: var(--body);
+  font-size: 16px;
+}
+
+/* Tables of measured limits on the game-making page. */
+.table {
+  margin: 0 0 22px;
+  padding: 4px 22px;
+  overflow-x: auto;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.table th,
+.table td {
+  padding: 10px 14px 10px 0;
+  border-top: 1px solid var(--panel-2);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table td:nth-child(2) {
+  color: var(--accent);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.table td:last-child {
+  color: var(--body);
+}
+
+.column h3.section {
+  margin: 30px 0 12px;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.column > ul {
+  margin: 0 0 18px;
+  padding-left: 1.2em;
+  color: var(--body);
+}
+
+.column > ul li {
+  margin-bottom: 8px;
+}
+
+.column > ul li::marker {
+  color: var(--accent);
+}
+
+.page-intro {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px var(--gutter) 8px;
+}
+
+.page-intro > * {
+  max-width: 720px;
+}
+
+.page-intro .actions {
+  margin-top: 8px;
 }
 
 /* What you need: a card for each kind of handheld, then the handhelds it was
@@ -1170,7 +1345,14 @@ h2 {
 
 .code pre {
   margin: 0;
+  padding-right: 64px; /* clear of the Copy button */
   overflow-x: auto;
+}
+
+/* A sentence to paste into an AI tool wraps instead of scrolling. */
+.code.prompt pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .code code {
@@ -1218,6 +1400,34 @@ h2 {
 }
 
 @media (max-width: 560px) {
+  /* The Copy button sits above the code instead of over it. */
+  .code {
+    padding-top: 46px;
+  }
+
+  .code pre {
+    padding-right: 0;
+  }
+
+  .steps li {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .steps .code {
+    padding: 44px 14px 14px;
+  }
+
+  .steps .copy {
+    top: 10px;
+    right: 10px;
+  }
+
+  .buttons div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
   .bar nav a:not(:last-child) {
     display: none;
   }

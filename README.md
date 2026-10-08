@@ -63,8 +63,11 @@ On an Android handheld, download the newest APK from
 [pocketvibe.cobanov.dev/download/android](https://pocketvibe.cobanov.dev/download/android) and
 open it; allow your browser or file manager to install apps when Android asks.
 
-To make your own game, run `npm create pocketvibe@latest my-game` and follow
-[Get started](docs/getting-started.md). [Making games that run well](docs/performance.md)
+To make your own game, run `npm create pocketvibe@latest my-game`, then tell your AI coding
+tool to read [the brief](https://pocketvibe.cobanov.dev/agents.md) and what to make.
+`npx pocketvibe serve` puts the game on your own handheld, and `npx pocketvibe publish` sends it
+to the store. [Make a game](https://pocketvibe.cobanov.dev/make/) and
+[Get started](docs/getting-started.md) walk through it; [Making games that run well](docs/performance.md)
 has the handheld's measured limits.
 
 **Made on an Anbernic RG34XX SP** with ROCKNIX, and tested on the RG34XX and the two-screen

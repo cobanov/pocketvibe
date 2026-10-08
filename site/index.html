@@ -21,7 +21,7 @@
         <a href="#games">Games</a>
         <a href="#requirements">Requirements</a>
         <a href="#install">Install</a>
-        <a href="#make">Make your own</a>
+        <a href="/make/">Make a game</a>
         <a href="https://github.com/cobanov/pocketvibe">GitHub</a>
       </nav>
     </header>
@@ -36,10 +36,13 @@
             buttons.
           </p>
           <div class="actions">
-            <a class="button primary" href="#install"><kbd>A</kbd>Download PocketVibe</a>
-            <a class="button" href="#make"><kbd>B</kbd>Make your own</a>
+            <a class="button primary" href="/download/rocknix"><kbd>A</kbd>Download for ROCKNIX</a>
+            <a class="button" href="/download/android"><kbd>B</kbd>Download for Android</a>
           </div>
-          <p class="small">Free and open source.</p>
+          <p class="small">
+            Free and open source. <a href="#install">How to install it</a> ·
+            <a href="/make/">Make your own game</a>
+          </p>
         </div>
 
         <figure class="stage" id="play">
@@ -143,6 +146,22 @@
 
       <section class="column" id="install">
         <h2>Put it on your handheld</h2>
+        <div class="downloads">
+          <a class="download" href="/download/rocknix">
+            <kbd>A</kbd>
+            <span>
+              <strong>PocketVibe for ROCKNIX</strong>
+              <small>PocketVibe.zip · <span data-release="rocknix">newest version</span></small>
+            </span>
+          </a>
+          <a class="download" href="/download/android">
+            <kbd>B</kbd>
+            <span>
+              <strong>PocketVibe for Android</strong>
+              <small>PocketVibe.apk · <span data-release="android">newest version</span></small>
+            </span>
+          </a>
+        </div>
         <h3 class="platform">On ROCKNIX</h3>
         <ol class="steps">
           <li>
@@ -197,35 +216,44 @@
             <div>
               <h3>Start PocketVibe from the app list</h3>
               <p>
-                Made for handhelds with buttons, such as the Retroid Pocket or the Anbernic RG Rotate.
-                A new version installs over the old one.
+                Made for handhelds with buttons, such as the Anbernic RG Rotate. A new version
+                installs over the old one, and PocketVibe updates itself from Settings.
               </p>
             </div>
           </li>
         </ol>
         <p class="note">In a game, hold <kbd>Start</kbd> and <kbd>Select</kbd>, or press Back, to go back to PocketVibe.</p>
+
+        <h3 class="platform">Using it</h3>
+        <dl class="buttons">
+          <div><dt><kbd>L</kbd> <kbd>R</kbd></dt><dd>Switch between Library, Store and Settings</dd></div>
+          <div><dt><kbd>A</kbd></dt><dd>Play a game, or open a game's page in the Store, where A downloads it</dd></div>
+          <div><dt><kbd>B</kbd></dt><dd>Go back; on the tabs, quit PocketVibe</dd></div>
+          <div><dt><kbd>Y</kbd></dt><dd>Sort: recently played, newest, most downloaded, A to Z or by category</dd></div>
+          <div><dt><kbd>X</kbd></dt><dd>In the Store, hide the games you already have</dd></div>
+          <div><dt><kbd>Select</kbd></dt><dd>Cards or a list</dd></div>
+          <div><dt><kbd>Start</kbd> + <kbd>Select</kbd></dt><dd>Held in a game: back to PocketVibe. Held for three seconds: quit</dd></div>
+        </dl>
+        <p class="note">
+          The bar along the bottom always shows what each button does. PocketVibe checks for a new
+          version of itself every few hours and offers it in Settings &gt; App update.
+        </p>
       </section>
 
       <section class="column" id="make">
         <h2>Make your own game</h2>
-        <p>Start from a project that already knows the handheld.</p>
-        <div class="code">
-          <pre><code>npm create pocketvibe@latest my-game
-cd my-game
-npm install
-npm run dev</code></pre>
+        <p>
+          Describe a game to your AI coding tool and play it on your handheld the same day. Give it
+          our brief first: the handheld's measured limits, the rules that keep a game at 60 fps,
+          and how to try it on a handheld and send it to the store.
+        </p>
+        <div class="code prompt">
+          <pre><code>Read https://pocketvibe.cobanov.dev/agents.md and follow it. Then make me a PocketVibe game: a snowboard race down a mountain, dodging trees.</code></pre>
           <button class="copy" type="button">Copy</button>
         </div>
-        <p>
-          Describe your game to your AI coding tool. The project's <code>AGENTS.md</code> tells it the
-          screen size, the buttons and the performance budget measured on the handheld, so the game
-          runs at 60 fps there too. Your browser shows it at the handheld's 720 by 480, with its
-          buttons on your keyboard.
-        </p>
-        <p>When it plays well, publish it to the store. You sign in with GitHub, and a new game appears once it is reviewed.</p>
-        <div class="code">
-          <pre><code>npx pocketvibe publish</code></pre>
-          <button class="copy" type="button">Copy</button>
+        <div class="actions">
+          <a class="button primary" href="/make/"><kbd>A</kbd>How to make a game</a>
+          <a class="button" href="/agents.md"><kbd>B</kbd>The brief for your AI</a>
         </div>
       </section>
     </main>

@@ -2,6 +2,7 @@
 //   public/demo/   the handheld app's launcher, copied from app/pocketvibe/launcher
 //   public/play/   every game in the store, unpacked so the demo can play it
 //   public/_redirects   /download/android to the newest Android release's APK
+//   public/releases.json   the newest version and size of each app, for the download buttons
 // The demo's /api answers come from public/sw.js.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
@@ -77,6 +78,7 @@ console.log(`demo ${version}, ${playable.length} playable games`);
 // list of releases. If GitHub cannot be reached, the last APK address stays.
 const REPO = 'https://github.com/cobanov/pocketvibe/releases';
 const redirects = join(SITE, 'public', '_redirects');
+const releasesFile = join(SITE, 'public', 'releases.json');
 const lines = [
   `/download/rocknix ${REPO}/latest/download/PocketVibe.zip 302`,
   `/download/runtime-1 ${REPO}/download/runtime-v1/pocketvibe-runtime-1.tar.xz 302`,
@@ -86,12 +88,18 @@ try {
     headers: { Accept: 'application/vnd.github+json' },
   });
   if (!res.ok) throw new Error(`GitHub: ${res.status}`);
-  const apk = (await res.json())
-    .filter((r) => r.tag_name.startsWith('android-v') && !r.draft && !r.prerelease)
-    .flatMap((r) => r.assets.filter((a) => a.name.endsWith('.apk')))[0];
-  if (!apk) throw new Error('no Android release with an APK');
-  lines.push(`/download/android ${apk.browser_download_url} 302`);
-  console.log(`android ${apk.name}`);
+  const list = (await res.json()).filter((r) => !r.draft && !r.prerelease);
+  const newest = (prefix, asset) => {
+    const release = list.find((r) => r.tag_name.startsWith(prefix) && r.assets.some(asset));
+    return release && { version: release.tag_name.slice(prefix.length), asset: release.assets.find(asset) };
+  };
+  const android = newest('android-v', (a) => a.name.endsWith('.apk'));
+  if (!android) throw new Error('no Android release with an APK');
+  lines.push(`/download/android ${android.asset.browser_download_url} 302`);
+  console.log(`android ${android.asset.name}`);
+  const rocknix = newest('v', (a) => a.name === 'PocketVibe.zip');
+  const entry = (r) => r && { version: r.version, size: r.asset.size };
+  writeFileSync(releasesFile, JSON.stringify({ rocknix: entry(rocknix), android: entry(android) }));
 } catch (e) {
   const old = existsSync(redirects) ? readFileSync(redirects, 'utf8').split('\n').find((l) => l.startsWith('/download/android ')) : null;
   if (old) lines.push(old);

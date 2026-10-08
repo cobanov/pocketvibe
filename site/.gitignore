@@ -5,4 +5,5 @@ dist/
 public/demo/
 public/play/
 public/_redirects
+public/releases.json
 worker-configuration.d.ts

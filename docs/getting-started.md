@@ -97,13 +97,35 @@ keyboard stands in for its buttons:
 
 **P** shows the performance overlay. It turns red when the game is too heavy for the handheld.
 
-Then describe your game to your AI tool. `AGENTS.md` (also read through `CLAUDE.md`) tells it
-the rules that keep a game at 60 fps on the handheld: the screen, the buttons, the materials to
-use, and the budget for draw calls and triangles. The starter project comes with a small
-example game, Coin Rush, to change or replace.
+Then describe your game to your AI tool, and give it the brief first:
+
+```text
+Read https://pocketvibe.cobanov.dev/agents.md and follow it. Then make me a PocketVibe game: a snowboard race down a mountain, dodging trees.
+```
+
+[The brief](https://pocketvibe.cobanov.dev/agents.md) holds the handheld's measured limits, the
+rules that keep a game at 60 fps there, and how to try the game on a handheld and publish it.
+The project's own `AGENTS.md` (also read through `CLAUDE.md`) has the same rules in detail,
+with code. The starter project comes with a small example game to change or replace.
+[Make a game](https://pocketvibe.cobanov.dev/make/) on the website walks through it all.
 
 [Making games that run well](performance.md) explains the handheld's measured limits and how
 to stay inside them, and how to measure a game on a handheld.
+
+### Play it on your own handheld
+
+With the handheld on the same network as your computer, run this in the game's folder:
+
+```sh
+npx pocketvibe serve
+```
+
+It builds the game and prints an address such as `http://192.168.1.20:8740`. In PocketVibe on
+the handheld, open **Settings > Stores > Add a store** and type it. The game is then in the
+**Store** tab as "(dev)", beside the store's copy if there is one, with its own saves: **A**
+downloads it. Each change is built again, and the Store offers the new build as an update.
+This works on ROCKNIX and Android handhelds; keep `serve` running while you play.
+**Settings > Show FPS in games** shows the performance overlay on the handheld.
 
 ### Publish it to the store
 
@@ -130,14 +152,15 @@ npx pocketvibe publish
 
 It builds the game, packs it with its listing and cover, and uploads it. You sign in with
 GitHub: the tool uses the [GitHub CLI](https://cli.github.com) (`gh auth login`) or a
-`GITHUB_TOKEN`. A new game or version appears in the store once it is reviewed, and
-`npx pocketvibe status` shows where your uploads are. To publish an update, raise `version`
-and run `publish` again.
+`GITHUB_TOKEN`. Every game is played before it goes into the store; `npx pocketvibe status`
+shows where your uploads are, and the reason if one is turned down. What review checks is on
+[Make a game](https://pocketvibe.cobanov.dev/make/#review). To publish an update, raise
+`version` and run `publish` again.
 
-### Try it on your own handheld first
+### Over SSH, with this repository
 
-With this repository and SSH access to the handheld, `device/play.sh` copies a built game into
-PocketVibe's Library and starts it there:
+On a ROCKNIX handheld you can also copy a built game straight into PocketVibe's Library and
+start it, with this repository and SSH access to the handheld:
 
 ```sh
 npm run build

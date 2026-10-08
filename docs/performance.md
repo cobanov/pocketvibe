@@ -149,10 +149,11 @@ triangle drawn, also those outside the view, so a red triangle count with a stea
 handheld means they are off screen. The desktop's frame rate tells you nothing about the
 handheld's.
 
-**On a handheld**, turn on **Settings > Show FPS in games** in PocketVibe to see the same
-overlay over every game. To read the numbers from your computer instead, put the game on the
-handheld with `device/play.sh` (see [Get started](getting-started.md)) and start it with
-`perflog`:
+**On a handheld**, put the game there with `npx pocketvibe serve` (see
+[Get started](getting-started.md#play-it-on-your-own-handheld)) and turn on
+**Settings > Show FPS in games** in PocketVibe to see the same overlay over every game. To read
+the numbers from your computer instead, on a ROCKNIX handheld with SSH, put the game there with
+`device/play.sh` and start it with `perflog`:
 
 ```sh
 ssh root@<handheld> 'sh /storage/pocketvibe/run-game.sh <game-id> "&perflog"'

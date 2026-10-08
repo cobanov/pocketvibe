@@ -1,3 +1,5 @@
+import './page.js';
+
 // The hero's handheld runs the real launcher in a frame. public/sw.js stands
 // in for the handheld's local service, so the launcher works as it does there.
 
@@ -348,13 +350,3 @@ async function shelf() {
 render();
 shelf();
 start();
-
-// ---------- Copy buttons ----------
-
-for (const button of document.querySelectorAll('.copy')) {
-  button.addEventListener('click', async () => {
-    await navigator.clipboard.writeText(button.previousElementSibling.textContent.trim());
-    button.textContent = 'Copied';
-    setTimeout(() => (button.textContent = 'Copy'), 1500);
-  });
-}
