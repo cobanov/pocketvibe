@@ -66,6 +66,8 @@ GAME_ID = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
 RUNTIME = HOME / 'runtime'  # the Debian root with WPE WebKit; runtime.py runs things in it
 QUIT_FLAG = Path('/tmp/pocketvibe-quit')  # tells PocketVibe.sh not to restart the browser
 BROWSER_LOG = Path('/tmp/pocketvibe-cog.log')  # PocketVibe.sh sends the browser's output here
+PAGE_MEMORY_LIMIT_KB = 250 * 1024  # see browser_worn
+FREE_MEMORY_LIMIT_KB = 160 * 1024
 RESTART_FLAG = Path('/tmp/pocketvibe-restart')  # tells PocketVibe.sh to start again (after an update)
 BUSY_FLAG = Path('/tmp/pocketvibe-busy')  # PocketVibe.sh waits for it to go before reopening the browser
 WEB_DATA = RUNTIME / 'root' / '.local' / 'share' / 'wpe'  # WebKit's data; storage/ holds every game's saves
@@ -809,10 +811,28 @@ def watch_browser():
             close_browser()
 
 
+def browser_worn():
+    """Whether the browser should start fresh instead of opening the launcher
+    in the same page process. That process grows with the games it has run
+    (95 MB at the start, 250 to 360 MB after a few games on the H700, with
+    100 to 150 MB left free), and it crashed once in that state. A fresh
+    browser takes about 4 s instead of 1 s, so it is only for a full one."""
+    try:
+        pids = subprocess.run(['pgrep', '-f', '^/usr/lib/.*/WPEWebProcess'], capture_output=True, text=True).stdout.split()
+        used = max((int(line.split()[1]) for pid in pids for line in open(f'/proc/{pid}/status') if line.startswith('RssAnon:')), default=0)
+        available = next(int(line.split()[1]) for line in open('/proc/meminfo') if line.startswith('MemAvailable:'))
+    except (OSError, ValueError, StopIteration):
+        return False
+    return used > PAGE_MEMORY_LIMIT_KB or available < FREE_MEMORY_LIMIT_KB
+
+
 def go_home():
     """Leave the running game and show the launcher."""
     global in_game
     in_game = False
+    if browser_worn():
+        # PocketVibe.sh opens a new browser on the launcher.
+        return close_browser()
     try:
         # Ask the running browser to open the launcher (fast, keeps it running).
         done = subprocess.run(
