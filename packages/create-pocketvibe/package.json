@@ -1,6 +1,6 @@
 {
   "name": "create-pocketvibe",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Start a three.js game for PocketVibe handhelds: npm create pocketvibe@latest",
   "type": "module",
   "bin": {

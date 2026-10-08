@@ -130,4 +130,4 @@ Run `npm run dev`, play the game with the keyboard, and check that:
 3. Every action works with the buttons above and every on-screen hint names those buttons.
 4. Nothing is created per frame inside `hh.run`, and nothing new is compiled or uploaded during play (see Loading).
 
-The desktop's frame rate says nothing about the handheld's. If the person has a handheld, have them play the game there: `npx pocketvibe serve` in this folder prints an address to add in PocketVibe's Settings > Stores > Add a store (see README.md). To send it to the store: `npx pocketvibe publish`.
+The desktop's frame rate says nothing about the handheld's. If the person has a handheld, have them play the game there: `npx pocketvibe serve` in this folder prints an address to add in PocketVibe's Settings > Stores > Add a store (see README.md). To send it to the store: the project must be in a public GitHub repository (committed and pushed), then `npx pocketvibe publish` opens a pull request to github.com/cobanov/pocketvibe-store.

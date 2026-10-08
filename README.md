@@ -37,7 +37,7 @@ source, no account needed.
 - **Feels like a console.** Menus with their own sounds and music, everything on the handheld's buttons, and Start + Select to leave a game any time.
 - **Make your own with AI.** Give your coding agent [one link](https://pocketvibe.cobanov.dev/agents.md): it learns the handheld's screen, buttons and measured limits, and writes games that hold 60 fps there.
 - **Play it on your handheld while you make it.** `npx pocketvibe serve` puts the game you are working on in your handheld's store, and every change arrives as an update.
-- **Share it.** `npx pocketvibe publish` sends your game to the store; once it is reviewed, it is on every PocketVibe handheld.
+- **Share it.** `npx pocketvibe publish` opens a pull request to [the store](https://github.com/cobanov/pocketvibe-store), like F-Droid: your game is built from its source and reviewed in the open, and once merged it is on every PocketVibe handheld.
 
 ## Try it
 

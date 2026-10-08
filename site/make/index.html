@@ -118,15 +118,18 @@ npm install</code></pre>
               <p>
                 Fill in <code>pocketvibe.json</code> (a unique <code>id</code>, the title, version
                 <code>1.0.0</code>, a description, the genre and the controls) and add a 480×270
-                <code>cover.png</code>. Sign in to GitHub once with <code>gh auth login</code>, then:
+                <code>cover.png</code>. Store games are open source: put yours in a public GitHub
+                repository (<code>gh repo create my-game --public --source . --push</code>), then:
               </p>
               <div class="code">
                 <pre><code>npx pocketvibe publish</code></pre>
                 <button class="copy" type="button">Copy</button>
               </div>
               <p>
-                We play every game before it goes into the store. <code>npx pocketvibe status</code>
-                shows where yours is. Once approved, it is on every PocketVibe handheld.
+                It opens a pull request to
+                <a href="https://github.com/cobanov/pocketvibe-store">the store's repository</a>, like
+                F-Droid: the game is built from its source and checked there, we play it, and once it
+                is merged it is on every PocketVibe handheld.
               </p>
             </div>
           </li>
@@ -134,7 +137,7 @@ npm install</code></pre>
             <kbd>6</kbd>
             <div>
               <h3>Update it</h3>
-              <p>Raise <code>version</code> in <code>pocketvibe.json</code> and publish again. Players get the update in the Store.</p>
+              <p>Raise <code>version</code> in <code>pocketvibe.json</code>, commit, push and publish again. Players get the update in the Store.</p>
             </div>
           </li>
         </ol>
@@ -220,11 +223,11 @@ npm install</code></pre>
           <li>It works offline.</li>
           <li>Its listing is complete, with a cover that shows the game.</li>
           <li>It is suitable for everyone, and you have the right to use every image, sound and model in it.</li>
-          <li>The zip is under 50 MB.</li>
+          <li>Its repository is public and open source, and the zip is under 50 MB.</li>
         </ul>
         <p>
-          If we turn a game down, <code>npx pocketvibe status</code> says why. Fix it, raise the
-          version and publish again. Questions and ideas are welcome on
+          Everything happens in the open, on the game's pull request: what the check found, what we
+          ask to change, and why. Questions and ideas are welcome on
           <a href="https://github.com/cobanov/pocketvibe/issues">GitHub</a>.
         </p>
       </section>

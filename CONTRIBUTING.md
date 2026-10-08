@@ -7,8 +7,9 @@ Thanks for wanting to help. PocketVibe is small, and every kind of help counts.
 - **Try it on your handheld.** If it works on a handheld we have not tested, or breaks on one,
   [open an issue](https://github.com/cobanov/pocketvibe/issues) with the handheld, its system
   and version (ROCKNIX build or Android version), what you did and what happened.
-- **Make a game.** Games go through the store, not pull requests: start with
-  `npm create pocketvibe@latest`, and send it with `npx pocketvibe publish`.
+- **Make a game.** Games go to [the store's repository](https://github.com/cobanov/pocketvibe-store),
+  not this one: start with `npm create pocketvibe@latest`, and send it with `npx pocketvibe publish`,
+  which opens the pull request there.
   [Make a game](https://pocketvibe.cobanov.dev/make/) has the steps and what review checks.
 - **Improve the app, the store or the website.** Pull requests are welcome. For something big,
   open an issue first so we can agree on the direction.

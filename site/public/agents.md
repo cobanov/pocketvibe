@@ -141,13 +141,18 @@ performance overlay on the handheld. This works on ROCKNIX and Android handhelds
    (`Arcade`, `Shooter`, `Racing`, `Puzzle`, `Platformer` or `Sports`) and `controls` (what each
    button does, e.g. `{ "D-pad": "Move", "A": "Jump", "START": "Pause" }`).
 2. Make `cover.png`, 480×270: a screenshot of the title screen works well.
-3. Sign in to GitHub once with the GitHub CLI (`gh auth login`), or set `GITHUB_TOKEN`.
-4. Run `npx pocketvibe publish`. It builds the game and uploads it for review.
-   `npx pocketvibe status` shows where it is: waiting for review, published or turned down,
-   with the reason.
+3. Store games are open source, built from their source. Put the game in a public GitHub
+   repository with a `LICENSE` (MIT is a good default): sign in once with the GitHub CLI
+   (`gh auth login`), then `git init`, commit, and `gh repo create <name> --public --source . --push`.
+4. Run `npx pocketvibe publish`. It checks that the game builds and is committed and pushed, then
+   opens a pull request to the store's repository,
+   [github.com/cobanov/pocketvibe-store](https://github.com/cobanov/pocketvibe-store), pointing at
+   that commit. Give the person the pull request's link.
 
-Once it is approved, the game is in the store on every PocketVibe handheld. For a new version,
-raise `version` and publish again; it is reviewed too.
+The pull request builds the game from source and checks it. Feedback from the review is posted on
+the pull request; once it is merged, the game is in the store on every PocketVibe handheld.
+`npx pocketvibe status` lists the person's pull requests. For a new version: raise `version`,
+commit, push, and run `npx pocketvibe publish` again.
 
 ## 7. What review checks
 
@@ -159,7 +164,7 @@ raise `version` and publish again; it is reviewed too.
 - Its listing is complete, with a cover that shows the game.
 - It is suitable for everyone, and the person has the right to use every image, sound and model
   in it.
-- The zip is under 50 MB (200 MB unpacked).
+- Its repository is public and open source, and the zip is under 50 MB (200 MB unpacked).
 
 ## Working with the person
 

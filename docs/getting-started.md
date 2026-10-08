@@ -150,12 +150,22 @@ Add a `cover.png` of 480×270, for example a picture of your title screen. Then:
 npx pocketvibe publish
 ```
 
-It builds the game, packs it with its listing and cover, and uploads it. You sign in with
-GitHub: the tool uses the [GitHub CLI](https://cli.github.com) (`gh auth login`) or a
-`GITHUB_TOKEN`. Every game is played before it goes into the store; `npx pocketvibe status`
-shows where your uploads are, and the reason if one is turned down. What review checks is on
+The store works like F-Droid: it is a GitHub repository,
+[cobanov/pocketvibe-store](https://github.com/cobanov/pocketvibe-store), where each game is a
+file pointing at the game's own public repository and a commit. So first put the game in a
+public GitHub repository with a `LICENSE` (MIT is a good default), using the
+[GitHub CLI](https://cli.github.com) (`gh auth login` once):
+
+```sh
+gh repo create my-game --public --source . --push
+```
+
+`npx pocketvibe publish` then checks that the game builds and is committed and pushed, and opens
+a pull request to the store. There the game is built from its source and checked, anyone can
+play it with `npx pocketvibe review <number>`, and the review happens in the open. Once merged,
+it is in the store on every handheld. What review checks is on
 [Make a game](https://pocketvibe.cobanov.dev/make/#review). To publish an update, raise
-`version` and run `publish` again.
+`version`, commit, push and run `publish` again.
 
 ### Over SSH, with this repository
 

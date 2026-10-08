@@ -62,13 +62,15 @@ Android handhelds.
 
 ## Publish it to the store
 
-Give the game its own `id` and a `version` in `pocketvibe.json`, then:
+Give the game its own `id` and a `version` in `pocketvibe.json`. Store games are open source:
+put the project in a public GitHub repository with a `LICENSE`
+(`gh repo create my-game --public --source . --push`), then:
 
 ```sh
 npx pocketvibe publish
 ```
 
-You sign in with GitHub. Every game is played before it goes into the store
-([what review checks](https://pocketvibe.cobanov.dev/make/#review)); `npx pocketvibe status`
-shows where yours is. Once approved, it is on every handheld with PocketVibe. For a new
-version, raise `version` and publish again.
+It opens a pull request to [the store's repository](https://github.com/cobanov/pocketvibe-store),
+where the game is built from its source and reviewed
+([what review checks](https://pocketvibe.cobanov.dev/make/#review)). Once merged, it is on every
+handheld with PocketVibe. For a new version, raise `version`, commit, push and publish again.
