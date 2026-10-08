@@ -5,83 +5,71 @@
 <h1 align="center">PocketVibe</h1>
 
 <p align="center">
-  <strong>Make a game with AI. Play it on your handheld.</strong><br>
-  A launcher, a game store and a starter project for three.js games on ROCKNIX handhelds.
+  <strong>Play three.js games on your retro handheld. Make your own with AI.</strong><br>
+  A launcher, a game store and a starter kit for ROCKNIX and Android handhelds.
 </p>
 
 <p align="center">
-  <a href="https://pocketvibe.cobanov.dev/download/rocknix"><strong>Download PocketVibe</strong></a> ·
+  <a href="https://pocketvibe.cobanov.dev/download/rocknix"><strong>Download for ROCKNIX</strong></a> ·
+  <a href="https://pocketvibe.cobanov.dev/download/android"><strong>Download for Android</strong></a> ·
   <a href="https://pocketvibe.cobanov.dev">Website</a> ·
-  <a href="docs/getting-started.md">Get started</a> ·
+  <a href="https://pocketvibe.cobanov.dev/how/">How it works</a> ·
   <a href="https://github.com/cobanov/pocketvibe/issues">Issues</a>
 </p>
 
-PocketVibe is for people who make three.js games with AI coding tools like Claude Code or
-Cursor and want to play them on a real handheld. It adds an app to the Ports menu of
-ROCKNIX with a store of games made for the handheld's screen and buttons. No Linux, SSH or
-porting needed: unzip it once and it keeps itself up to date.
+PocketVibe turns a retro handheld into a little console for web games. It comes with 21 three.js
+games, a store to download more with one button, and everything you need to make your own with
+an AI coding tool like Claude Code, Codex or Cursor and play it on your own device. Free and open
+source, no account needed.
 
 <p align="center">
-  <a href="docs/screenshots/library.png"><img src="docs/screenshots/library.png" alt="The Library: game covers in a grid, with the tabs and the handheld's buttons as hints" width="360"></a>
-  <a href="docs/screenshots/ready.png"><img src="docs/screenshots/ready.png" alt="A game that just finished downloading, ready to play, with small fireworks" width="360"></a>
+  <a href="docs/screenshots/library.png"><img src="docs/screenshots/library.png" alt="The Library: five game covers in a grid, with the tabs and the handheld's buttons as hints" width="360"></a>
+  <a href="docs/screenshots/store.png"><img src="docs/screenshots/store.png" alt="The Store: 21 games with their covers and sizes" width="360"></a>
   <br>
-  <sub>Captured on an Anbernic RG34XX SP at its 720×480. Try the launcher in your browser on the <a href="https://pocketvibe.cobanov.dev">website</a>.</sub>
+  <sub>The launcher at the handheld's 720×480. Play every game in your browser on the <a href="https://pocketvibe.cobanov.dev">website</a>.</sub>
 </p>
 
-## Your game, in your hands.
+## A console for the games you vibe-code.
 
-- **Get games from the store.** PocketVibe starts with five games, and the store has more: pick one, watch it download, and play. Updates show up on their own.
-- **Fits every screen.** Games fill 3:2, 4:3, 16:9 and square screens, and on the two-screen Anbernic RG DS a game can use both, like Turbo Circuit's map and standings below the race.
-- **Feels like a console.** Menus have their own sounds and music, and everything works with the handheld's buttons.
-- **Start from a project that knows the handheld.** `npm create pocketvibe` sets up Vite and three.js with an `AGENTS.md` that teaches your AI tool the screen, the buttons and the performance budget.
-- **Keep it at 60 fps.** WPE WebKit draws with the handheld's GPU. Scenes that follow the rules ran at 60 fps on the H700; the same scenes written the usual way stayed under 6.
-- **Publish with one command.** `npx pocketvibe publish` builds your game and sends it to the store. You sign in with GitHub.
-- **Leave a game any time.** Hold Start + Select to go back to the launcher, or a little longer to quit.
-- **Keep your saves.** Every game saves on its own, and Settings backs all saves up to the SD card.
+- **Games in one press.** It starts with five games, and the store has the rest: press A, watch it download, play. Updates arrive on their own.
+- **Runs on ROCKNIX and Android.** Tested on the Anbernic RG34XX SP, RG34XX and RG DS with ROCKNIX, and the RG Rotate with Android.
+- **Fits every screen.** Games fill 3:2, 4:3, 16:9 and square screens, and on the two-screen RG DS a game can use both.
+- **Feels like a console.** Menus with their own sounds and music, everything on the handheld's buttons, and Start + Select to leave a game any time.
+- **Make your own with AI.** Give your coding agent [one link](https://pocketvibe.cobanov.dev/agents.md): it learns the handheld's screen, buttons and measured limits, and writes games that hold 60 fps there.
+- **Play it on your handheld while you make it.** `npx pocketvibe serve` puts the game you are working on in your handheld's store, and every change arrives as an update.
+- **Share it.** `npx pocketvibe publish` sends your game to the store; once it is reviewed, it is on every PocketVibe handheld.
 
 ## Try it
 
-Just curious? The [website](https://pocketvibe.cobanov.dev) runs the real launcher with the
-store's games in your browser.
+Just curious? The [website](https://pocketvibe.cobanov.dev) runs the real launcher with every game
+in your browser.
 
-On your handheld, with ROCKNIX (PocketVibe does not run on muOS or other firmware), a 64-bit
-Arm chip, 1 GB of RAM or more, Wi-Fi and about 1 GB free on the SD card:
+**On ROCKNIX** (not muOS or other firmware), with a 64-bit Arm chip, 1 GB of RAM, Wi-Fi and about
+1 GB free on the SD card:
 
-1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix) (5 MB).
-2. Unzip it into the handheld's `roms/ports`. Over the network, turn on Samba in ROCKNIX's
-   network settings and open the handheld's `games-roms` share; a second SD card for games can
-   also be filled with a card reader.
-3. Restart the handheld (or update the game lists) and open **Ports**, then **PocketVibe**.
+1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix).
+2. Turn on Samba in ROCKNIX's network settings, open the handheld's `games-roms` share and unzip it into `ports`.
+3. Restart the handheld, open **Ports**, then **PocketVibe**. The first start sets up the game engine (about 150 MB, a minute and a half).
 
-The first start downloads PocketVibe's game engine (about 150 MB) and installs it, with a
-progress bar for each step: about a minute and a half over Wi-Fi, once. Then it opens with
-five games, and updates itself from Settings from then on. If the handheld uses the libmali
-graphics driver, PocketVibe offers to switch to Panfrost with one press, so games run at
-full speed.
+**On Android** (10 or newer): open [pocketvibe.cobanov.dev/download/android](https://pocketvibe.cobanov.dev/download/android) on the handheld and install the APK.
 
-On an Android handheld, download the newest APK from
-[pocketvibe.cobanov.dev/download/android](https://pocketvibe.cobanov.dev/download/android) and
-open it; allow your browser or file manager to install apps when Android asks.
+**Make a game:**
 
-To make your own game, run `npm create pocketvibe@latest my-game`, then tell your AI coding
-tool to read [the brief](https://pocketvibe.cobanov.dev/agents.md) and what to make.
-`npx pocketvibe serve` puts the game on your own handheld, and `npx pocketvibe publish` sends it
-to the store. [Make a game](https://pocketvibe.cobanov.dev/make/) and
-[Get started](docs/getting-started.md) walk through it; [Making games that run well](docs/performance.md)
-has the handheld's measured limits.
+```sh
+npm create pocketvibe@latest my-game
+```
 
-**Made on an Anbernic RG34XX SP** with ROCKNIX, and tested on the RG34XX and the two-screen
-Anbernic RG DS. On Android it runs on the Anbernic RG Rotate. Other ROCKNIX handhelds with the
-same chips, such as the RG35XX and RG40XX families, should work too, but are not tested yet.
+Then tell your AI tool: "Read https://pocketvibe.cobanov.dev/agents.md and follow it. Then make me
+a PocketVibe game: ...". [Make a game](https://pocketvibe.cobanov.dev/make/) walks through the rest.
 
 ## Want to tinker?
 
-On the handheld, a small Python service and an HTML launcher run WPE WebKit and Cog from a
-Debian root. The store is a Cloudflare Worker with D1 and R2; the website is static. The app
-and its engine are GitHub releases, downloaded through `pocketvibe.cobanov.dev/download/`, so
-where they are hosted can change without a new app.
+On ROCKNIX, a small Python service and an HTML launcher run WPE WebKit and Cog from a Debian root;
+on Android, a Kotlin app runs the same launcher in a WebView. The store is a Cloudflare Worker with
+D1 and R2. [How it works](https://pocketvibe.cobanov.dev/how/) explains it all in a few minutes.
 
 [Development](docs/development.md) ·
+[Contributing](CONTRIBUTING.md) ·
 [Rules for AI tools](template/AGENTS.md) ·
 [Performance guide](docs/performance.md) ·
 [Command line tool](packages/pocketvibe/README.md) ·
@@ -89,4 +77,4 @@ where they are hosted can change without a new app.
 
 ---
 
-[MIT](LICENSE) · DejaVu fonts under the [Bitstream Vera license](site/public/fonts/LICENSE.txt)
+[MIT](LICENSE) · DejaVu fonts under the [Bitstream Vera license](site/public/fonts/LICENSE.txt) · Platform marks from [Simple Icons](https://simpleicons.org) (CC0)
