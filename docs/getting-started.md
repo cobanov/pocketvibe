@@ -10,7 +10,7 @@ its SD card. PocketVibe is made on an Anbernic RG34XX SP and also runs on the tw
 Anbernic RG DS; other ROCKNIX handhelds may work. On a handheld that lets you choose its GPU
 driver (the RG DS does), choose Panfrost in the system settings: with libmali, games run slowly.
 
-1. Download [PocketVibe.zip](https://github.com/cobanov/pocketvibe/releases/latest/download/PocketVibe.zip).
+1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix).
 2. Unzip it into the `roms/ports` folder of the handheld's SD card. Put the card in your computer,
    or copy the files over the handheld's network share.
 3. Restart the handheld, open **Ports** and start **PocketVibe**.

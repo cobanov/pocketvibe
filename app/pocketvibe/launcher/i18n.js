@@ -102,6 +102,16 @@ const STRINGS = {
     en: 'Games need a newer Android System WebView (94 or later). Update it from the Play Store.',
     tr: "Oyunlar daha yeni bir Android System WebView istiyor (94 ya da sonrası). Play Store'dan güncelle.",
   },
+  gpuAsk: {
+    en: 'This handheld uses the libmali graphics driver, which makes games run very slowly here. Switch to Panfrost? The handheld restarts.',
+    tr: "Bu cihaz libmali grafik sürücüsünü kullanıyor; oyunlar onunla burada çok yavaş çalışır. Panfrost'a geçilsin mi? Cihaz yeniden başlar.",
+  },
+  welcome: {
+    en: 'Welcome to PocketVibe! L and R switch to the Store, where more games are a press of A away.',
+    tr: "PocketVibe'a hoş geldin! L ve R ile Store'a geç; daha fazla oyun orada, A ile bir tuş uzağında.",
+  },
+  gpuSwitch: { en: 'Switch to Panfrost', tr: "Panfrost'a geç" },
+  gpuRestarting: { en: 'Switching to Panfrost. Restarting...', tr: "Panfrost'a geçiliyor. Yeniden başlatılıyor..." },
   gpuToast: {
     en: 'Games run slowly with the libmali GPU driver. Choose Panfrost in the ROCKNIX system settings and restart.',
     tr: "libmali GPU sürücüsüyle oyunlar yavaş çalışır. ROCKNIX sistem ayarlarından Panfrost'u seçip yeniden başlat.",

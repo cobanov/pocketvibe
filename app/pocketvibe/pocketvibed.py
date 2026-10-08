@@ -440,6 +440,14 @@ def gpu_driver():
     return 'libmali' if Path('/dev/mali0').exists() else None
 
 
+def switch_to_panfrost():
+    """Choose Panfrost in ROCKNIX's settings and restart, which loads it."""
+    subprocess.run(['sh', '-c', '. /etc/profile.d/001-functions && set_setting gpu.driver panfrost'], check=True, timeout=10)
+    subprocess.run(['sync'], check=False)
+    time.sleep(1.5)  # let the launcher show that it is restarting
+    subprocess.run(['systemctl', 'reboot'], check=False)
+
+
 def device_info():
     usage = shutil.disk_usage(HOME if HOME.exists() else '/')
     games_size = sum(f.stat().st_size for f in GAMES.rglob('*') if f.is_file()) if GAMES.exists() else 0
@@ -964,6 +972,11 @@ class LauncherHandler(SimpleHTTPRequestHandler):
                 set_job('__app__', state='queued', progress=0, error=None)
                 threading.Thread(target=install_update, daemon=True).start()
             return self.send_json({'ok': True})
+        if route == '/api/gpu/panfrost':
+            if gpu_driver() != 'libmali':
+                return self.send_json({'error': 'the GPU already uses Panfrost'}, 400)
+            self.send_json({'ok': True})
+            return threading.Thread(target=switch_to_panfrost, daemon=True).start()
         if route == '/api/unlock-audio':
             return self.send_json({'ok': audio_key.tap()})
         if route == '/api/saves/backup':

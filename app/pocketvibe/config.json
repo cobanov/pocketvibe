@@ -4,8 +4,13 @@
   "update_url": "https://api.github.com/repos/cobanov/pocketvibe/releases?per_page=20",
   "runtime": {
     "version": 1,
+    "urls": [
+      "https://pocketvibe.cobanov.dev/download/runtime-1",
+      "https://github.com/cobanov/pocketvibe/releases/download/runtime-v1/pocketvibe-runtime-1.tar.xz"
+    ],
     "url": "https://github.com/cobanov/pocketvibe/releases/download/runtime-v1/pocketvibe-runtime-1.tar.xz",
     "sha256": "b70707018a044a143a7d646462b9c48034a6196ce7d1b5a930c8ee0ef033ea60",
-    "size_mb": 147
+    "size_mb": 147,
+    "unpacked_mb": 690
   }
 }

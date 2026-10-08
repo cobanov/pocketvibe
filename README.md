@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/cobanov/pocketvibe/releases/latest/download/PocketVibe.zip"><strong>Download PocketVibe</strong></a> ·
+  <a href="https://pocketvibe.cobanov.dev/download/rocknix"><strong>Download PocketVibe</strong></a> ·
   <a href="https://pocketvibe.cobanov.dev">Website</a> ·
   <a href="docs/getting-started.md">Get started</a> ·
   <a href="https://github.com/cobanov/pocketvibe/issues">Issues</a>
@@ -44,7 +44,7 @@ store's games in your browser.
 
 On your handheld:
 
-1. Download [PocketVibe.zip](https://github.com/cobanov/pocketvibe/releases/latest/download/PocketVibe.zip).
+1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix).
 2. Unzip it into `roms/ports` on the handheld's SD card.
 3. Restart the handheld and open **Ports**, then **PocketVibe**. The first start downloads the game engine, about 150 MB, over Wi-Fi.
 

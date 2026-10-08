@@ -67,10 +67,20 @@ const shelf = games
 writeFileSync(join(play, 'catalog.json'), JSON.stringify(shelf));
 console.log(`demo ${version}, ${playable.length} playable games`);
 
+// Download addresses on the site's own domain, so that where the files are
+// hosted can change without a new app or new links:
+//   /download/rocknix     the handheld app to install (GitHub's latest release)
+//   /download/runtime-1   the app's game engine, which it downloads on its first start
+//   /download/android     the newest Android release's APK
 // The Android app's releases are tagged android-v<version>, and GitHub's
 // "latest" release is the ROCKNIX app, so the APK's address comes from the
-// list of releases. If GitHub cannot be reached, the last _redirects stays.
+// list of releases. If GitHub cannot be reached, the last APK address stays.
+const REPO = 'https://github.com/cobanov/pocketvibe/releases';
 const redirects = join(SITE, 'public', '_redirects');
+const lines = [
+  `/download/rocknix ${REPO}/latest/download/PocketVibe.zip 302`,
+  `/download/runtime-1 ${REPO}/download/runtime-v1/pocketvibe-runtime-1.tar.xz 302`,
+];
 try {
   const res = await fetch('https://api.github.com/repos/cobanov/pocketvibe/releases?per_page=30', {
     headers: { Accept: 'application/vnd.github+json' },
@@ -80,8 +90,11 @@ try {
     .filter((r) => r.tag_name.startsWith('android-v') && !r.draft && !r.prerelease)
     .flatMap((r) => r.assets.filter((a) => a.name.endsWith('.apk')))[0];
   if (!apk) throw new Error('no Android release with an APK');
-  writeFileSync(redirects, `/download/android ${apk.browser_download_url} 302\n`);
+  lines.push(`/download/android ${apk.browser_download_url} 302`);
   console.log(`android ${apk.name}`);
 } catch (e) {
-  console.log(`android download not updated (${e.message})${existsSync(redirects) ? '' : ', and there is none yet'}`);
+  const old = existsSync(redirects) ? readFileSync(redirects, 'utf8').split('\n').find((l) => l.startsWith('/download/android ')) : null;
+  if (old) lines.push(old);
+  console.log(`android download not updated (${e.message})${old ? '' : ', and there is none yet'}`);
 }
+writeFileSync(redirects, lines.join('\n') + '\n');

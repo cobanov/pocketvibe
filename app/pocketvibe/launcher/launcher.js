@@ -614,6 +614,8 @@ function settingsAction(button, repeat) {
       .catch((e) => toast(e.message, 'error'));
   } else if (id === 'restore' && button === 'A') {
     pickBackup(); // its list opening (or the toast) is the sound
+  } else if (id === 'gpu' && button === 'A') {
+    askForPanfrost();
   } else if (id === 'update' && button === 'A') {
     if (state.update?.available) {
       showDialog(t('updateConfirm', { version: state.update.version }), async () => {
@@ -873,6 +875,7 @@ function renderHints() {
     if (['music', 'uiSounds', 'showFps', 'musicVolume', 'sfxVolume', 'language'].includes(id)) parts.push(hint('A', t('change')));
     if (['addStore', 'backup', 'restore'].includes(id)) parts.push(hint('A', t('select')));
     if (id === 'update') parts.push(hint('A', state.update?.available ? t('update') : t('check')));
+    if (id === 'gpu') parts.push(hint('A', t('gpuSwitch')));
     if (id.startsWith('store:')) parts.push(hint('Y', t('remove')));
     parts.push(hint('B', t('quit')));
   } else {
@@ -885,6 +888,19 @@ function renderHints() {
     parts.push(hint('B', t('quit')));
   }
   ui.hints.innerHTML = parts.join('');
+}
+
+// libmali draws PocketVibe's games on the CPU. Panfrost is one tap away:
+// the service switches ROCKNIX's driver setting and restarts the handheld.
+function askForPanfrost() {
+  showDialog(t('gpuAsk'), async () => {
+    try {
+      await api('/api/gpu/panfrost', 'POST');
+      toast(t('gpuRestarting'), 'notification');
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
 }
 
 function showDialog(text, onYes) {
@@ -1379,8 +1395,24 @@ async function unlockAudio() {
   if (notice === 'restored') toast(t('restored'), 'save_done');
   else if (notice?.startsWith('updated:')) toast(t('updatedTo', { version: notice.slice(8) }));
   else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }), 'error');
-  else if (state.info?.gpu === 'libmali') toast(t('gpuToast'));
-  else if (state.info?.platform === 'android' && webviewVersion() < 94) toast(t('webviewOld'));
+  else if (state.info?.gpu === 'libmali' && !load('gpuAsked', false)) {
+    // Asked once; Settings keeps the row to switch later.
+    try {
+      localStorage.setItem('gpuAsked', 'true');
+    } catch {
+      // Then it asks again next time.
+    }
+    askForPanfrost();
+  } else if (state.info?.platform === 'android' && webviewVersion() < 94) toast(t('webviewOld'));
+  else if (!load('welcomed', false)) {
+    // The first start: where to find more games.
+    try {
+      localStorage.setItem('welcomed', 'true');
+    } catch {
+      // Then it says hello again next time.
+    }
+    toast(t('welcome'), 'notification');
+  }
   pollJobs();
   await checkUpdate();
   renderTabs();
