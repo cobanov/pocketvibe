@@ -1,13 +1,33 @@
 // Device layer for handheld games.
 //
-// Owns the screen (a fixed 720x480 canvas), input (gamepad + keyboard), the
-// game loop, saving and a performance overlay. Games use this module instead
-// of touching the window, the renderer size or input events directly, so the
-// same code behaves the same in a desktop browser and on the handheld.
+// Owns the screen (a canvas sized for the handheld's screen), input (gamepad +
+// keyboard), the game loop, saving and a performance overlay. Games use this
+// module instead of touching the window, the renderer size or input events
+// directly, so the same code behaves the same in a desktop browser and on the
+// handheld.
 
 import * as THREE from 'three';
 
+// The screen games are designed for (the RG34XX SP's, 3:2). Every screen
+// shows at least this much: a wider one adds space at the sides, a taller one
+// above and below (see screenSize).
 export const SCREEN = { width: 720, height: 480 };
+
+// The shapes of handheld screens (width / height), for trying them in the
+// desktop browser: the 3:2 RG34XX SP, the 4:3 RG DS, 16:9 Android handhelds
+// and the square RG Rotate.
+export const ASPECTS = { '3:2': 3 / 2, '4:3': 4 / 3, '16:9': 16 / 9, '1:1': 1 };
+
+// The game's screen for a display of this shape: 720x480 grown to the shape,
+// so 4:3 is 720x540, 16:9 854x480 and 1:1 720x720. Shapes past 1:1 and 2:1
+// get those sizes and black bars.
+export function screenSize(aspect) {
+  const a = Math.min(Math.max(aspect || SCREEN.width / SCREEN.height, 1), 2);
+  const even = (n) => Math.round(n / 2) * 2;
+  return a >= SCREEN.width / SCREEN.height
+    ? { width: even(SCREEN.height * a), height: SCREEN.height }
+    : { width: SCREEN.width, height: even(SCREEN.width / a) };
+}
 
 // Per-frame performance budget, measured on the RG34XX SP (bench/results/
 // 2026-10-08-limits.md). The overlay counts every triangle drawn, also those
@@ -53,7 +73,23 @@ const PADMAP = {
   15: 'RIGHT',
 };
 
-const onDevice = new URLSearchParams(location.search).has('handheld');
+const params = new URLSearchParams(location.search);
+const onDevice = params.has('handheld');
+
+// ?screen=720x540 comes from the PocketVibe game shell, which gives the game
+// a frame of that size; ?aspect=4:3 tries a shape in the desktop browser.
+// Without either the screen is 720x480, as on the RG34XX SP.
+function chooseScreen() {
+  const size = /^(\d+)x(\d+)$/.exec(params.get('screen') ?? '');
+  if (size) {
+    const width = Number(size[1]);
+    const height = Number(size[2]);
+    if (width >= SCREEN.width && height >= SCREEN.height && width <= 1440 && height <= 1440) return { width, height };
+  }
+  const aspect = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(params.get('aspect') ?? '');
+  if (aspect) return screenSize(Number(aspect[1]) / Number(aspect[2]));
+  return { ...SCREEN };
+}
 
 function createInput() {
   const keys = new Set(); // buttons held on the keyboard
@@ -115,7 +151,6 @@ function createInput() {
 }
 
 function createPerfOverlay(parent, renderer) {
-  const params = new URLSearchParams(location.search);
   const el = document.createElement('div');
   el.id = 'perf';
   el.hidden = onDevice && !params.has('perf');
@@ -163,50 +198,115 @@ function createPerfOverlay(parent, renderer) {
   };
 }
 
-// Fit the 720x480 screen into the browser window. On the device the window
-// is exactly 720x480, so nothing is scaled there.
-function fitScreen(frame, screen) {
+// Fit the game's screen into the browser window. On the device the window
+// is exactly the game's screen, so nothing is scaled there.
+function fitScreen(frame, screen, size) {
   const fit = () => {
-    const scale = onDevice
-      ? 1
-      : Math.min((innerWidth - 48) / SCREEN.width, (innerHeight - 96) / SCREEN.height, 2);
-    frame.style.width = `${SCREEN.width * scale}px`;
-    frame.style.height = `${SCREEN.height * scale}px`;
+    const scale = onDevice ? 1 : Math.min((innerWidth - 48) / size.width, (innerHeight - 96) / size.height, 2);
+    frame.style.width = `${size.width * scale}px`;
+    frame.style.height = `${size.height * scale}px`;
     screen.style.transform = `scale(${scale})`;
   };
   addEventListener('resize', fit);
   fit();
 }
 
-// resolution: 0.5 draws the 3D scene at 360x240 and stretches it to the
-// screen. It cuts the cost of drawing by half or more; use it when a scene
-// cannot be made cheap enough. The HUD stays sharp.
+// In the desktop browser, links under the screen switch between the shapes
+// of handheld screens.
+function addShapeLinks(size) {
+  const legend = document.getElementById('legend');
+  if (!legend || onDevice) return;
+  legend.append(' · Screen');
+  for (const [name, aspect] of Object.entries(ASPECTS)) {
+    const { width, height } = screenSize(aspect);
+    const link = document.createElement('a');
+    const url = new URL(location.href);
+    url.searchParams.set('aspect', name);
+    link.href = url.href;
+    link.textContent = name;
+    link.style.marginLeft = '6px';
+    link.style.color = width === size.width && height === size.height ? '#fff' : '#888';
+    link.style.fontWeight = width === size.width && height === size.height ? '700' : '400';
+    legend.append(link);
+  }
+}
+
+// resolution: 0.5 draws the 3D scene at half the screen's size and stretches
+// it to the screen. It cuts the cost of drawing by half or more; use it when
+// a scene cannot be made cheap enough. The HUD stays sharp.
 export function createHandheld({ clearColor = 0x000000, resolution = 1 } = {}) {
   document.body.classList.toggle('handheld', onDevice);
   const frame = document.getElementById('frame');
   const screen = document.getElementById('screen');
   const hud = document.getElementById('hud');
+  const size = chooseScreen();
+  const { width, height } = size;
+  const aspect = width / height;
+  screen.style.width = `${width}px`;
+  screen.style.height = `${height}px`;
+  screen.style.setProperty('--screen-width', `${width}px`);
+  screen.style.setProperty('--screen-height', `${height}px`);
 
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(1);
-  // false: keep the CSS size from style.css instead of setting it here.
-  renderer.setSize(Math.round(SCREEN.width * resolution), Math.round(SCREEN.height * resolution), false);
+  // false: the canvas keeps the screen's CSS size, set below.
+  renderer.setSize(Math.round(width * resolution), Math.round(height * resolution), false);
+  renderer.domElement.style.width = `${width}px`;
+  renderer.domElement.style.height = `${height}px`;
   renderer.setClearColor(clearColor);
   // Count draw calls over the whole frame, even if the game renders twice.
   renderer.info.autoReset = false;
   screen.insertBefore(renderer.domElement, hud);
 
-  fitScreen(frame, screen);
+  fitScreen(frame, screen, size);
+  addShapeLinks(size);
   const input = createInput();
   const perf = createPerfOverlay(screen, renderer);
+
+  // How much taller than designed the view must be here, so that a part of
+  // it `minAspect` wide (width / height) stays in view: 1 on screens at least
+  // that wide, more on narrower ones.
+  const viewScale = (minAspect = SCREEN.width / SCREEN.height) => Math.max(1, minAspect / aspect);
 
   return {
     renderer,
     input,
     hud,
-    width: SCREEN.width,
-    height: SCREEN.height,
+    // The game's screen: 720x480 on the RG34XX SP, larger on other shapes
+    // (see screenSize). The HUD's coordinate space is this size too.
+    width,
+    height,
+    aspect,
     onDevice,
+    viewScale,
+
+    // Sets a camera for this screen. Give the view as designed for the
+    // 720x480 screen: a perspective camera's vertical `fov` in degrees, an
+    // orthographic camera's `height` in world units (centered on `center`).
+    // Left out, they are taken from the camera the first time. The whole
+    // designed view stays visible; wider screens show more at the sides,
+    // taller ones more above and below. `minAspect` narrows the part that
+    // must stay visible (e.g. 1.1 for a board), so that taller screens zoom
+    // in on it instead. Call it again whenever the designed view changes.
+    fitCamera(camera, { fov, height: viewHeight, center, minAspect } = {}) {
+      const design = (camera.userData.design ??= camera.isOrthographicCamera
+        ? { height: camera.top - camera.bottom, center: (camera.top + camera.bottom) / 2, middle: (camera.left + camera.right) / 2 }
+        : { fov: camera.fov });
+      const scale = viewScale(minAspect);
+      if (camera.isOrthographicCamera) {
+        const half = ((viewHeight ?? design.height) * scale) / 2;
+        const y = center ?? design.center;
+        camera.top = y + half;
+        camera.bottom = y - half;
+        camera.left = design.middle - half * aspect;
+        camera.right = design.middle + half * aspect;
+      } else {
+        const tan = Math.tan(THREE.MathUtils.degToRad(fov ?? design.fov) / 2) * scale;
+        camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tan));
+        camera.aspect = aspect;
+      }
+      camera.updateProjectionMatrix();
+    },
 
     // Runs update(dt) once per frame. dt is in seconds and capped, so a long
     // pause (loading, a hitch) does not make objects jump.

@@ -76,7 +76,8 @@ npm install
 npm run dev
 ```
 
-Open the address it prints. The game runs in a 720×480 frame, the handheld's screen, and your
+Open the address it prints. The game runs in a 720×480 frame, the handheld's screen (links under it
+try the other screen shapes PocketVibe runs on), and your
 keyboard stands in for its buttons:
 
 | Handheld | Keyboard |

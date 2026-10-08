@@ -7,6 +7,19 @@
 // in its pixels.
 export const NATIVE = { width: 720, height: 480 };
 
+// The screen a game that fits any screen shape (`"responsive": true` in its
+// pocketvibe.json) gets for a display of this shape: 720x480 grown to the
+// shape, so 4:3 is 720x540, 16:9 854x480 and 1:1 720x720. Shapes past 1:1 and
+// 2:1 get those sizes and black bars. Same as screenSize in the starter
+// project's handheld.js.
+export function gameSize(aspect) {
+  const a = Math.min(Math.max(aspect || NATIVE.width / NATIVE.height, 1), 2);
+  const even = (n) => Math.round(n / 2) * 2;
+  return a >= NATIVE.width / NATIVE.height
+    ? { width: even(NATIVE.height * a), height: NATIVE.height }
+    : { width: NATIVE.width, height: even(NATIVE.width / a) };
+}
+
 // "x,y,width,height;x,y,width,height" -> [{ x, y, width, height }]
 export function parseScreens(text) {
   const screens = [];

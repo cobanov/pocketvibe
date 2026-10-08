@@ -17,6 +17,7 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(SKY, 25, 60);
 
 const camera = new THREE.PerspectiveCamera(60, hh.width / hh.height, 0.1, 70);
+hh.fitCamera(camera); // the 60° view stays whole on every screen shape
 
 // One hemisphere light and one directional light, no shadows.
 scene.add(new THREE.HemisphereLight(0xffffff, 0x445533, 1.2));

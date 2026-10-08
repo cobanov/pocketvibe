@@ -12,7 +12,7 @@
   <a href="AGENTS.md">Rules for AI tools</a>
 </p>
 
-This project is ready for a game on a handheld's 720×480 screen and buttons. It starts as
+This project is ready for a game on a handheld's screen (720×480, and the other shapes PocketVibe runs on) and buttons. It starts as
 Coin Rush, a small example game; tell your AI coding tool what to make instead.
 
 ## Make it yours

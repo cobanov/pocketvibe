@@ -28,7 +28,7 @@ const readmePath = resolve(target, 'README.md');
 writeFileSync(readmePath, readFileSync(readmePath, 'utf8').replace('My handheld game', title));
 writeFileSync(
   resolve(target, 'pocketvibe.json'),
-  JSON.stringify({ id, title, author: '', version: '0.1.0', description: '' }, null, 2) + '\n',
+  JSON.stringify({ id, title, author: '', version: '0.1.0', description: '', responsive: true }, null, 2) + '\n',
 );
 
 console.log(`

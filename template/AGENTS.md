@@ -1,6 +1,6 @@
 # Handheld game rules
 
-This project is a three.js game for a handheld game console (Anbernic RG34XX SP, running ROCKNIX). The game runs full screen in an embedded browser engine (WPE WebKit) on low-end hardware: 4× Cortex-A53 CPU, Mali-G31 MP2 GPU, 1 GB RAM (the browser engine uses most of it, so keep the game's own assets well under 150 MB), 720×480 screen. There is no mouse, no touch screen and no keyboard; only the buttons below.
+This project is a three.js game for a handheld game console (Anbernic RG34XX SP, running ROCKNIX). The game runs full screen in an embedded browser engine (WPE WebKit) on low-end hardware: 4× Cortex-A53 CPU, Mali-G31 MP2 GPU, 1 GB RAM (the browser engine uses most of it, so keep the game's own assets well under 150 MB), 720×480 screen. PocketVibe also runs on handhelds with other screen shapes (see Screen shapes). There is no mouse, no touch screen and no keyboard; only the buttons below.
 
 Follow these rules whenever you write or change code here. They are what keeps the game smooth on the device. Measured on the real handheld: typical three.js code (one mesh per object, `MeshStandardMaterial`, shadows, point lights, antialias) ran at 3 to 6 fps, while the same scenes written with these rules ran at a steady 60 fps.
 
@@ -22,9 +22,19 @@ Follow these rules whenever you write or change code here. They are what keeps t
     renderer.render(scene, camera);
   });
   ```
-- The screen is always 720×480 (`hh.width`, `hh.height`). Never resize the renderer to the window, never call `setPixelRatio`, never enable antialias, never listen to `resize`. To draw the 3D scene at half resolution, pass `resolution: 0.5` to `createHandheld` (see the graphics budget).
+- Never resize the renderer to the window, never call `setPixelRatio`, never enable antialias, never listen to `resize`. To draw the 3D scene at half resolution, pass `resolution: 0.5` to `createHandheld` (see the graphics budget).
 - All game logic goes inside `hh.run`. Move things with `dt`, never per frame. Render once per frame.
 - Do not use `requestAnimationFrame`, `setInterval` or `setTimeout` for the game loop.
+
+## Screen shapes
+
+The game is designed for a 720×480 screen (3:2, the RG34XX SP), but PocketVibe also runs on 4:3 handhelds (720×540), 16:9 ones (854×480) and square ones (720×720). The game gets the screen's shape, at least 720×480: `hh.width` and `hh.height` are its size, `hh.aspect` its shape. Make every part of the game work on all four:
+
+- Set up each camera with `hh.fitCamera(camera)` after creating it (and again if its designed view changes). Give the view as designed for 720×480 (`fov` for a perspective camera, `height` for an orthographic one); wider screens then show more at the sides and taller ones more above and below, and the designed view always stays whole. For a board or a playfield that must fill the screen, pass `minAspect` (its own width / height) so taller screens zoom in on it.
+- Never write `720`, `480` or `1.5` in the game. Use `hh.width`, `hh.height` and `hh.aspect`.
+- Lay out the HUD with CSS that adapts: anchor things to edges (`left`, `right`, `top`, `bottom`) and center with `left: 50%; transform: translateX(-50%)` or flexbox, never at fixed coordinates computed for 720×480. The HUD's coordinate space is `hh.width` × `hh.height`.
+- Gameplay must not depend on the shape: a wider screen may show more of the level, but must not let the player see or reach what a 3:2 screen hides in a way that changes the game.
+- Try every shape in the browser with the links under the screen (or `?aspect=4:3`, `16:9`, `1:1`). When the game works on all four, set `"responsive": true` in `pocketvibe.json`; without it, PocketVibe shows the game at 720×480 with black bars on other screens.
 
 ## Input
 
@@ -38,7 +48,7 @@ Follow these rules whenever you write or change code here. They are what keeps t
 
 ## UI
 
-- Put HUD, menus and text in the `hud` element as HTML and CSS. Its coordinate space is the 720×480 screen, so use `px`.
+- Put HUD, menus and text in the `hud` element as HTML and CSS. Its coordinate space is the game's screen (`hh.width` × `hh.height`, 720×480 on the RG34XX SP), so use `px`, anchored to the edges (see Screen shapes).
 - Text must be readable on a 3.4" screen: at least 18px, bold, with a dark outline or shadow.
 - Update the DOM only when a value changes, never every frame. Ten elements changing in one frame is fine; fifty drop the game to 30 fps.
 - Static panels, bars, dimmed backgrounds and CSS animations over the game cost nothing. Never use `backdrop-filter` (blur dropped the game to 40 fps).
@@ -96,6 +106,7 @@ The first use of anything new costs a long frame, so do it all while the game lo
 - `title`, `author`, `version` (start at `1.0.0`), `description` (one or two sentences).
 - `genre`: one of `Arcade`, `Shooter`, `Racing`, `Puzzle`, `Platformer`, `Sports`. The store groups games by it.
 - `controls`: what each button does, e.g. `{ "D-pad": "Move", "A": "Jump", "START": "Pause" }`.
+- `responsive`: `true` once the game works on every screen shape (see Screen shapes).
 
 Add a `cover.png` (480×270) at the project root; a screenshot of the title screen works well.
 
@@ -104,5 +115,6 @@ Add a `cover.png` (480×270) at the project root; a screenshot of the title scre
 Run `npm run dev`, play the game with the keyboard, and check that:
 
 1. The perf overlay is not red anywhere in the game.
-2. Every action works with the buttons above and every on-screen hint names those buttons.
-3. Nothing is created per frame inside `hh.run`, and nothing new is compiled or uploaded during play (see Loading).
+2. The game looks right and plays the same on every screen shape (the links under the screen).
+3. Every action works with the buttons above and every on-screen hint names those buttons.
+4. Nothing is created per frame inside `hh.run`, and nothing new is compiled or uploaded during play (see Loading).
