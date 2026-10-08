@@ -47,6 +47,10 @@ To start the app as the Ports menu does: `curl -d /storage/roms/ports/PocketVibe
 on the handheld. Its files live in `/storage/pocketvibe` (`app`, `runtime`, `games`,
 `settings.json`, `backups`); the logs are `/tmp/pocketvibed.log` and `/tmp/pocketvibe-cog.log`.
 
+To test without touching the handheld, `tools/handheld-pad.py` adds a virtual gamepad to it,
+and `tools/handheld-run.sh` plays a file of button presses and screenshots on it (see the top of
+`handheld-pad.py`). Screenshots come from `grim`, so they show exactly what the screen shows.
+
 Two things to know:
 
 - `pkill -f <pattern>` over SSH also matches the SSH command that contains the pattern and ends
