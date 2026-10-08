@@ -97,6 +97,10 @@ const STRINGS = {
   ipAddress: { en: 'IP address', tr: 'IP adresi' },
   gpuDriver: { en: 'GPU driver', tr: 'GPU sürücüsü' },
   gpuSlow: { en: 'libmali: games run slowly', tr: 'libmali: oyunlar yavaş çalışır' },
+  webviewOld: {
+    en: 'Games need a newer Android System WebView (94 or later). Update it from the Play Store.',
+    tr: "Oyunlar daha yeni bir Android System WebView istiyor (94 ya da sonrası). Play Store'dan güncelle.",
+  },
   gpuToast: {
     en: 'Games run slowly with the libmali GPU driver. Choose Panfrost in the ROCKNIX system settings and restart.',
     tr: "libmali GPU sürücüsüyle oyunlar yavaş çalışır. ROCKNIX sistem ayarlarından Panfrost'u seçip yeniden başlat.",

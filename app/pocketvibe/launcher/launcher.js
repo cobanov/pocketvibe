@@ -410,6 +410,8 @@ function settingsSections() {
   const s = state.settings ?? {};
   const info = state.info ?? {};
   const stores = state.store.stores?.length ? state.store.stores : (s.stores ?? []).map((url) => ({ url, name: url }));
+  // The Android app has no save backups or app updates of its own yet.
+  const android = info.platform === 'android';
   return [
     {
       title: t('sound'),
@@ -435,14 +437,14 @@ function settingsSections() {
       title: t('general'),
       rows: [{ id: 'language', label: t('language'), value: `‹ ${LANGUAGES[getLanguage()]} ›` }],
     },
-    {
+    ...(android ? [] : [{
       title: t('saveData'),
       note: t('backupsWhere'),
       rows: [
         { id: 'backup', label: t('backupSaves'), value: '' },
         { id: 'restore', label: t('restoreSaves'), value: '' },
       ],
-    },
+    }]),
     {
       title: t('developer'),
       rows: [{ id: 'showFps', label: t('showFps'), value: onOff(s.showFps) }],
@@ -459,7 +461,7 @@ function settingsSections() {
       title: t('about'),
       note: CREDITS,
       rows: [
-        { id: 'update', label: t('appUpdate'), value: updateValue() },
+        ...(android ? [] : [{ id: 'update', label: t('appUpdate'), value: updateValue() }]),
         { id: 'version', label: 'PocketVibe', value: info.version ? `${t('version')} ${info.version}` : '' },
       ],
     },
@@ -620,6 +622,12 @@ function renderStatus() {
   if (ui.companion.dataset.idle) renderCompanion();
 }
 
+// The Chrome version of Android's WebView. Games are built for 94 and later
+// (class static blocks, for one).
+function webviewVersion() {
+  return Number(navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] ?? 999);
+}
+
 // ---------- Screens ----------
 
 // For trying layouts in a desktop browser: ?screens=0,0,640,480;640,0,640,480
@@ -752,7 +760,7 @@ function renderMain() {
       html += `<div class="${grid ? 'grid' : 'list'}">`;
       section.games.forEach((game, i) => {
         if (i % perRow === 0) state.rows.push([]);
-        state.rows.at(-1).push(index);
+        state.rows[state.rows.length - 1].push(index); // not .at(-1): older Android WebViews lack it
         html += grid ? cardHtml(game, index, index === focus) : rowHtml(game, index, index === focus);
         index++;
       });
@@ -1191,12 +1199,16 @@ function onButton(button) {
 // ---------- Input ----------
 
 const keys = new Set();
+// Keys pressed since the last frame, so a press and release between two
+// frames (a quick tap, or Android sending both at once) still counts.
+const tapped = new Set();
 addEventListener('keydown', (e) => {
   // Any real key press lets the page start audio (see unlockAudio).
   audio.ensure();
   const b = KEYMAP[e.code];
   if (b) {
     keys.add(b);
+    tapped.add(b);
     e.preventDefault();
   }
 });
@@ -1210,7 +1222,8 @@ const readyAt = performance.now() + 500;
 
 function poll(now) {
   tickDownloads(now);
-  const down = new Set(keys);
+  const down = new Set([...keys, ...tapped]);
+  tapped.clear();
   for (const pad of navigator.getGamepads?.() ?? []) {
     if (!pad) continue;
     pad.buttons.forEach((b, i) => b.pressed && PADMAP[i] && down.add(PADMAP[i]));
@@ -1271,6 +1284,7 @@ async function unlockAudio() {
   else if (notice?.startsWith('updated:')) toast(t('updatedTo', { version: notice.slice(8) }));
   else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }));
   else if (state.info?.gpu === 'libmali') toast(t('gpuToast'));
+  else if (state.info?.platform === 'android' && webviewVersion() < 94) toast(t('webviewOld'));
   pollJobs();
   if (state.settings?.music || state.settings?.uiSounds) unlockAudio();
   await checkUpdate();
