@@ -356,6 +356,13 @@ def remove(gid):
     shutil.rmtree(GAMES / gid, ignore_errors=True)
 
 
+# ROCKNIX's battery service (batteryplus) estimates the charge from the
+# battery's voltage and writes it here; EmulationStation shows this number.
+# The kernel's own figure can be far off on handhelds whose fuel gauge was
+# never calibrated (the RG34XX SP said 12% when ROCKNIX said 41%).
+BATTERY_ESTIMATE = Path('/tmp/battery.percent')
+
+
 def device_status():
     """Clock, battery and Wi-Fi for the launcher's header (local time zone)."""
     battery, charging = None, False
@@ -368,6 +375,11 @@ def device_status():
             break
         except (OSError, ValueError):
             continue
+    try:
+        if battery is not None and time.time() - BATTERY_ESTIMATE.stat().st_mtime < 600:
+            battery = max(0, min(100, int(BATTERY_ESTIMATE.read_text())))
+    except (OSError, ValueError):
+        pass
     wifi = False
     for iface in Path('/sys/class/net').glob('wl*'):
         try:
