@@ -48,12 +48,16 @@ On your handheld:
 2. Unzip it into `roms/ports` on the handheld's SD card.
 3. Restart the handheld and open **Ports**, then **PocketVibe**. The first start downloads the game engine, about 150 MB, over Wi-Fi.
 
+On an Android handheld, download the APK from the
+[Android release](https://github.com/cobanov/pocketvibe/releases/tag/android-v0.6.0) and open
+it; allow your browser or file manager to install apps when Android asks.
+
 To make your own game, run `npm create pocketvibe@latest my-game` and follow
 [Get started](docs/getting-started.md). [Making games that run well](docs/performance.md)
 has the handheld's measured limits.
 
-**Made on an Anbernic RG34XX SP** with ROCKNIX. Other ROCKNIX handhelds may work, but are
-not tested yet.
+**Made on an Anbernic RG34XX SP** with ROCKNIX, and runs on the two-screen Anbernic RG DS.
+On Android it runs on the Anbernic RG Rotate. Other handhelds may work, but are not tested yet.
 
 ## Want to tinker?
 
