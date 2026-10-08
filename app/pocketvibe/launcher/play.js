@@ -3,7 +3,8 @@
 // its origin, and with it its saves. The game gets a 720x480 frame, fitted to
 // the main screen; a game that says it fits any screen shape ("responsive":
 // true in its pocketvibe.json) gets a frame of the screen's shape instead, and
-// its size as ?screen=WxH. A second screen shows the game's controls.
+// its size as ?screen=WxH. A second screen shows the game's controls. A
+// splash with the game's cover and name stays until the game has drawn.
 //
 //   /__pocketvibe__/play.html?entry=index.html&perf=0&lang=en&screens=0,0,640,480;640,0,640,480&primary=0
 
@@ -19,6 +20,8 @@ const game = document.getElementById('game');
 const frame = document.getElementById('frame');
 const side = document.getElementById('side');
 const inner = side.querySelector('.side-inner');
+const splash = document.getElementById('splash');
+const splashInner = splash.querySelector('.splash-inner');
 let size = NATIVE; // the game's screen
 let second = null; // { width, height, layout } when the game uses the second screen too
 
@@ -30,8 +33,14 @@ function secondLayout(main, other) {
   return null;
 }
 
+function placeSplash(main) {
+  place(splashInner, main, uiScale(main));
+  splashInner.classList.add('placed');
+}
+
 function layout() {
   const { main, other } = fitScreens(screens, primary, innerWidth, innerHeight);
+  placeSplash(main);
   if (second && other) {
     // One frame over both screens, scaled as one.
     const right = second.layout === 'right';
@@ -74,6 +83,51 @@ async function manifest() {
   return {};
 }
 
+// The splash stays until the game has drawn a few frames: until its script has
+// run, a game's page shows what it shows in a desktop browser (the starter
+// project's keyboard legend, an empty frame). The game is on this page's
+// origin, so its page can be watched. Ready once it has a canvas (or, for a
+// page without one, a moment after it loaded) and three frames have gone by
+// after that; the first frame is the one that compiles the shaders.
+const SPLASH_MIN = 800; // ms: long enough not to flicker
+const SPLASH_MAX = 15000; // ms: whatever happens, the game is shown then
+const shellStart = performance.now();
+let splashDone = false;
+
+function hideSplash() {
+  if (splashDone) return;
+  splashDone = true;
+  setTimeout(() => {
+    splash.classList.add('gone');
+    setTimeout(() => splash.remove(), 300);
+  }, Math.max(0, SPLASH_MIN - (performance.now() - shellStart)));
+}
+
+function watchGame() {
+  let win, doc;
+  try {
+    win = frame.contentWindow;
+    doc = frame.contentDocument;
+  } catch {
+    return hideSplash();
+  }
+  if (!doc || win.location.href === 'about:blank') return;
+  const loaded = performance.now();
+  let frames = 0;
+  const tick = () => {
+    if (splashDone) return;
+    if (frames > 0 || doc.querySelector('canvas') || performance.now() - loaded > 1500) frames++;
+    if (frames >= 3) hideSplash();
+    else win.requestAnimationFrame(tick);
+  };
+  win.requestAnimationFrame(tick);
+}
+
+function fillSplash(meta) {
+  splash.querySelector('.splash-title').textContent = meta.title ?? '';
+  splash.querySelector('.splash-meta').textContent = [meta.author, meta.genre].filter(Boolean).join(' · ');
+}
+
 function fillSide(meta) {
   if (meta.title) document.title = meta.title;
   const controls = Object.entries(meta.controls ?? {})
@@ -106,7 +160,13 @@ addEventListener('pointerdown', (e) => {
 });
 addEventListener('resize', layout);
 
+// The splash shows from the start; the game's name follows its manifest.
+placeSplash(fitScreens(screens, primary, innerWidth, innerHeight).main);
+splash.querySelector('.splash-leave').innerHTML = `<b class="hint">START</b>+<b class="hint">SELECT</b>${t('holdToLeave')}`;
+setTimeout(hideSplash, SPLASH_MAX);
+
 const meta = await manifest();
+fillSplash(meta);
 if (meta.responsive === true) {
   const { main, other } = fitScreens(screens, primary, innerWidth, innerHeight);
   size = gameSize(main.width / main.height);
@@ -119,5 +179,6 @@ layout();
 let entry = new URL(params.get('entry') || 'index.html', `${location.origin}/`);
 if (entry.origin !== location.origin) entry = new URL('/index.html', location.origin); // a game runs on its own port only
 entry.search = `?handheld${params.get('perf') === '1' ? '&perf' : ''}${size === NATIVE ? '' : `&screen=${size.width}x${size.height}`}${second ? `&second=${second.width}x${second.height}&layout=${second.layout}` : ''}`;
+frame.addEventListener('load', watchGame);
 frame.src = entry.href;
 fillSide(meta);

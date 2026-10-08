@@ -127,6 +127,95 @@ body {
   color: var(--muted);
 }
 
+/* The splash: the game's cover and name until the game has drawn its first
+   frames (play.js). Until then a game's page is not ready to be seen. */
+#splash {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  transition: opacity 0.25s;
+}
+
+#splash.gone {
+  opacity: 0;
+}
+
+.splash-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px var(--gutter) 64px;
+  text-align: center;
+  transform-origin: 0 0;
+  visibility: hidden; /* until play.js has fitted it to the screen */
+}
+
+.splash-inner.placed {
+  visibility: visible;
+}
+
+.splash-cover {
+  width: 336px;
+  aspect-ratio: 16 / 9;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: var(--panel) url(/cover.png) center / cover;
+}
+
+.splash-title {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.splash-meta {
+  min-height: 20px;
+  font-size: 16px;
+  color: var(--muted);
+}
+
+.splash-bar {
+  position: relative;
+  width: 200px;
+  height: 4px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--panel);
+}
+
+/* Moved with transform, so it keeps going while the game's page loads. */
+.splash-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: splash-load 1.1s ease-in-out infinite;
+}
+
+@keyframes splash-load {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.splash-leave {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  justify-content: center;
+  margin: 0;
+}
+
 .hint {
   min-width: 24px;
   padding: 0 5px;
