@@ -2,8 +2,7 @@
 
 import * as THREE from 'three';
 
-export const SKY = 0xb4e0fb; // horizon haze: fog and the bottom of the sky
-export const LAPS = 3;
+export const SKY = 0xb4e0fb; // the first circuit's horizon haze, until a circuit sets its own
 
 // Car handling, in world units (1 unit is about 2 m) and seconds.
 export const TOP_SPEED = 40; // on asphalt
@@ -29,8 +28,21 @@ export function paint(geometry, hex) {
   return geometry;
 }
 
-export function box(w, h, d, x, y, z, hex) {
+// A box of one color. `skip` lists faces nobody ever sees (the bottom, the
+// side against a wall) to leave out: 'px', 'nx', 'py', 'ny', 'pz', 'nz'.
+const FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
+export function box(w, h, d, x, y, z, hex, skip = null) {
   const g = new THREE.BoxGeometry(w, h, d);
+  if (skip) {
+    const all = g.index.array;
+    const index = [];
+    g.groups.forEach((group, k) => {
+      if (skip.includes(FACES[k])) return;
+      for (let i = group.start; i < group.start + group.count; i++) index.push(all[i]);
+    });
+    g.setIndex(index);
+    g.clearGroups();
+  }
   g.translate(x, y, z);
   return paint(g, hex);
 }

@@ -1,9 +1,9 @@
-// The circuit: a closed spline sampled at even spacing. Everything that needs
+// A circuit: a closed spline sampled at even spacing. Everything that needs
 // to know "where on the track" something is uses these samples: the road mesh,
 // lap counting, the AI's racing line and the scenery placement.
 
 import * as THREE from 'three';
-import { TOP_SPEED } from './shared.js';
+import { TOP_SPEED, angleDiff } from './shared.js';
 
 export const ROAD_HALF = 7; // half the asphalt width
 export const CURB_W = 1.3;
@@ -13,29 +13,16 @@ export const LIMIT = ROAD_HALF + 9; // cars cannot get farther from the centre l
 const STEP = 2; // rough spacing of the samples along the track
 const SEARCH = 12; // samples searched either side of a car's last position
 
-// Control points (x, z) of the circuit, driven in this order.
-const POINTS = [
-  [10, -98], [62, -94], [106, -78], [124, -42], [118, -6], [104, 22],
-  [122, 50], [140, 86], [124, 108], [100, 100], [70, 72], [26, 66],
-  [-8, 92], [-48, 106], [-92, 98], [-128, 70], [-126, 26], [-104, -4],
-  [-122, -40], [-118, -78], [-80, -96],
-];
-
-// Boost pads: position along the lap (0..1) and lateral offset.
-const PADS = [
-  [0.045, 0],
-  [0.17, 0],
-  [0.585, 1.5],
-];
 export const PAD_LEN = 7;
 export const PAD_HALF_W = 2.6;
 
 const AI_GRIP = 62; // sideways acceleration the AI plans corners with
 const AI_BRAKE = 22; // deceleration the AI plans braking with
 
-export function buildCircuit() {
+// def: an entry of CIRCUITS (control points and boost pads).
+export function buildCircuit(def) {
   const curve = new THREE.CatmullRomCurve3(
-    POINTS.map(([x, z]) => new THREE.Vector3(x, 0, z)),
+    def.points.map(([x, z]) => new THREE.Vector3(x, 0, z)),
     true,
     'centripetal',
   );
@@ -73,10 +60,7 @@ export function buildCircuit() {
   const K = 3;
   const raw = new Float32Array(n);
   for (let i = 0; i < n; i++) {
-    let d = heading[(i + K) % n] - heading[(i + n - K) % n];
-    if (d > Math.PI) d -= Math.PI * 2;
-    else if (d < -Math.PI) d += Math.PI * 2;
-    raw[i] = d / (2 * K * step);
+    raw[i] = angleDiff(heading[(i + K) % n], heading[(i + n - K) % n]) / (2 * K * step);
   }
   smooth(raw, curv, 4);
 
@@ -96,13 +80,25 @@ export function buildCircuit() {
     }
   }
 
-  const padIndex = new Int32Array(PADS.length);
-  const padOffset = new Float32Array(PADS.length);
-  for (let p = 0; p < PADS.length; p++) {
-    padIndex[p] = Math.round(PADS[p][0] * n) % n;
-    padOffset[p] = PADS[p][1];
+  const pads = def.pads;
+  const padIndex = new Int32Array(pads.length);
+  const padOffset = new Float32Array(pads.length);
+  for (let p = 0; p < pads.length; p++) {
+    padIndex[p] = Math.round(pads[p][0] * n) % n;
+    padOffset[p] = pads[p][1];
     const span = Math.round(PAD_LEN / step / 2);
     for (let k = -span; k <= span; k++) pad[(padIndex[p] + k + n) % n] = p + 1;
+  }
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < n; i++) {
+    minX = Math.min(minX, px[i]);
+    maxX = Math.max(maxX, px[i]);
+    minZ = Math.min(minZ, pz[i]);
+    maxZ = Math.max(maxZ, pz[i]);
   }
 
   return {
@@ -120,6 +116,10 @@ export function buildCircuit() {
     pad,
     padIndex,
     padOffset,
+    minX,
+    maxX,
+    minZ,
+    maxZ,
 
     // Finds where a car is on the track. Searches only near car.idx so the
     // answer never jumps to another part of the circuit, then writes
@@ -176,48 +176,65 @@ function smooth(src, dst, radius) {
   }
 }
 
+// Grid slot k (0 = pole): distance along the lap, sample and lateral offset.
+export function gridSlot(c, k) {
+  const back = 9 + k * 6.5;
+  const s = c.length - back;
+  return { s, idx: Math.round(s / c.step) % c.n, off: k % 2 ? 3.2 : -3.2 };
+}
+
 // ---------------------------------------------------------------------------
 // Meshes
 
-const ASPHALT_A = 0x4d5260;
-const ASPHALT_B = 0x555a68;
 const CURB_RED = 0xe8433a;
 const CURB_WHITE = 0xf4f1ea;
 const LINE_WHITE = 0xf4f1ea;
-const VERGE = 0x5aa845;
+const MERGE_SAG = 0.2; // how far (turn x length) a merged road quad may stray from the curve
+const MERGE_MAX = 8; // samples one road quad may span
 
-// Writes a flat quad (two triangles) into position/color arrays. Corners are
-// given as (x, z) pairs, in order around the quad.
-function quad(pos, col, o, ax, az, bx, bz, cx, cz, dx, dz, y, hex) {
-  tmp.setHex(hex);
-  const v = [ax, az, bx, bz, cx, cz, ax, az, cx, cz, dx, dz];
-  for (let k = 0; k < 6; k++) {
-    pos[o + k * 3] = v[k * 2];
-    pos[o + k * 3 + 1] = y;
-    pos[o + k * 3 + 2] = v[k * 2 + 1];
-    col[o + k * 3] = tmp.r;
-    col[o + k * 3 + 1] = tmp.g;
-    col[o + k * 3 + 2] = tmp.b;
+// One strip along the track between lateral offsets a and b (a < b),
+// colored per sample. Neighbouring samples of the same color share one quad
+// while the curve bends little over them (its chord strays from the curve by
+// about turn x length / 8), so straights cost a few triangles.
+function strip(soup, c, a, b, color, height) {
+  const { n, step, px, pz, tx, tz, heading } = c;
+  const X = (i, off) => px[i] - tz[i] * off;
+  const Z = (i, off) => pz[i] + tx[i] * off;
+  // Begin at a color change, so the last run ends where the first begins.
+  let start = 0;
+  for (let i = 1; i < n; i++) {
+    if (color(i) !== color(i - 1)) {
+      start = i;
+      break;
+    }
   }
-  return o + 18;
+  let i = start;
+  let done = 0;
+  while (done < n) {
+    const hex = color(i);
+    const y = height(i);
+    let len = 1;
+    while (
+      len < MERGE_MAX &&
+      done + len < n &&
+      color((i + len) % n) === hex &&
+      height((i + len) % n) === y &&
+      Math.abs(angleDiff(heading[(i + len) % n], heading[i])) * len * step < MERGE_SAG
+    ) {
+      len++;
+    }
+    const j = (i + len) % n;
+    soup.quad(X(i, a), Z(i, a), X(i, b), Z(i, b), X(j, b), Z(j, b), X(j, a), Z(j, a), y, hex);
+    i = j;
+    done += len;
+  }
 }
-const tmp = new THREE.Color();
 
-function flatGeometry(pos, col, used) {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos.slice(0, used), 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col.slice(0, used), 3));
-  g.computeVertexNormals();
-  return g;
-}
-
-// The asphalt, curbs, start line and grid marks as one merged mesh.
-function roadGeometry(c) {
+// The asphalt, curbs, start line, grid marks and pad plates, into the soup.
+export function roadInto(soup, c, colors) {
   const { n, px, pz, tx, tz, curv } = c;
-  const quads = n * 5 + 200;
-  const pos = new Float32Array(quads * 18);
-  const col = new Float32Array(quads * 18);
-  let o = 0;
+  const X = (i, off) => px[i] - tz[i] * off;
+  const Z = (i, off) => pz[i] + tx[i] * off;
 
   // Curbs are red and white where the track bends, a white line elsewhere.
   const bend = new Uint8Array(n);
@@ -227,34 +244,19 @@ function roadGeometry(c) {
     bend[i] = max > 0.012 ? 1 : 0;
   }
 
-  // Corner (x, z) of sample i at lateral offset `off`.
-  const X = (i, off) => px[i] - tz[i] * off;
-  const Z = (i, off) => pz[i] + tx[i] * off;
-
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    const road = (i >> 2) % 2 ? ASPHALT_A : ASPHALT_B;
-    o = quad(pos, col, o, X(i, -ROAD_HALF), Z(i, -ROAD_HALF), X(i, ROAD_HALF), Z(i, ROAD_HALF),
-      X(j, ROAD_HALF), Z(j, ROAD_HALF), X(j, -ROAD_HALF), Z(j, -ROAD_HALF), 0.02, road);
-
-    for (let side = -1; side <= 1; side += 2) {
-      const a = side * ROAD_HALF;
-      const m = side * (ROAD_HALF + 0.45);
-      const b = side * EDGE;
-      const stripe = (i >> 1) % 2 ? CURB_RED : CURB_WHITE;
-      const inner = bend[i] ? stripe : LINE_WHITE;
-      const outer = bend[i] ? stripe : VERGE;
-      const y = bend[i] ? 0.06 : 0.03;
-      // Keep the winding counter-clockwise from above on both sides.
-      if (side > 0) {
-        o = quad(pos, col, o, X(i, a), Z(i, a), X(i, m), Z(i, m), X(j, m), Z(j, m), X(j, a), Z(j, a), y, inner);
-        o = quad(pos, col, o, X(i, m), Z(i, m), X(i, b), Z(i, b), X(j, b), Z(j, b), X(j, m), Z(j, m), y, outer);
-      } else {
-        o = quad(pos, col, o, X(i, m), Z(i, m), X(i, a), Z(i, a), X(j, a), Z(j, a), X(j, m), Z(j, m), y, inner);
-        o = quad(pos, col, o, X(i, b), Z(i, b), X(i, m), Z(i, m), X(j, m), Z(j, m), X(j, b), Z(j, b), y, outer);
-      }
-    }
-  }
+  const [asphaltA, asphaltB] = colors.asphalt;
+  strip(soup, c, -ROAD_HALF, ROAD_HALF, (i) => ((i >> 2) % 2 ? asphaltA : asphaltB), () => 0.02);
+  const stripe = (i) => ((i >> 1) % 2 ? CURB_RED : CURB_WHITE);
+  const inner = (i) => (bend[i] ? stripe(i) : LINE_WHITE);
+  const outer = (i) => (bend[i] ? stripe(i) : colors.verge);
+  const y = (i) => (bend[i] ? 0.06 : 0.03);
+  // The inner strips reach a little under the asphalt edge, so merged quads
+  // of different lengths never leave a gap between them.
+  const m = ROAD_HALF + 0.45;
+  strip(soup, c, ROAD_HALF - 0.1, m, inner, y);
+  strip(soup, c, m, EDGE, outer, y);
+  strip(soup, c, -m, -ROAD_HALF + 0.1, inner, y);
+  strip(soup, c, -EDGE, -m, outer, y);
 
   // Checkered start/finish line across the road at sample 0.
   const cells = 14;
@@ -265,7 +267,7 @@ function roadGeometry(c) {
       const along0 = (row - 1) * cell;
       const along1 = row * cell;
       const hex = (k + row) % 2 ? 0x222222 : 0xffffff;
-      o = quad(pos, col, o,
+      soup.quad(
         px[0] - tz[0] * a + tx[0] * along0, pz[0] + tx[0] * a + tz[0] * along0,
         px[0] - tz[0] * (a + cell) + tx[0] * along0, pz[0] + tx[0] * (a + cell) + tz[0] * along0,
         px[0] - tz[0] * (a + cell) + tx[0] * along1, pz[0] + tx[0] * (a + cell) + tz[0] * along1,
@@ -281,7 +283,7 @@ function roadGeometry(c) {
     const a1 = c.padOffset[p] + PAD_HALF_W + 0.4;
     const l0 = -PAD_LEN / 2 - 0.7;
     const l1 = PAD_LEN / 2 + 0.9;
-    o = quad(pos, col, o, X(i, a0) + tx[i] * l0, Z(i, a0) + tz[i] * l0, X(i, a1) + tx[i] * l0, Z(i, a1) + tz[i] * l0,
+    soup.quad(X(i, a0) + tx[i] * l0, Z(i, a0) + tz[i] * l0, X(i, a1) + tx[i] * l0, Z(i, a1) + tz[i] * l0,
       X(i, a1) + tx[i] * l1, Z(i, a1) + tz[i] * l1, X(i, a0) + tx[i] * l1, Z(i, a0) + tz[i] * l1, 0.035, 0xc8352a);
   }
 
@@ -291,19 +293,17 @@ function roadGeometry(c) {
     const i = c.ahead(g.idx, 1.6);
     const a0 = g.off - 1.1;
     const a1 = g.off + 1.1;
-    o = quad(pos, col, o, X(i, a0), Z(i, a0), X(i, a1), Z(i, a1), X(i, a1) + tx[i] * 0.4, Z(i, a1) + tz[i] * 0.4,
+    soup.quad(X(i, a0), Z(i, a0), X(i, a1), Z(i, a1), X(i, a1) + tx[i] * 0.4, Z(i, a1) + tz[i] * 0.4,
       X(i, a0) + tx[i] * 0.4, Z(i, a0) + tz[i] * 0.4, 0.035, LINE_WHITE);
   }
-
-  return flatGeometry(pos, col, o);
 }
 
-// Chevrons pointing along the track, one group per boost pad.
-function padGeometry(c) {
+// Chevrons pointing along the track, one group per boost pad. They glow by
+// pulsing their shared unlit material, so they are a mesh of their own.
+export function padGeometry(c) {
   const { px, pz, tx, tz } = c;
-  const pos = new Float32Array(c.padIndex.length * 3 * 2 * 18);
-  const col = new Float32Array(pos.length);
-  let o = 0;
+  const pos = [];
+  const quad = (ax, az, bx, bz, cx, cz, dx, dz) => pos.push(ax, 0.05, az, bx, 0.05, bz, cx, 0.05, cz, ax, 0.05, az, cx, 0.05, cz, dx, 0.05, dz);
   for (let p = 0; p < c.padIndex.length; p++) {
     const i = c.padIndex[p];
     const off = c.padOffset[p];
@@ -314,36 +314,11 @@ function padGeometry(c) {
       const l = -PAD_LEN / 2 + k * 2.3;
       const w = PAD_HALF_W - 0.2;
       // Left and right arms of a chevron pointing forward.
-      o = quad(pos, col, o, wx(-w, l), wz(-w, l), wx(0, l + 1.8), wz(0, l + 1.8), wx(0, l + 3.1), wz(0, l + 3.1),
-        wx(-w, l + 1.3), wz(-w, l + 1.3), 0.05, 0xffffff);
-      o = quad(pos, col, o, wx(0, l + 1.8), wz(0, l + 1.8), wx(w, l), wz(w, l), wx(w, l + 1.3), wz(w, l + 1.3),
-        wx(0, l + 3.1), wz(0, l + 3.1), 0.05, 0xffffff);
+      quad(wx(-w, l), wz(-w, l), wx(0, l + 1.8), wz(0, l + 1.8), wx(0, l + 3.1), wz(0, l + 3.1), wx(-w, l + 1.3), wz(-w, l + 1.3));
+      quad(wx(0, l + 1.8), wz(0, l + 1.8), wx(w, l), wz(w, l), wx(w, l + 1.3), wz(w, l + 1.3), wx(0, l + 3.1), wz(0, l + 3.1));
     }
   }
-  return flatGeometry(pos, col, o);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return g;
 }
-
-// Grid slot k (0 = pole): distance along the lap, sample and lateral offset.
-export function gridSlot(c, k) {
-  const back = 9 + k * 6.5;
-  const s = c.length - back;
-  return { s, idx: Math.round(s / c.step) % c.n, off: k % 2 ? 3.2 : -3.2 };
-}
-
-export function createTrackMeshes(scene, c) {
-  const road = new THREE.Mesh(roadGeometry(c), new THREE.MeshLambertMaterial({ vertexColors: true }));
-  scene.add(road);
-
-  // Boost pads glow by pulsing their unlit color each frame.
-  const padMaterial = new THREE.MeshBasicMaterial({ color: 0xffb020 });
-  const pads = new THREE.Mesh(padGeometry(c), padMaterial);
-  scene.add(pads);
-
-  return {
-    update(time) {
-      const t = 0.5 + 0.5 * Math.sin(time * 9);
-      padMaterial.color.setRGB(1, 0.55 + t * 0.4, 0.1 + t * 0.35);
-    },
-  };
-}
-

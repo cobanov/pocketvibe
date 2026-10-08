@@ -49,6 +49,7 @@ export function createCar(index, isPlayer) {
     s: 0,
     off: 0,
     laps: -1, // start-line crossings; the grid is behind the line
+    lapsDone: -1, // the most laps ever reached, so reversing over the line and back is no lap
     progress: 0,
     surface: SURFACE_ROAD,
     boost: 0,
@@ -79,7 +80,7 @@ export function placeCar(car, track, s, off) {
   car.vx = car.vz = car.fwd = car.lat = car.spin = 0;
   car.throttle = car.brake = car.steer = car.steerTarget = 0;
   car.idx = i;
-  car.laps = -1;
+  car.laps = car.lapsDone = -1;
   car.boost = car.padCooldown = 0;
   car.finished = false;
   car.finishTime = car.place = car.lapStart = car.bestLap = 0;
@@ -278,28 +279,31 @@ export function collideCars(a, b, hit) {
   return impact;
 }
 
-// Low-poly race car facing +z, all parts merged with vertex colors.
+// Low-poly race car facing +z, all parts merged with vertex colors. Faces
+// the camera never sees (bottoms, the tyres' inner sides, the backs of the
+// lights) are left out.
 export function carGeometry(body, stripe) {
   const glass = 0x243246;
   const tyre = 0x1d1d22;
+  const top = ['px', 'nx', 'ny', 'pz', 'nz']; // all but the top
   const parts = [
-    box(1.3, 0.36, 2.4, 0, 0.38, 0, body),
-    box(1.2, 0.2, 0.5, 0, 0.32, 1.42, body), // nose
-    box(1.0, 0.36, 1.05, 0, 0.74, -0.22, glass), // cabin
-    box(1.02, 0.08, 0.82, 0, 0.94, -0.26, body), // roof
-    box(0.34, 0.02, 2.42, 0, 0.57, 0, stripe), // racing stripe
-    box(0.34, 0.02, 0.52, 0, 0.43, 1.42, stripe),
-    box(0.34, 0.02, 0.84, 0, 0.99, -0.26, stripe),
-    box(1.44, 0.08, 0.36, 0, 0.94, -1.08, stripe), // rear wing
-    box(0.08, 0.36, 0.14, -0.46, 0.74, -1.08, tyre),
-    box(0.08, 0.36, 0.14, 0.46, 0.74, -1.08, tyre),
-    box(0.28, 0.12, 0.04, -0.4, 0.48, 1.21, 0xfff4c0), // headlights
-    box(0.28, 0.12, 0.04, 0.4, 0.48, 1.21, 0xfff4c0),
-    box(0.3, 0.12, 0.04, -0.4, 0.46, -1.21, 0xff2a2a), // tail lights
-    box(0.3, 0.12, 0.04, 0.4, 0.46, -1.21, 0xff2a2a),
+    box(1.3, 0.36, 2.4, 0, 0.38, 0, body, ['ny']),
+    box(1.2, 0.2, 0.5, 0, 0.32, 1.42, body, ['ny']), // nose
+    box(1.0, 0.36, 1.05, 0, 0.74, -0.22, glass, ['ny']), // cabin
+    box(1.02, 0.08, 0.82, 0, 0.94, -0.26, body, ['ny']), // roof
+    box(0.34, 0.02, 2.42, 0, 0.57, 0, stripe, top), // racing stripe
+    box(0.34, 0.02, 0.52, 0, 0.43, 1.42, stripe, top),
+    box(0.34, 0.02, 0.84, 0, 0.99, -0.26, stripe, top),
+    box(1.44, 0.08, 0.36, 0, 0.94, -1.08, stripe, ['ny']), // rear wing
+    box(0.08, 0.36, 0.14, -0.46, 0.74, -1.08, tyre, ['py', 'ny']),
+    box(0.08, 0.36, 0.14, 0.46, 0.74, -1.08, tyre, ['py', 'ny']),
+    box(0.28, 0.12, 0.04, -0.4, 0.48, 1.21, 0xfff4c0, ['px', 'nx', 'py', 'ny', 'nz']), // headlights
+    box(0.28, 0.12, 0.04, 0.4, 0.48, 1.21, 0xfff4c0, ['px', 'nx', 'py', 'ny', 'nz']),
+    box(0.3, 0.12, 0.04, -0.4, 0.46, -1.21, 0xff2a2a, ['px', 'nx', 'py', 'ny', 'pz']), // tail lights
+    box(0.3, 0.12, 0.04, 0.4, 0.46, -1.21, 0xff2a2a, ['px', 'nx', 'py', 'ny', 'pz']),
   ];
   for (let sx = -1; sx <= 1; sx += 2) {
-    for (let sz = -1; sz <= 1; sz += 2) parts.push(box(0.32, 0.44, 0.58, sx * 0.67, 0.22, sz * 0.8, tyre));
+    for (let sz = -1; sz <= 1; sz += 2) parts.push(box(0.32, 0.44, 0.58, sx * 0.67, 0.22, sz * 0.8, tyre, ['ny', sx < 0 ? 'px' : 'nx']));
   }
   return mergeGeometries(parts);
 }

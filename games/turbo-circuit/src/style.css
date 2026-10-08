@@ -296,8 +296,9 @@ body.handheld #legend {
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 20px 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 30px;
   border-radius: 12px;
   background: rgba(10, 20, 40, 0.6);
   font-size: 24px;
@@ -343,6 +344,137 @@ body.handheld #legend {
   color: #d6e2f0;
 }
 
+/* Title screen: the chosen circuit's card. */
+.card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 16px 6px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  text-align: left;
+}
+
+.card svg {
+  display: block;
+  flex: none;
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cname {
+  font-size: 28px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.cname b {
+  display: inline-block;
+  margin: 0 8px;
+  font-size: 20px;
+  font-style: normal;
+  color: #ffd23f;
+  vertical-align: 3px;
+}
+
+.cname b:first-child {
+  margin-left: 0;
+}
+
+.panel .rec {
+  color: #ffd23f;
+}
+
+/* Menus: UP and DOWN move the highlight, A picks. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.item {
+  min-width: 220px;
+  padding: 2px 18px;
+  border-radius: 8px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #c9d6e8;
+}
+
+.item.sel {
+  color: #1d2233;
+  background: #ffd23f;
+  text-shadow: none;
+}
+
+/* Results: the final order. */
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 300px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 24px 14px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.row i {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #10182a;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.row em {
+  font-style: normal;
+  color: #d6e2f0;
+  font-variant-numeric: tabular-nums;
+}
+
+.row.me span {
+  color: #ffd23f;
+}
+
+/* The lap just driven, under the lap banner. */
+#laptime {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+#laptime .pop {
+  margin: 56px 0 0;
+  font-size: 30px;
+  color: #fff;
+  animation-duration: 1.8s;
+}
+
+#laptime .pop.best {
+  color: #5be37a;
+}
+
+#laptime .pop.record {
+  color: #ffd23f;
+}
+
 /* Position and lap sit in the top corners, so the perf overlay goes top centre. */
 #perf {
   right: auto;
@@ -358,17 +490,98 @@ body.handheld #legend {
   font-family: inherit;
 }
 
+#logo {
+  position: absolute;
+  top: 26px;
+  left: 24px;
+  font-size: 44px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 2px;
+  color: #ffd23f;
+  text-shadow: 0 3px 0 #b8322b, 0 5px 0 #000;
+}
+
+#logo span {
+  color: #fff;
+  text-shadow: 0 3px 0 #2f6fdf, 0 5px 0 #000;
+}
+
 #brand {
   position: absolute;
-  top: 116px;
+  top: 108px;
   right: 24px;
   width: 232px;
   text-align: center;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   font-style: italic;
   letter-spacing: 1px;
   color: #ffd23f;
+}
+
+#info {
+  position: absolute;
+  top: 150px;
+  right: 24px;
+  width: 232px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+  font-weight: 800;
+  text-shadow: 0 2px 0 #000;
+}
+
+#info .tag {
+  font-size: 20px;
+}
+
+#info .small {
+  font-size: 18px;
+  color: #9fb3d9;
+}
+
+#info .rec span {
+  display: block;
+  font-size: 18px;
+  color: #9fb3d9;
+}
+
+#info .rec b {
+  font-size: 34px;
+  color: #ffd23f;
+  font-variant-numeric: tabular-nums;
+}
+
+#logo[hidden],
+#info[hidden],
+#standings[hidden] {
+  display: none;
+}
+
+#standings {
+  position: absolute;
+  top: 360px;
+  right: 24px;
+  width: 232px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-shadow: 0 2px 0 #000;
+}
+
+#standings .row {
+  grid-template-columns: 18px 14px 1fr auto;
+  gap: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 18px;
+  background: rgba(10, 20, 40, 0.45);
+}
+
+#standings .row.me {
+  background: rgba(255, 75, 85, 0.3);
 }
 
 #stats.dual #pos {
@@ -411,7 +624,7 @@ body.handheld #legend {
 }
 
 #stats.dual #speed {
-  top: 180px;
+  top: 140px;
   right: 24px;
   bottom: auto;
   width: 232px;
@@ -429,7 +642,7 @@ body.handheld #legend {
 
 #best {
   position: absolute;
-  top: 330px;
+  top: 270px;
   right: 24px;
   width: 232px;
   text-align: center;
