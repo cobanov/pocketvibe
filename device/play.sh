@@ -1,21 +1,26 @@
 #!/bin/sh
-# From the computer: copy a built game to the handheld and run it there.
+# From the computer: copy a built game to the handheld and open it there.
 #
-#   device/play.sh <dist-dir> [name] [query]
+#   device/play.sh <dist-dir> [game-id]
 #
-# The handheld's address comes from $HANDHELD (default root@192.168.8.197).
-# Start + Select on the handheld quits the game and returns here.
+# The game goes into PocketVibe's Library. Its id comes from the
+# pocketvibe.json next to the dist folder, else from the project's folder
+# name; that pocketvibe.json and cover.png are copied along, so the Library
+# shows its title and cover. The handheld's address comes from $HANDHELD
+# (default root@192.168.8.197).
 set -e
 
-DIST=${1:?usage: play.sh <dist-dir> [name] [query]}
-NAME=${2:-$(basename "$(cd "$DIST/.." && pwd)")}
-QUERY=${3:-handheld}
+DIST=${1:?usage: play.sh <dist-dir> [game-id]}
+PROJECT=$(cd "$DIST/.." && pwd)
+ID=${2:-$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["id"])' "$PROJECT/pocketvibe.json" 2>/dev/null || basename "$PROJECT")}
 HOST=${HANDHELD:-root@192.168.8.197}
 HERE=$(cd "$(dirname "$0")" && pwd)
-REMOTE=/storage/pocketvibe
+GAMES=/storage/pocketvibe/games
 
-scp -q "$HERE/run-game.sh" "$HERE/exit-only.gptk" "$HERE/debian-chroot.sh" "$HOST:$REMOTE/"
-ssh "$HOST" "rm -rf $REMOTE/games/$NAME && mkdir -p $REMOTE/games/$NAME"
-scp -q -r "$DIST"/. "$HOST:$REMOTE/games/$NAME/"
-echo "Running $NAME on $HOST. Start + Select on the handheld quits."
-ssh "$HOST" "sh $REMOTE/run-game.sh $REMOTE/games/$NAME '$QUERY'"
+ssh "$HOST" "rm -rf $GAMES/$ID && mkdir -p $GAMES/$ID"
+scp -q -r "$DIST"/. "$HOST:$GAMES/$ID/"
+for file in pocketvibe.json cover.png; do
+  [ -f "$PROJECT/$file" ] && scp -q "$PROJECT/$file" "$HOST:$GAMES/$ID/"
+done
+scp -q "$HERE/run-game.sh" "$HOST:/storage/pocketvibe/run-game.sh"
+ssh "$HOST" "sh /storage/pocketvibe/run-game.sh $ID"

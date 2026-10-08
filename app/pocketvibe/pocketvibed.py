@@ -350,9 +350,12 @@ def restore_saves(name):
     global notice
     BUSY_FLAG.touch()
     try:
-        subprocess.run(['pkill', '-x', 'cog'], check=False)
+        close_browser()
+        # Wait for WebKit's helpers too: the network process writes the saves.
+        # (Process names are cut to 15 characters.)
         for _ in range(50):
-            if subprocess.run(['pgrep', '-x', 'cog'], capture_output=True).returncode != 0:
+            running = subprocess.run(['pgrep', '-x', 'cog|WPENetworkProce|WPEWebProcess'], capture_output=True)
+            if running.returncode != 0:
                 break
             time.sleep(0.2)
         staging = WEB_DATA / '.restore'
@@ -501,7 +504,7 @@ def install_update():
         # PocketVibe.sh sees the flag when the browser closes and starts over.
         RESTART_FLAG.touch()
         time.sleep(1.5)  # let the launcher see "done"
-        subprocess.run(['pkill', '-x', 'cog'], check=False)
+        close_browser()
         threading.Thread(target=launcher_server.shutdown, daemon=True).start()
     except Exception as e:  # reported to the launcher
         set_job('__app__', state='error', error=str(e))
@@ -563,10 +566,18 @@ class AudioKey:
 audio_key = AudioKey()
 
 
+def close_browser():
+    """End the browser engine at once. Cog 0.18's Wayland code crashes while
+    shutting down (SIGTERM and cogctl quit alike) and leaves a coredump entry;
+    SIGKILL skips that code. Saves are safe: WebKit's network process writes
+    localStorage, and it finishes on its own (tested on the handheld)."""
+    subprocess.run(['pkill', '-KILL', '-x', 'cog'], check=False)
+
+
 def quit_app():
     # Closing the browser engine ends the launch script, which stops this service.
     QUIT_FLAG.touch()
-    subprocess.run(['pkill', '-x', 'cog'], check=False)
+    close_browser()
     threading.Thread(target=launcher_server.shutdown, daemon=True).start()
 
 
@@ -584,7 +595,7 @@ def go_home():
         done = False
     if not done:
         # Restart the browser instead; PocketVibe.sh reopens it on the launcher.
-        subprocess.run(['pkill', '-x', 'cog'], check=False)
+        close_browser()
 
 
 def gamepad_devices():
