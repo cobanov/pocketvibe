@@ -1518,19 +1518,6 @@ h2 {
   color: var(--body);
 }
 
-/* ROCKNIX beside Android, on How it works. */
-.table.compare td:nth-child(2) {
-  color: var(--body);
-  font-weight: 400;
-  white-space: normal;
-}
-
-.table.compare tbody th {
-  color: var(--muted);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .column h3.section {
   margin: 30px 0 12px;
   font-size: 19px;

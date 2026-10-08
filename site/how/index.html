@@ -38,46 +38,38 @@
       <section class="page-intro">
         <h1>How PocketVibe works</h1>
         <p class="lede">
-          Everything you see in PocketVibe is a web page: the menus, and every game. The handheld runs
-          a small browser and a small web server side by side, with no internet needed once a game is
-          downloaded. Here is how the pieces fit.
+          Short version: PocketVibe sets up a tiny website and a browser inside your handheld. The
+          menus and the games are all web pages, running on the device itself, with no internet
+          needed.
         </p>
       </section>
 
       <section class="column" id="engine">
-        <h2>A browser made for a handheld</h2>
+        <h2>Why a browser engine?</h2>
+        <p>three.js draws 3D with WebGL, and WebGL only exists in browsers. So the handheld needs a browser.</p>
         <p>
-          three.js draws 3D with WebGL, and WebGL lives in browsers. So a handheld needs a browser,
-          but Chrome or Firefox are too heavy for one and expect a desktop around them. PocketVibe uses
-          <strong>WPE WebKit</strong>: the engine behind Safari, in the version made for set-top boxes,
-          car dashboards and other small devices. It has no window and no address bar, and draws
-          straight to the screen. <strong>Cog</strong> is the smallest browser built on it: one page,
-          full screen.
+          Chrome and Firefox are too heavy for it, and they want a desktop around them. We use
+          <strong>WPE WebKit</strong>: Safari's engine, in the version made for small devices like TV
+          boxes and car screens. No address bar, no window; it draws straight to the screen.
+          <strong>Cog</strong> is the smallest browser built on it: one page, full screen.
         </p>
-        <p>A frame of a game goes down these layers to reach the screen:</p>
+        <p>A frame of a game reaches the screen through these layers:</p>
         <ol class="layers">
           <li><strong>The game</strong><span>three.js, in JavaScript</span><em>WebGL</em></li>
           <li><strong>WPE WebKit</strong><span>inside Cog, full screen</span><em>OpenGL ES</em></li>
-          <li><strong>Mesa Panfrost</strong><span>the open-source driver for the GPU</span><em></em></li>
-          <li><strong>Mali-G31 GPU</strong><span>and the screen, through ROCKNIX's Sway</span><em></em></li>
+          <li><strong>Mesa Panfrost</strong><span>the open-source GPU driver</span><em></em></li>
+          <li><strong>Mali-G31 GPU</strong><span>and the screen</span><em></em></li>
         </ol>
       </section>
 
       <section class="column" id="runtime">
         <h2>Getting the engine onto the handheld</h2>
-        <p>
-          ROCKNIX is a lean system for handhelds: it has no WPE, and no package manager to install
-          one with. So PocketVibe brings its own: a small Debian file system with WPE WebKit, Cog and
-          the Mesa graphics drivers, packed into a 147 MB download. That is what the first start
-          downloads and unpacks (690 MB on the SD card).
-        </p>
-        <p>
-          PocketVibe runs the browser inside that Debian with Linux's own tools for containers: a
-          private set of mounts and <code>pivot_root</code>, so the browser sees Debian as its whole
-          system. A plain <code>chroot</code> would be simpler, but WebKit puts every page in a
-          sandbox (bubblewrap), and bubblewrap refuses to work inside a chroot. This way, games run
-          sandboxed.
-        </p>
+        <p>ROCKNIX is very lean: it has no WPE, and no package manager to install one. So we packed WPE, Cog and Mesa into a small Debian file system.</p>
+        <ul>
+          <li>It is a 147 MB download. The "downloading the game engine" screen on the first start unpacks it on the SD card (690 MB).</li>
+          <li>PocketVibe runs Cog "inside" that Debian, with Linux mount namespaces and <code>pivot_root</code>. Think of a lightweight container.</li>
+          <li>A <code>chroot</code> was not an option: WebKit runs every page in a sandbox (bubblewrap), and bubblewrap refuses to run in a chroot.</li>
+        </ul>
       </section>
 
       <section class="column" id="parts">
@@ -85,96 +77,80 @@
         <div class="parts">
           <div class="part">
             <code>PocketVibe.sh</code>
-            <p>What the Ports menu starts. It sets PocketVibe up the first time, starts the service, opens the browser, and opens it again if it ever crashes.</p>
+            <p>What the Ports menu starts. Sets things up, starts the service, opens the browser, and reopens it if it crashes.</p>
           </div>
           <div class="part">
             <code>pocketvibed</code>
-            <p>A small web server in Python on <code>127.0.0.1:8730</code>: the launcher's files, and an <code>/api</code> to the library, the store, downloads, settings and updates.</p>
+            <p>A small web server in Python, the handheld's backend. Downloads games, keeps settings and saves, installs updates.</p>
           </div>
           <div class="part">
             <code>Cog</code>
-            <p>The browser. It opens the launcher, which is a web page like any other, and the games from there.</p>
+            <p>The browser. It opens the launcher, and the games from there.</p>
           </div>
         </div>
+        <ul>
+          <li><strong>The launcher</strong> is the menus you see: a plain web page. The handheld on our home page runs exactly this.</li>
+          <li><strong>Each game</strong> is a folder of web files built with Vite.</li>
+        </ul>
         <p>
-          Each game is a folder of web files built with Vite, and the service gives each one its own
-          address on the handheld: <code>127.0.0.1:20066</code>, <code>127.0.0.1:21544</code>, and so
-          on. Browsers keep saved data per address, so every game gets its own saves, and no game can
-          read another's.
+          <strong>Why does each game get its own port?</strong> Browsers keep saves per address. A port
+          per game means its own storage, so its own saves, and no game can read another's.
         </p>
       </section>
 
       <section class="column" id="play">
         <h2>What happens when you press A</h2>
         <ol class="sequence">
-          <li>The launcher asks the service to start the game: <code>POST /api/launch/brick-breaker</code>.</li>
-          <li>The service starts a small server for that game on its own address, and answers with where the game is.</li>
-          <li>The browser goes there, to the game's shell: <code>127.0.0.1:20066/__pocketvibe__/play.html</code>.</li>
-          <li>The shell shows the game's cover and name, and loads the game in a frame sized for the screen.</li>
-          <li>The game's device layer sets up WebGL, reads the buttons and starts the game loop. Once the first frames are drawn, the cover fades away.</li>
+          <li>The launcher asks the service to start the game.</li>
+          <li>The service starts a small server for that game on its own port, and says where it is.</li>
+          <li>The browser opens the game's shell there.</li>
+          <li>The shell shows the cover and the name, and loads the game sized for the screen.</li>
+          <li>The game sets up WebGL, reads the buttons and starts its loop. Once the first frames are drawn, the cover fades away.</li>
         </ol>
         <p>
-          Holding <kbd>Start</kbd> and <kbd>Select</kbd> takes you back. Those two buttons are read by
-          the service straight from Linux, not by the browser, so they work even if a game freezes. The
-          service tells Cog to open the launcher; held for three seconds, it quits PocketVibe.
+          <strong>Going back:</strong> hold <kbd>Start</kbd> + <kbd>Select</kbd>. The service reads
+          those buttons straight from Linux, not through the browser, so you can leave even if a game
+          freezes. Hold them for three seconds to quit.
         </p>
         <p>
-          The buttons reach games through the browser's Gamepad API. One trick: WebKit lets a page
-          play sound only after a real key press, and gamepad buttons do not count. So the service
-          keeps a tiny virtual keyboard and taps F13, a key nothing uses, which unlocks the sound.
+          <strong>Buttons and sound:</strong> games read the controls through the browser's Gamepad
+          API. WebKit only allows sound after a real key press, and gamepad buttons do not count. So
+          the service taps a virtual F13 key that nothing uses. A bit of a hack, but it works.
         </p>
       </section>
 
       <section class="column" id="android">
         <h2>On Android</h2>
         <p>The launcher, the shell and the games are the same files. Only the layers under them change:</p>
-        <div class="table compare">
-          <table>
-            <thead>
-              <tr><th></th><th>ROCKNIX</th><th>Android</th></tr>
-            </thead>
-            <tbody>
-              <tr><th scope="row">Browser engine</th><td>WPE WebKit, in Cog</td><td>Android System WebView (Chrome's engine)</td></tr>
-              <tr><th scope="row">Local service</th><td><code>pocketvibed</code>, in Python</td><td>The same API, in Kotlin, inside the app</td></tr>
-              <tr><th scope="row">Buttons</th><td>Gamepad API, through libmanette</td><td>Android's key events, turned into the keys pages read</td></tr>
-              <tr><th scope="row">Graphics driver</th><td>Mesa Panfrost</td><td>The handheld maker's own</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <ul>
+          <li><strong>Browser engine:</strong> Android's WebView (Chrome's engine) instead of WPE.</li>
+          <li><strong>Service:</strong> the same job in Kotlin, a small web server inside the app.</li>
+          <li><strong>Buttons:</strong> Android's key events become the keyboard keys the pages read.</li>
+        </ul>
         <p>
-          That last row is why the same game can run smoother on an Android handheld: Chrome's graphics
-          path is very mature, and the maker's driver is tuned for its chip.
+          That is why the same game can run smoother on an Android handheld: Chrome's graphics path is
+          very mature, and the maker's own driver is faster than Mesa on a Mali-G31.
         </p>
       </section>
 
       <section class="column" id="store">
         <h2>The store, and this website</h2>
-        <p>
-          The store runs on Cloudflare: a small Worker, a D1 database of games and versions, and R2
-          for the game zips and covers. The handheld reads the store's <code>catalog.json</code>.
-          <code>npx pocketvibe publish</code> builds a game, packs it with its listing and cover and
-          uploads it; once it is reviewed, it joins the catalog.
-        </p>
-        <p>
-          The handheld on the home page runs the very same launcher. In your browser, a service worker
-          answers in place of <code>pocketvibed</code>, which is why the demo behaves exactly like the
-          real thing.
-        </p>
+        <ul>
+          <li><strong>The store</strong> runs on Cloudflare: a Worker, a D1 database for games and versions, and R2 for the zips and covers. <code>npx pocketvibe publish</code> builds and uploads a game; once reviewed, it is in the store.</li>
+          <li><strong>The website</strong> runs the same launcher inside a drawn handheld. A service worker in your browser stands in for the handheld's service, so the demo behaves exactly like the real thing.</li>
+        </ul>
       </section>
 
       <section class="column" id="speed">
         <h2>The hard part: speed</h2>
         <p>
-          The setup above is simple. Getting 60 fps out of a small GPU through a browser engine is not.
-          Typical three.js code ran at 3 to 6 fps on the handheld. So we measured what every cost
-          does there, one at a time: triangles, draw calls, lights, shadows, the CPU time large indexed
-          meshes take in WebKit, and more. Those numbers became the rules the AI tools follow when they
-          write a game, and games that follow them run at 60.
+          The setup itself is simple. The hard part is 60 fps on a small GPU through a browser engine.
+          So we measured what everything costs on the handheld: triangles, draw calls, shadows, and
+          more. Those numbers became the rules the AI follows when it writes a game. That is the
+          difference between 3 to 6 fps for typical three.js code and 60 fps for games that follow
+          the rules.
         </p>
-        <p>
-          <a href="/make/#budget">The measured limits</a> are on Make a game, and the code is on
-          <a href="https://github.com/cobanov/pocketvibe">GitHub</a>.
-        </p>
+        <p><a href="/make/#budget">See the measured limits</a> · <a href="https://github.com/cobanov/pocketvibe">The code on GitHub</a></p>
       </section>
     </main>
 
