@@ -164,6 +164,9 @@ async function handle(request, path) {
       }
       case '/api/notice':
         return json({ notice: null });
+      case '/api/screens':
+        // One screen, the page's 720x480 frame.
+        return json({ screens: null, primary: 0 });
       case '/api/jobs':
         return json(await jobs());
     }
