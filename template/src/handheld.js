@@ -9,9 +9,11 @@ import * as THREE from 'three';
 
 export const SCREEN = { width: 720, height: 480 };
 
-// Per-frame performance budget. Provisional numbers: they will be replaced
-// with values measured on the Anbernic RG SP.
-export const BUDGET = { drawCalls: 100, triangles: 60000 };
+// Per-frame performance budget, measured on the RG34XX SP (bench/results/
+// 2026-10-08-limits.md). The overlay counts every triangle drawn, also those
+// outside the view, which cost almost nothing: if it is red for triangles
+// while the frame rate holds, they are off screen.
+export const BUDGET = { drawCalls: 100, triangles: 10000, fps: 55 };
 
 export const BUTTONS = ['UP', 'DOWN', 'LEFT', 'RIGHT', 'A', 'B', 'X', 'Y', 'L', 'R', 'START', 'SELECT'];
 
@@ -113,29 +115,50 @@ function createInput() {
 }
 
 function createPerfOverlay(parent, renderer) {
+  const params = new URLSearchParams(location.search);
   const el = document.createElement('div');
   el.id = 'perf';
-  el.hidden = onDevice && !new URLSearchParams(location.search).has('perf');
+  el.hidden = onDevice && !params.has('perf');
   parent.appendChild(el);
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyP') el.hidden = !el.hidden;
   });
 
+  // ?perflog writes a PERF line to the console every two seconds, so the
+  // frame rate can be read from the handheld's log without looking at it.
+  const log = params.has('perflog');
   let frames = 0;
   let windowStart = performance.now();
+  let logFrames = 0;
+  let logStart = windowStart;
+  let last = windowStart;
+  let worst = 0;
   return {
     // Called once per frame after the game rendered.
     frame(now) {
-      frames++;
-      if (now - windowStart < 500 || el.hidden) return;
-      const fps = (frames * 1000) / (now - windowStart);
       const { calls, triangles } = renderer.info.render;
+      if (log) {
+        logFrames++;
+        worst = Math.max(worst, now - last);
+        if (now - logStart >= 2000) {
+          const fps = (logFrames * 1000) / (now - logStart);
+          console.log(`PERF ${JSON.stringify({ fps: +fps.toFixed(1), worstMs: Math.round(worst), calls, triangles })}`);
+          logFrames = 0;
+          logStart = now;
+          worst = 0;
+        }
+      }
+      last = now;
+      frames++;
+      if (now - windowStart < 500) return;
+      const fps = (frames * 1000) / (now - windowStart);
+      frames = 0;
+      windowStart = now;
+      if (el.hidden) return;
       el.textContent =
         `${fps.toFixed(0)} fps  ${(1000 / fps).toFixed(1)} ms\n` +
         `${calls} draws  ${(triangles / 1000).toFixed(1)}k tris`;
-      el.classList.toggle('over', calls > BUDGET.drawCalls || triangles > BUDGET.triangles);
-      frames = 0;
-      windowStart = now;
+      el.classList.toggle('over', calls > BUDGET.drawCalls || triangles > BUDGET.triangles || fps < BUDGET.fps);
     },
   };
 }
@@ -155,7 +178,10 @@ function fitScreen(frame, screen) {
   fit();
 }
 
-export function createHandheld({ clearColor = 0x000000 } = {}) {
+// resolution: 0.5 draws the 3D scene at 360x240 and stretches it to the
+// screen. It cuts the cost of drawing by half or more; use it when a scene
+// cannot be made cheap enough. The HUD stays sharp.
+export function createHandheld({ clearColor = 0x000000, resolution = 1 } = {}) {
   document.body.classList.toggle('handheld', onDevice);
   const frame = document.getElementById('frame');
   const screen = document.getElementById('screen');
@@ -164,7 +190,7 @@ export function createHandheld({ clearColor = 0x000000 } = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(1);
   // false: keep the CSS size from style.css instead of setting it here.
-  renderer.setSize(SCREEN.width, SCREEN.height, false);
+  renderer.setSize(Math.round(SCREEN.width * resolution), Math.round(SCREEN.height * resolution), false);
   renderer.setClearColor(clearColor);
   // Count draw calls over the whole frame, even if the game renders twice.
   renderer.info.autoReset = false;

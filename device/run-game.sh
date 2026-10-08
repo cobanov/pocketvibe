@@ -1,12 +1,15 @@
 #!/bin/sh
 # On the handheld: open an installed game in the PocketVibe app.
 #
-#   run-game.sh <game-id>
+#   run-game.sh <game-id> [extra]
 #
 # The game lives in /storage/pocketvibe/games/<game-id>. The app is started
 # first if it is not running. Hold Start + Select to go back to the launcher.
+# extra is added to the game's address, e.g. "&perflog" to log the frame rate
+# to /tmp/pocketvibe-cog.log as PERF lines.
 
-ID=${1:?usage: run-game.sh <game-id>}
+ID=${1:?usage: run-game.sh <game-id> [extra]}
+EXTRA=$2
 API=http://127.0.0.1:8730
 COGCTL="python3 /storage/pocketvibe/app/runtime.py --root /storage/pocketvibe/runtime -- cogctl"
 
@@ -36,5 +39,5 @@ fi
 
 URL=$(curl -s -X POST -H 'X-PocketVibe: 1' "$API/api/launch/$ID" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("url", ""))')
 [ -n "$URL" ] || { echo "PocketVibe has no game called $ID."; exit 1; }
-$COGCTL open "$URL" || { echo "PocketVibe's browser did not open $ID."; exit 1; }
+$COGCTL open "$URL$EXTRA" || { echo "PocketVibe's browser did not open $ID."; exit 1; }
 echo "Opened $ID. Hold Start + Select on the handheld to go back to the launcher."

@@ -31,7 +31,8 @@ Sıradakiler:
 1. Ses testi düğmeye basılarak yeniden (AudioContext basış olmadan `suspended` kaldı).
 2. Mesa denemesi: runtime'ın kopyasına (`/storage/pv-runtime-m26`) trixie-backports'tan Mesa 26.1.6 kurup aynı testler. Host'ta Mesa 26.2.4 var ama glibc 2.43 istiyor, runtime'da 2.41 var; backports paketi uyumlu.
 3. Uygulamada: oyundan oyuna geçince web sürecinin GPU belleği birikiyor mu (`/proc/<WPEWebProcess>/fdinfo` `drm-total-memory`).
-4. Sonuçları `bench/results/` altına bir rapor olarak yaz, `template/AGENTS.md` bütçelerini düzelt (görünen üçgen, indexed mesh, yarım çözünürlük, shader ısıtma, yükleme), oyun optimizasyon ajanı için prompt dosyası hazırla.
+4. Yapıldı: rapor `bench/results/2026-10-08-limits.md`; `template/AGENTS.md` yeni bütçe ve "Loading" bölümü; `template/src/handheld.js` ölçülen bütçe, `resolution: 0.5` seçeneği ve `?perflog` (PERF satırları); `device/run-game.sh <id> "&perflog"`; oyun optimizasyon ajanı için `docs/optimize-prompt.md`. Template değiştiği için `create-pocketvibe` için yeni bir npm sürümü (0.1.1) gerekiyor (kullanıcının onayıyla, `script -q /dev/null npm publish --access public --browser=false`).
+5. Cihaz artık Tailscale'de: `root@100.86.26.111` (`rg34xx-sp`), her ağdan erişilebiliyor.
 
 ## Kalan işler (sırayla)
 

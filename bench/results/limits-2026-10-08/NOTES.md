@@ -10,4 +10,5 @@ PocketVibe app. Made with `limits.html` and `tools/collector.py`; `tools/limits-
   `audio` (the AudioContext stayed suspended without a button press, so nothing played) and the first
   `memory textures` line (it ran after `memory js` in the same browser); the last lines are reruns in fresh
   browsers.
+- `valid.jsonl`: the valid lines of the three runs together; `tables.md` is made from it.
 - `*-samples.jsonl`: temperatures, clocks and free memory every two seconds.

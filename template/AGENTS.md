@@ -22,7 +22,7 @@ Follow these rules whenever you write or change code here. They are what keeps t
     renderer.render(scene, camera);
   });
   ```
-- The screen is always 720×480 (`hh.width`, `hh.height`). Never resize the renderer to the window, never call `setPixelRatio`, never enable antialias, never listen to `resize`.
+- The screen is always 720×480 (`hh.width`, `hh.height`). Never resize the renderer to the window, never call `setPixelRatio`, never enable antialias, never listen to `resize`. To draw the 3D scene at half resolution, pass `resolution: 0.5` to `createHandheld` (see the graphics budget).
 - All game logic goes inside `hh.run`. Move things with `dt`, never per frame. Render once per frame.
 - Do not use `requestAnimationFrame`, `setInterval` or `setTimeout` for the game loop.
 
@@ -40,27 +40,42 @@ Follow these rules whenever you write or change code here. They are what keeps t
 
 - Put HUD, menus and text in the `hud` element as HTML and CSS. Its coordinate space is the 720×480 screen, so use `px`.
 - Text must be readable on a 3.4" screen: at least 18px, bold, with a dark outline or shadow.
-- Update the DOM only when a value changes, never every frame.
+- Update the DOM only when a value changes, never every frame. Ten elements changing in one frame is fine; fifty drop the game to 30 fps.
+- Static panels, bars, dimmed backgrounds and CSS animations over the game cost nothing. Never use `backdrop-filter` (blur dropped the game to 40 fps).
+- Never draw the HUD on a canvas and upload it as a texture: redrawing even a 256×256 canvas texture every frame dropped the game to 24 fps.
 
 ## Graphics budget
 
-The perf overlay (top right, toggle with `P` in the browser) shows fps, draw calls and triangles. It turns red when the game is over budget. Stay under it at all times:
+Measured on the handheld (`bench/results/2026-10-08-limits.md` in the PocketVibe repository). The game has 16.7 ms per frame for 60 fps. The perf overlay (top right, toggle with `P` in the browser) shows fps, draw calls and triangles, and turns red when the game is over budget or below 55 fps. Stay under it at all times:
 
-- Draw calls per frame: 100 or fewer.
-- Triangles per frame: 60,000 or fewer.
+- **Triangles on screen: 10,000 or fewer.** This is the hardest limit: about 1 ms per 1,000 visible triangles (15k: 48 fps, 20k: 39 fps, 30k: 28 fps). Triangles outside the view cost almost nothing, so use `scene.fog` with a short camera `far`, and low-poly models (a few hundred triangles for a character, tens for props).
+- **Draw calls: 100 or fewer.** Each costs 30 to 70 µs of CPU.
+- **Large meshes must not be indexed.** WebKit spends about 0.6 µs per triangle every frame on an indexed mesh (a 20,000-triangle level costs 13 ms). After `mergeGeometries` (from `three/addons/utils/BufferGeometryUtils.js`), call `.toNonIndexed()` on the result. This applies to any geometry over about 2,000 triangles, instanced or not; smaller ones are fine indexed.
 
 How to stay under it:
 
-- Materials: use `MeshLambertMaterial`, `MeshBasicMaterial` or `MeshToonMaterial`. Never use `MeshStandardMaterial` or `MeshPhysicalMaterial`.
-- Lights: one `HemisphereLight` or `AmbientLight` plus at most one `DirectionalLight`. No point lights or spot lights.
-- No shadows: never enable `renderer.shadowMap`, `castShadow` or `receiveShadow`. Fake shadows with a dark transparent circle under objects if needed.
-- No post-processing (`EffectComposer`, bloom, SSAO, outlines).
-- Repeated objects (coins, trees, enemies, bullets, particles) use one `InstancedMesh` per kind.
-- Merge static level geometry with `BufferGeometryUtils.mergeGeometries` from `three/addons/utils/BufferGeometryUtils.js`.
-- Create each geometry and material once and share it. Keep models low-poly.
-- Textures: small (256×256, at most 512×512), power-of-two sizes. For pixel art set `magFilter` and `minFilter` to `THREE.NearestFilter`.
-- Use `scene.fog` and a short camera `far` distance so distant objects are not drawn.
-- Avoid many overlapping transparent objects; they are expensive on this GPU.
+- Materials: use `MeshLambertMaterial`, `MeshBasicMaterial` or `MeshToonMaterial`. `MeshPhongMaterial` costs about 10%; never use `MeshStandardMaterial` (37 fps on a simple scene) or `MeshPhysicalMaterial`.
+- Lights: one `HemisphereLight` or `AmbientLight` plus at most one `DirectionalLight`. Avoid point lights; one costs about 3 ms, four drop the game to 37 fps. No spot lights.
+- No shadows: never enable `renderer.shadowMap`, `castShadow` or `receiveShadow`; even the cheapest shadow map drops a simple scene to 36 fps. Fake shadows with a dark transparent circle under objects.
+- No post-processing (`EffectComposer`, bloom, FXAA, SSAO, outlines). Bloom alone costs 20 fps.
+- Repeated objects (coins, trees, enemies, bullets) use one `InstancedMesh` per kind. Rewriting up to about 5,000 instance matrices per frame is fine.
+- Merge static level geometry into one mesh per material, then `.toNonIndexed()` (see above).
+- Create each geometry and material once and share it.
+- Particles: `THREE.Points` with up to about 1,000 small points or 250 large soft ones. Never `THREE.Sprite` for many objects; each sprite is a draw call.
+- Transparency: at most one transparent layer covering the whole screen (each costs about 3 ms); keep transparent objects small.
+- Textures: PNG files, 256×256 to 512×512, at most 1024×1024, power-of-two sizes. For pixel art set `magFilter` and `minFilter` to `THREE.NearestFilter`.
+- Custom shaders: keep fragment shaders that cover the screen to a few operations; a loop of a dozen `sin`/`cos` per pixel already drops the game to 35 fps.
+- 2D games: use three.js too (an `OrthographicCamera`, with `InstancedMesh` or `Points` for sprites). A 2D canvas is far slower here: 250 `drawImage` sprites per frame drop it to 25 fps.
+- Game code: keep your own JavaScript under about 8 ms per frame (the device's CPU is roughly ten times slower than a laptop's).
+- If a scene still does not fit, draw it at half resolution: `createHandheld({ clearColor, resolution: 0.5 })`. A scene with 20,000 visible triangles went from 27 to 60 fps. The HUD stays sharp.
+
+## Loading
+
+The first use of anything new costs a long frame, so do it all while the game loads, never during play:
+
+- Shaders compile when a material is first drawn: 40 ms for Basic, 90 ms for Lambert, up to 300 ms with shadows. While loading, put one of every kind of object the game will show (enemies, bullets, effects, pickups) in the scene, call `renderer.compile(scene, camera)` once, then hide or pool them.
+- Textures upload when first used: about 30 ms for a 512×512 PNG, 100 ms for 1024×1024. Call `renderer.initTexture(texture)` for each texture while loading.
+- Create geometries while loading too; a 50,000-triangle geometry takes 130 ms to upload.
 
 ## Memory
 
@@ -90,4 +105,4 @@ Run `npm run dev`, play the game with the keyboard, and check that:
 
 1. The perf overlay is not red anywhere in the game.
 2. Every action works with the buttons above and every on-screen hint names those buttons.
-3. Nothing is created per frame inside `hh.run`.
+3. Nothing is created per frame inside `hh.run`, and nothing new is compiled or uploaded during play (see Loading).

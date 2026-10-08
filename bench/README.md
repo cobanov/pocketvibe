@@ -18,6 +18,20 @@ On an Anbernic RG34XX SP (Allwinner H700, Mali-G31 MP2) with WPE WebKit 2.48, ev
 held 60 fps, and every naive scene ran at 3.6 to 5.6 fps. Full results:
 [results/2026-10-08-rg-sp.md](results/2026-10-08-rg-sp.md).
 
+## The device's limits
+
+The scene bench above flatters the handheld: most of its triangles are off screen. `limits.html` measures
+one cost at a time (triangles in and out of view, draw calls, materials, lights, shadows, transparency,
+particles, post-processing, HTML over the game, a 2D canvas, JavaScript time, shader compiles, uploads and
+memory), raising it step by step until the frame rate falls. The device draws about 10,000 triangles inside
+the view at 60 fps, a big indexed mesh costs CPU every frame, and drawing at half resolution doubles what a
+scene can afford. Results: [results/2026-10-08-limits.md](results/2026-10-08-limits.md).
+
+On the handheld, `tools/collector.py` takes the results and reports free memory; open
+`limits.html?run=all&collect=http://127.0.0.1:8799` in the PocketVibe app. Run each test in a freshly started
+browser (`?run=all&tests=<id>`): WebKit keeps the GPU memory of earlier pages, and after many steps the
+numbers go wrong. `node tools/limits-report.mjs results.jsonl` prints the tables.
+
 ## Try it
 
 ```sh
