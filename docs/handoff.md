@@ -18,6 +18,21 @@ Bu dosyayı baştan sona oku, sonra "Kalan işler"den devam et. Önce `docs/plan
 - Denetim (iki alt ajan) ve düzeltmeler: yerel API artık `X-PocketVibe` başlığı, Origin ve Host denetimi istiyor; güncelleme açılmazsa `app.old`'a dönüş; daemon ölürse tarayıcıyı kapatan gözcü; kalıcı port kaydı (`ports.json`); dosyaların atomik yazılması; mağazada kimlik sahipliği, zip bombası, sürüm geri alma ve manifest doğrulaması; CLI'ın Windows'ta çalışması.
 - Cihazda tam test: her ekran, 11 oyunun hepsi, güncelleme, yedekleme ve geri yükleme, gözcü, geri dönüş, sıfırdan kurulum.
 
+## Yarım kalan: cihazın sınırları (2026-10-08 öğlen)
+
+Kullanıcı oyun optimizasyonu için yeni bir ajan başlatmadan önce cihazın gerçek sınırlarını istedi. Yapılanlar:
+
+- `bench/limits.html` ve `bench/src/limits/` (her etkeni adım adım artıran testler), cihazda çalışan `bench/tools/collector.py`, tablolar için `bench/tools/limits-report.mjs`. Ham veriler `bench/results/limits-2026-10-08/` (hangi dosyanın geçerli olduğu `NOTES.md`'de).
+- Ana bulgular (60 fps): ekranda görünen ~10k üçgen (eski 60k bütçesi yanlış; eski bench'te üçgenlerin çoğu ekran dışındaydı), ekran dışı üçgenler neredeyse bedava, ~300 draw call (ayrı materyalle ~100), büyük indexed mesh her karede üçgen başına ~0,6 µs CPU (`toNonIndexed()` ile yok), yarım çözünürlük (360×240) 20k üçgenli sahneyi 27'den 60 fps'e çıkarıyor, Standard 37 fps, her point light ~5-8 fps, gölge en ucuzu 36 fps, ilk kullanımda shader derleme 86-295 ms, canvas'tan doku yüklemek çok yavaş (1024 px 312 ms), PNG 1024 px 99 ms, oyun ~300 MB JS ya da doku belleği kullanabiliyor.
+- WebKit sayfa değişiminde GPU belleğini bırakmıyor (`forceContextLoss` da yetmedi); testler bu yüzden her biri ayrı tarayıcıda koşuldu (cihazda `/storage/pv-each.sh`, `/storage/pv-one.sh`, `/storage/pv-fresh-one.sh`, `/storage/pv-limits.sh`, `/storage/pv-limits-collector.py`).
+
+Sıradakiler:
+
+1. Ses testi düğmeye basılarak yeniden (AudioContext basış olmadan `suspended` kaldı).
+2. Mesa denemesi: runtime'ın kopyasına (`/storage/pv-runtime-m26`) trixie-backports'tan Mesa 26.1.6 kurup aynı testler. Host'ta Mesa 26.2.4 var ama glibc 2.43 istiyor, runtime'da 2.41 var; backports paketi uyumlu.
+3. Uygulamada: oyundan oyuna geçince web sürecinin GPU belleği birikiyor mu (`/proc/<WPEWebProcess>/fdinfo` `drm-total-memory`).
+4. Sonuçları `bench/results/` altına bir rapor olarak yaz, `template/AGENTS.md` bütçelerini düzelt (görünen üçgen, indexed mesh, yarım çözünürlük, shader ısıtma, yükleme), oyun optimizasyon ajanı için prompt dosyası hazırla.
+
 ## Kalan işler (sırayla)
 
 1. **Yeni oyunlar yayında:** maze-chase, tank-brigade, tower-stack, pulse-dash, cloud-climber, snow-slalom, mini-golf, tile-merge, crate-pusher 1.0.0 olarak mağazada (2026-10-08), site de onlarla yeniden yayınlandı. Commit'lemek oyun ajanının işi (`games/`, `docs/upcoming-games.md`). Cihazda henüz denenmediler.

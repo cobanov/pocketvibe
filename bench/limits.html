@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Handheld limits</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+        color: #eee;
+        font: 16px/1.4 system-ui, sans-serif;
+        overflow: hidden;
+      }
+      #stage,
+      #hud {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 720px;
+        height: 480px;
+      }
+      #stage canvas {
+        display: block;
+      }
+      #hud {
+        pointer-events: none;
+        overflow: hidden;
+      }
+      #status {
+        position: absolute;
+        top: 6px;
+        left: 8px;
+        z-index: 1;
+        padding: 2px 6px;
+        background: rgba(0, 0, 0, 0.6);
+        font: 13px ui-monospace, monospace;
+      }
+      #menu {
+        padding: 8px 12px;
+        font-size: 13px;
+      }
+      #menu a {
+        color: #8cf;
+      }
+      #menu span {
+        color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="hud"></div>
+    <div id="status">Loading...</div>
+    <div id="menu"></div>
+    <script type="module" src="./src/limits/harness.js"></script>
+  </body>
+</html>
