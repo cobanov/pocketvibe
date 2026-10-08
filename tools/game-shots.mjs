@@ -5,7 +5,7 @@
 // Usage: node tools/game-shots.mjs <game folder or URL> <outDir> <step>...
 //   step = "key:KeyX" (press and release) | "hold:KeyX:800" (hold for ms)
 //        | "down:ArrowLeft" | "up:ArrowLeft" | "wait:1500" | "shot:title"
-//   ASPECTS=3:2,1:1 limits the shapes.
+//   ASPECTS=3:2,1:1 limits the shapes. PERF=1 shows the performance overlay.
 // A game folder is served with its own Vite dev server, so edits show without
 // a build. Keys are the desktop keyboard's: X is A, Z is B, Enter is START.
 // The game runs as on the handheld (?handheld&screen=WxH), so the screenshot
@@ -112,6 +112,7 @@ for (const shape of shapes) {
   const url = new URL(base);
   url.searchParams.set('handheld', '');
   url.searchParams.set('screen', `${width}x${height}`);
+  if (process.env.PERF) url.searchParams.set('perf', ''); // the overlay: draw calls and triangles
   await send('Page.navigate', { url: url.href });
   await sleep(2500);
   for (const step of steps) {
