@@ -9,8 +9,9 @@
 //   POST /api/admin/review          approve or reject an upload (admin)
 //
 // Developers sign in with a GitHub token; the store asks GitHub who it
-// belongs to and keeps nothing else. A game id belongs to whoever uploaded it
-// first. Uploads by ADMIN_LOGIN are published at once, others wait for review.
+// belongs to and keeps nothing else. A game id belongs to whoever published it,
+// or holds it while their first upload waits for review; a rejected upload
+// frees it. Uploads by ADMIN_LOGIN are published at once, others wait for review.
 
 import { unzipSync } from 'fflate';
 
@@ -55,6 +56,9 @@ const GAME_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,4}$/;
 const MAX_ZIP = 50 * 1024 * 1024;
 const MAX_COVER = 2 * 1024 * 1024;
+const MAX_MANIFEST = 64 * 1024;
+const MAX_UNPACKED = 200 * 1024 * 1024; // all files of a game, unpacked
+const ENTRY = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*\.html$/;
 
 class HttpError extends Error {
   constructor(
@@ -130,7 +134,7 @@ async function catalog(env: Env, origin: string) {
 }
 
 // Serve a published zip or cover; count zip downloads.
-async function file(env: Env, key: string, ctx: ExecutionContext) {
+async function file(request: Request, env: Env, key: string, ctx: ExecutionContext) {
   const match = key.match(/^games\/([a-z0-9-]+)\/(\d+\.\d+\.\d+)\.(zip|png|jpg)$/);
   if (!match) throw new HttpError(404, 'not found');
   const [, id, version, kind] = match;
@@ -140,7 +144,8 @@ async function file(env: Env, key: string, ctx: ExecutionContext) {
   if (release?.status !== 'published') throw new HttpError(404, 'not found');
   const object = await env.FILES.get(key);
   if (!object) throw new HttpError(404, 'not found');
-  if (kind === 'zip') {
+  // The website's build fetches every game; those are not downloads.
+  if (kind === 'zip' && !request.headers.has('X-PocketVibe-Mirror')) {
     ctx.waitUntil(env.DB.prepare('UPDATE games SET downloads = downloads + 1 WHERE id = ?').bind(id).run());
   }
   const type = kind === 'zip' ? 'application/zip' : kind === 'png' ? 'image/png' : 'image/jpeg';
@@ -149,13 +154,36 @@ async function file(env: Env, key: string, ctx: ExecutionContext) {
   });
 }
 
+// Every field is text the handheld shows, so types and lengths are checked.
 function validateManifest(manifest: Manifest, names: string[]) {
-  if (!GAME_ID.test(manifest.id ?? '')) throw new HttpError(400, 'pocketvibe.json: id must be lowercase letters, digits and dashes');
-  if (!manifest.title?.trim()) throw new HttpError(400, 'pocketvibe.json: title is missing');
-  if (!VERSION.test(manifest.version ?? '')) throw new HttpError(400, 'pocketvibe.json: version must look like 1.2.3');
+  if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest)) throw new HttpError(400, 'pocketvibe.json must be an object');
+  const text = (key: keyof Manifest, max: number, required = false) => {
+    const value = manifest[key];
+    if (value === undefined && !required) return;
+    if (typeof value !== 'string' || (required && !value.trim())) throw new HttpError(400, `pocketvibe.json: ${key} must be text`);
+    if (value.length > max) throw new HttpError(400, `pocketvibe.json: ${key} is longer than ${max} characters`);
+  };
+  if (typeof manifest.id !== 'string' || !GAME_ID.test(manifest.id)) throw new HttpError(400, 'pocketvibe.json: id must be lowercase letters, digits and dashes');
+  if (typeof manifest.version !== 'string' || !VERSION.test(manifest.version)) throw new HttpError(400, 'pocketvibe.json: version must look like 1.2.3');
+  text('title', 60, true);
+  text('author', 60);
+  text('description', 500);
+  text('genre', 30);
+  text('entry', 100);
   const entry = manifest.entry || 'index.html';
+  if (!ENTRY.test(entry) || entry.split('/').includes('..')) throw new HttpError(400, 'pocketvibe.json: entry must be the path of an .html file');
   if (!names.includes(entry)) throw new HttpError(400, `the zip has no ${entry}`);
-  if (manifest.controls && typeof manifest.controls !== 'object') throw new HttpError(400, 'pocketvibe.json: controls must be an object');
+  const controls = manifest.controls;
+  if (controls !== undefined) {
+    if (typeof controls !== 'object' || controls === null || Array.isArray(controls)) throw new HttpError(400, 'pocketvibe.json: controls must be an object');
+    const pairs = Object.entries(controls);
+    if (pairs.length > 12) throw new HttpError(400, 'pocketvibe.json: list at most 12 controls');
+    for (const [button, action] of pairs) {
+      if (button.length > 20 || typeof action !== 'string' || action.length > 80) {
+        throw new HttpError(400, 'pocketvibe.json: each control is a button name and up to 80 characters of text');
+      }
+    }
+  }
 }
 
 async function upsertGame(env: Env, owner: string, manifest: Manifest, release: { size: number; sha256: string; zip_key: string; cover_key: string | null }) {
@@ -170,7 +198,7 @@ async function upsertGame(env: Env, owner: string, manifest: Manifest, release: 
       manifest.id,
       owner,
       manifest.title.trim(),
-      manifest.author ?? owner,
+      manifest.author?.trim() || owner,
       manifest.description ?? '',
       manifest.genre ?? '',
       JSON.stringify(manifest.controls ?? {}),
@@ -187,23 +215,37 @@ async function upsertGame(env: Env, owner: string, manifest: Manifest, release: 
 
 async function publish(request: Request, env: Env) {
   const login = await githubLogin(request);
+  if (Number(request.headers.get('Content-Length') ?? 0) > MAX_ZIP) throw new HttpError(413, 'the zip is larger than 50 MB');
   const data = new Uint8Array(await request.arrayBuffer());
   if (data.length === 0) throw new HttpError(400, 'send the game zip as the request body');
   if (data.length > MAX_ZIP) throw new HttpError(413, 'the zip is larger than 50 MB');
 
-  // Read the file list, and only the manifest and cover out of the zip.
+  // Read the file list, and only the manifest and cover out of the zip. Sizes
+  // are checked before anything is unpacked: a tiny zip can claim gigabytes.
   const names: string[] = [];
+  let unpacked = 0;
+  let tooBig = '';
   let files: Record<string, Uint8Array>;
   try {
     files = unzipSync(data, {
       filter: (f) => {
         names.push(f.name);
-        return ['pocketvibe.json', 'cover.png', 'cover.jpg'].includes(f.name);
+        unpacked += f.originalSize;
+        const limit = f.name === 'pocketvibe.json' ? MAX_MANIFEST : ['cover.png', 'cover.jpg'].includes(f.name) ? MAX_COVER : 0;
+        if (!limit) return false;
+        if (f.originalSize > limit) {
+          tooBig ||= f.name;
+          return false;
+        }
+        return true;
       },
     });
   } catch {
     throw new HttpError(400, 'that is not a valid zip');
   }
+  if (tooBig) throw new HttpError(413, `${tooBig} is too large`);
+  if (unpacked > MAX_UNPACKED) throw new HttpError(413, 'the game is larger than 200 MB unpacked');
+  if (new Set(names).size !== names.length) throw new HttpError(400, 'the zip lists a file twice');
   if (names.some((n) => n.startsWith('/') || n.split('/').includes('..'))) throw new HttpError(400, 'the zip contains unsafe paths');
   if (!files['pocketvibe.json']) throw new HttpError(400, 'the zip has no pocketvibe.json at its top level');
   let manifest: Manifest;
@@ -214,38 +256,55 @@ async function publish(request: Request, env: Env) {
   }
   validateManifest(manifest, names);
 
+  // The owner is whoever published the game. An id nobody has published yet
+  // is held by the first upload still waiting for review; the admin can always
+  // take an unpublished id.
   const existing = await env.DB.prepare('SELECT owner, version FROM games WHERE id = ?').bind(manifest.id).first<{ owner: string; version: string }>();
-  const firstUpload = await env.DB.prepare('SELECT uploader FROM releases WHERE game_id = ? ORDER BY created_at LIMIT 1')
+  const waiting = await env.DB.prepare("SELECT uploader FROM releases WHERE game_id = ? AND status = 'pending' ORDER BY created_at LIMIT 1")
     .bind(manifest.id)
     .first<{ uploader: string }>();
-  const owner = existing?.owner ?? firstUpload?.uploader ?? login;
-  if (owner !== login && login !== env.ADMIN_LOGIN) throw new HttpError(403, `the id "${manifest.id}" belongs to another developer`);
-  if (existing && compareVersions(manifest.version, existing.version) <= 0) {
-    throw new HttpError(409, `version must be higher than ${existing.version}; bump it in pocketvibe.json`);
+  const isAdmin = login === env.ADMIN_LOGIN;
+  const owner = existing?.owner ?? (isAdmin ? login : (waiting?.uploader ?? login));
+  if (owner !== login && !isAdmin) throw new HttpError(403, `the id "${manifest.id}" belongs to another developer`);
+  // Higher than every version published or waiting, so an approval can never go backwards.
+  const { results: versions } = await env.DB.prepare("SELECT version FROM releases WHERE game_id = ? AND status != 'rejected'")
+    .bind(manifest.id)
+    .all<{ version: string }>();
+  const highest = versions.map((r) => r.version).sort(compareVersions).at(-1);
+  if (highest && compareVersions(manifest.version, highest) <= 0) {
+    throw new HttpError(409, `version must be higher than ${highest}; bump it in pocketvibe.json`);
   }
-  const taken = await env.DB.prepare('SELECT status FROM releases WHERE game_id = ? AND version = ?').bind(manifest.id, manifest.version).first();
-  if (taken) throw new HttpError(409, `version ${manifest.version} was already uploaded; bump it in pocketvibe.json`);
 
   const zipKey = `games/${manifest.id}/${manifest.version}.zip`;
-  let coverKey: string | null = null;
-  await env.FILES.put(zipKey, data, { httpMetadata: { contentType: 'application/zip' } });
   const cover = files['cover.png'] ?? files['cover.jpg'];
-  if (cover && cover.length <= MAX_COVER) {
-    const png = cover[0] === 0x89 && cover[1] === 0x50;
-    coverKey = `games/${manifest.id}/${manifest.version}.${png ? 'png' : 'jpg'}`;
-    await env.FILES.put(coverKey, cover, { httpMetadata: { contentType: png ? 'image/png' : 'image/jpeg' } });
-  }
-
+  const png = cover ? cover[0] === 0x89 && cover[1] === 0x50 : false;
+  const coverKey = cover ? `games/${manifest.id}/${manifest.version}.${png ? 'png' : 'jpg'}` : null;
   const release = { size: data.length, sha256: await sha256(data), zip_key: zipKey, cover_key: coverKey };
-  const status = login === env.ADMIN_LOGIN ? 'published' : 'pending';
+  const status = isAdmin ? 'published' : 'pending';
   const now = new Date().toISOString();
-  await env.DB.prepare(
-    `INSERT INTO releases (game_id, version, uploader, status, manifest, size, sha256, zip_key, cover_key, created_at, reviewed_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(manifest.id, manifest.version, login, status, JSON.stringify(manifest), release.size, release.sha256, zipKey, coverKey, now, status === 'published' ? now : null)
-    .run();
-  if (status === 'published') await upsertGame(env, owner, manifest, release);
+  // The row claims the version first (its primary key), so two uploads of the
+  // same version cannot both write the files.
+  try {
+    await env.DB.prepare(
+      `INSERT INTO releases (game_id, version, uploader, status, manifest, size, sha256, zip_key, cover_key, created_at, reviewed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(manifest.id, manifest.version, login, 'pending', JSON.stringify(manifest), release.size, release.sha256, zipKey, coverKey, now, null)
+      .run();
+  } catch {
+    throw new HttpError(409, `version ${manifest.version} was already uploaded; bump it in pocketvibe.json`);
+  }
+  try {
+    await env.FILES.put(zipKey, data, { httpMetadata: { contentType: 'application/zip' } });
+    if (cover && coverKey) await env.FILES.put(coverKey, cover, { httpMetadata: { contentType: png ? 'image/png' : 'image/jpeg' } });
+  } catch (e) {
+    await env.DB.prepare('DELETE FROM releases WHERE game_id = ? AND version = ?').bind(manifest.id, manifest.version).run();
+    throw e;
+  }
+  if (isAdmin) {
+    await upsertGame(env, owner, manifest, release);
+    await env.DB.prepare("UPDATE releases SET status = 'published', reviewed_at = ? WHERE game_id = ? AND version = ?").bind(now, manifest.id, manifest.version).run();
+  }
 
   return json({
     status,
@@ -269,7 +328,7 @@ async function me(request: Request, env: Env) {
 async function pending(request: Request, env: Env) {
   await requireAdmin(request, env);
   const { results } = await env.DB.prepare(
-    "SELECT game_id, version, uploader, manifest, size, created_at FROM releases WHERE status = 'pending' ORDER BY created_at",
+    "SELECT game_id, version, uploader, manifest, size, created_at FROM releases WHERE status = 'pending' ORDER BY created_at LIMIT 50",
   ).all();
   return json({ pending: results.map((r) => ({ ...r, manifest: JSON.parse(r.manifest as string) })) });
 }
@@ -283,7 +342,11 @@ async function review(request: Request, env: Env) {
   if (!release) throw new HttpError(404, 'no such pending upload');
   const now = new Date().toISOString();
   if (action === 'approve') {
-    const owner = (await env.DB.prepare('SELECT owner FROM games WHERE id = ?').bind(id).first<{ owner: string }>())?.owner ?? release.uploader;
+    const game = await env.DB.prepare('SELECT owner, version FROM games WHERE id = ?').bind(id).first<{ owner: string; version: string }>();
+    if (game && compareVersions(version, game.version) <= 0) {
+      throw new HttpError(409, `${id} is already at ${game.version}; reject this one`);
+    }
+    const owner = game?.owner ?? release.uploader;
     await upsertGame(env, owner, JSON.parse(release.manifest), release);
     await env.DB.prepare("UPDATE releases SET status = 'published', reviewed_at = ? WHERE game_id = ? AND version = ?").bind(now, id, version).run();
     return json({ status: 'published', id, version });
@@ -337,7 +400,7 @@ export default {
       }
       if (request.method === 'GET' && pathname === '/') return await home(env, url.origin);
       if (request.method === 'GET' && pathname === '/catalog.json') return await catalog(env, url.origin);
-      if (request.method === 'GET' && pathname.startsWith('/files/')) return await file(env, pathname.slice(7), ctx);
+      if (request.method === 'GET' && pathname.startsWith('/files/')) return await file(request, env, pathname.slice(7), ctx);
       if (request.method === 'POST' && pathname === '/api/publish') return await publish(request, env);
       if (request.method === 'GET' && pathname === '/api/me') return await me(request, env);
       if (request.method === 'GET' && pathname === '/api/admin/pending') return await pending(request, env);
