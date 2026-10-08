@@ -1,0 +1,119 @@
+{
+  "sampleRate": 48000,
+  "channels": 2,
+  "key": "D major (all tonal sounds)",
+  "sounds": {
+    "nav_move": {
+      "trigger": "D-pad/stick moves focus to a new item (single press)",
+      "tr": "İmleç başka bir öğeye geçti",
+      "seconds": 0.404,
+      "peak_dbfs": -15.0,
+      "wav": "app/pocketvibe/launcher/sounds/nav_move.wav"
+    },
+    "nav_scroll": {
+      "trigger": "Use instead of nav_move while a direction is held and auto-repeat fires",
+      "tr": "Basılı tutunca hızlı kaydırma",
+      "seconds": 0.318,
+      "peak_dbfs": -20.0,
+      "wav": "app/pocketvibe/launcher/sounds/nav_scroll.wav"
+    },
+    "nav_edge": {
+      "trigger": "Focus can't move (first/last item, grid edge)",
+      "tr": "Listenin sonuna çarptı",
+      "seconds": 0.086,
+      "peak_dbfs": -18.0,
+      "wav": "app/pocketvibe/launcher/sounds/nav_edge.wav"
+    },
+    "confirm": {
+      "trigger": "A / OK / select",
+      "tr": "Onay / A tuşu",
+      "seconds": 0.504,
+      "peak_dbfs": -6.0,
+      "wav": "app/pocketvibe/launcher/sounds/confirm.wav"
+    },
+    "back": {
+      "trigger": "B / back / cancel / close screen",
+      "tr": "Geri / B tuşu",
+      "seconds": 0.455,
+      "peak_dbfs": -9.0,
+      "wav": "app/pocketvibe/launcher/sounds/back.wav"
+    },
+    "error": {
+      "trigger": "Action not allowed, failed, locked item",
+      "tr": "Hata / izin yok",
+      "seconds": 0.453,
+      "peak_dbfs": -7.0,
+      "wav": "app/pocketvibe/launcher/sounds/error.wav"
+    },
+    "tab_switch": {
+      "trigger": "Shoulder buttons switch tab or category",
+      "tr": "Sekme değişti (L/R)",
+      "seconds": 0.415,
+      "peak_dbfs": -9.0,
+      "wav": "app/pocketvibe/launcher/sounds/tab_switch.wav"
+    },
+    "menu_open": {
+      "trigger": "Context menu, quick menu, popup, side panel opens",
+      "tr": "Menü/popup açıldı",
+      "seconds": 0.528,
+      "peak_dbfs": -10.0,
+      "wav": "app/pocketvibe/launcher/sounds/menu_open.wav"
+    },
+    "menu_close": {
+      "trigger": "Same, closing",
+      "tr": "Menü/popup kapandı",
+      "seconds": 0.418,
+      "peak_dbfs": -11.0,
+      "wav": "app/pocketvibe/launcher/sounds/menu_close.wav"
+    },
+    "toggle_on": {
+      "trigger": "Switch/checkbox turned on",
+      "tr": "Ayar açıldı",
+      "seconds": 0.447,
+      "peak_dbfs": -11.0,
+      "wav": "app/pocketvibe/launcher/sounds/toggle_on.wav"
+    },
+    "toggle_off": {
+      "trigger": "Switch/checkbox turned off",
+      "tr": "Ayar kapandı",
+      "seconds": 0.423,
+      "peak_dbfs": -13.0,
+      "wav": "app/pocketvibe/launcher/sounds/toggle_off.wav"
+    },
+    "key_type": {
+      "trigger": "On-screen keyboard key press",
+      "tr": "Ekran klavyesi tuşu",
+      "seconds": 0.022,
+      "peak_dbfs": -18.0,
+      "wav": "app/pocketvibe/launcher/sounds/key_type.wav"
+    },
+    "notification": {
+      "trigger": "Toast / notification appears",
+      "tr": "Bildirim",
+      "seconds": 1.732,
+      "peak_dbfs": -6.0,
+      "wav": "app/pocketvibe/launcher/sounds/notification.wav"
+    },
+    "save_done": {
+      "trigger": "Save / download / install finished",
+      "tr": "Kaydetme bitti",
+      "seconds": 0.539,
+      "peak_dbfs": -7.0,
+      "wav": "app/pocketvibe/launcher/sounds/save_done.wav"
+    },
+    "launch_game": {
+      "trigger": "Game launch starts (play right after confirm, ~140 ms later)",
+      "tr": "Oyun başlatılıyor",
+      "seconds": 1.883,
+      "peak_dbfs": -3.0,
+      "wav": "app/pocketvibe/launcher/sounds/launch_game.wav"
+    },
+    "boot": {
+      "trigger": "App startup sting, before menu music fades in",
+      "tr": "Uygulama açılışı",
+      "seconds": 3.836,
+      "peak_dbfs": -2.0,
+      "wav": "app/pocketvibe/launcher/sounds/boot.wav"
+    }
+  }
+}
