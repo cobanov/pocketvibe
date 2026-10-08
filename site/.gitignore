@@ -4,3 +4,4 @@ dist/
 # Made by scripts/prepare.mjs from the app and the store.
 public/demo/
 public/play/
+worker-configuration.d.ts
