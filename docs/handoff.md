@@ -6,7 +6,7 @@ Bu dosyayı baştan sona oku, sonra "Kalan işler"den devam et. Önce `docs/plan
 
 - **Sürüm 0.5.0 yayında:** GitHub release `v0.5.0` (`PocketVibe.zip` kurulum, `pocketvibe-app-0.5.0.zip` güncelleme). Cihaz 0.4.0'dan OTA ile 0.5.0'a güncellendi ve test edildi.
 - **Site:** https://pocketvibe.cobanov.dev (`site/`, Cloudflare static assets, `cd site && npm run deploy`). Gerçek launcher bir service worker (`site/public/sw.js`) ile tarayıcıda çalışıyor; mağazadaki oyunlar `scripts/prepare.mjs` ile açılıp `public/play/` altında oynanıyor. pocketvibed'in API yanıtları değişirse `sw.js` de güncellenmeli.
-- **Mağaza:** Worker güncel ve yayında (`store/worker`, `cf deploy`). 12 oyun.
+- **Mağaza:** Worker güncel ve yayında (`store/worker`, `cf deploy`). 21 oyun.
 - **Belgeler:** README'ler İngilizce, herdrchat düzeninde. `docs/getting-started.md` ve `docs/development.md` var.
 - **Cihaz:** Anbernic RG34XX SP, `ssh root@192.168.8.197`. Tercihleri test öncesine döndürüldü (Library: Recently played, kartlar; Store: Most downloaded, kartlar).
 
@@ -20,10 +20,7 @@ Bu dosyayı baştan sona oku, sonra "Kalan işler"den devam et. Önce `docs/plan
 
 ## Kalan işler (sırayla)
 
-1. **Yeni oyunlar:** Oyun ajanı (`openboy-9a` oturumu) dokuz yeni oyun yapıyor: maze-chase, tank-brigade, tower-stack, pulse-dash, cloud-climber, snow-slalom, mini-golf, tile-merge, crate-pusher. Kullanıcı onları görmeden commit etmiyor; kullanıcı baktıktan sonra commit edip haber verecek. O zaman:
-   - Her biri için `node packages/pocketvibe/cli.js publish games/<klasör>`. Sürümler 1.0.0, kimlikler mağazada boş.
-   - Sonra `cd site && npm run deploy`, böylece demo da onları içerir.
-   - `games/` ve `docs/upcoming-games.md` o ajanın. Dokunma.
+1. **Yeni oyunlar yayında:** maze-chase, tank-brigade, tower-stack, pulse-dash, cloud-climber, snow-slalom, mini-golf, tile-merge, crate-pusher 1.0.0 olarak mağazada (2026-10-08), site de onlarla yeniden yayınlandı. Commit'lemek oyun ajanının işi (`games/`, `docs/upcoming-games.md`). Cihazda henüz denenmediler.
 2. **npm paketleri yayında:** `create-pocketvibe` ve `pocketvibe` 0.1.0 (2026-10-08). npm hesabında 2FA güvenlik anahtarıyla açık. Yeni sürüm için `script -q /dev/null npm publish --access public --browser=false` arka planda çalıştırılıp çıkan `npmjs.com/auth/cli/...` bağlantısı kullanıcıya verilir; onaydan sonra birkaç dakika ikinci yayın onay istemez.
 3. **Oyunların FPS'i:** Turbo Circuit (başlangıç çizgisi, 26.8k üçgen) ve Star Defender cihazda 48 fps, Sky Hopper 56 fps. Oyun ajanına iletilmeli.
 4. **Denetimden kalanlar (bilerek ertelendi):**
