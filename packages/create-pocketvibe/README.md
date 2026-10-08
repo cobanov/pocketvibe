@@ -23,15 +23,17 @@ npm run dev
 ```
 
 Then open the folder in your AI coding tool, such as Claude Code or Cursor, and describe your
-game. The project is made for handhelds running ROCKNIX with the
-[PocketVibe](https://pocketvibe.cobanov.dev) app.
+game; start with "Read https://pocketvibe.cobanov.dev/agents.md and follow it." The project is
+made for handhelds running [PocketVibe](https://pocketvibe.cobanov.dev) on ROCKNIX or Android.
+`npx pocketvibe serve` puts the game on your own handheld, and `npx pocketvibe publish` sends
+it to the store. [Make a game](https://pocketvibe.cobanov.dev/make/) walks through it all.
 
 ## What you get
 
 - **Rules your AI tool reads.** `AGENTS.md`, also read through `CLAUDE.md`, teaches it the 720×480 screen, the buttons, and how to keep a three.js game at 60 fps on the handheld's GPU.
 - **A device layer.** `src/handheld.js` handles the screen, the buttons (gamepad on the handheld, keyboard in the browser), the game loop, saving, and a performance overlay that turns red when the game is too heavy.
-- **An example to start from.** Coin Rush, a small game that follows every rule.
-- **A store listing.** `pocketvibe.json`, ready for `npx pocketvibe publish`.
+- **An example to start from.** A small game that follows every rule, to change or replace.
+- **A store listing.** `pocketvibe.json`, ready for `npx pocketvibe serve` and `npx pocketvibe publish`.
 
 ---
 

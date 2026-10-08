@@ -17,7 +17,7 @@ Coin Rush, a small example game; tell your AI coding tool what to make instead.
 
 ## Make it yours
 
-- **Describe your game.** `AGENTS.md`, also read through `CLAUDE.md`, tells AI tools the screen, the buttons and the rules that keep the game at 60 fps on the handheld.
+- **Describe your game.** `AGENTS.md`, also read through `CLAUDE.md`, tells AI tools the screen, the buttons and the rules that keep the game at 60 fps on the handheld. [The brief](https://pocketvibe.cobanov.dev/agents.md) sums it up, with the steps to try and publish the game.
 - **Use the handheld layer.** `src/handheld.js` gives you the screen, the buttons, the game loop, saving and a performance overlay. Your game goes in `src/main.js` and beside it.
 - **Fill in the listing.** `pocketvibe.json` is the game's page in the store, and `cover.png` (480×270) its picture.
 
@@ -47,7 +47,20 @@ game is too heavy for the handheld. The
 [performance guide](https://github.com/cobanov/pocketvibe/blob/main/docs/performance.md)
 explains the handheld's limits and how to stay inside them.
 
-## Put it on the handheld
+## Play it on your handheld
+
+With the handheld on the same network as your computer:
+
+```sh
+npx pocketvibe serve
+```
+
+It prints an address such as `http://192.168.1.20:8740`. In PocketVibe on the handheld, open
+**Settings > Stores > Add a store** and type it: the game is then in the **Store** tab as
+"(dev)". Each change is built again, and the Store offers it as an update. Works on ROCKNIX and
+Android handhelds.
+
+## Publish it to the store
 
 Give the game its own `id` and a `version` in `pocketvibe.json`, then:
 
@@ -55,6 +68,7 @@ Give the game its own `id` and a `version` in `pocketvibe.json`, then:
 npx pocketvibe publish
 ```
 
-You sign in with GitHub. Once the game is reviewed, it is in the PocketVibe store and you can
-download it on any handheld with PocketVibe. For a new version, raise `version` and publish
-again.
+You sign in with GitHub. Every game is played before it goes into the store
+([what review checks](https://pocketvibe.cobanov.dev/make/#review)); `npx pocketvibe status`
+shows where yours is. Once approved, it is on every handheld with PocketVibe. For a new
+version, raise `version` and publish again.

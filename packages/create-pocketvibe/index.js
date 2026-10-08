@@ -39,5 +39,11 @@ Created ${title} in ${folder}
   npm run dev
 
 Then open the folder in your AI coding tool (Claude Code, Cursor, ...) and
-describe your game. AGENTS.md tells it how to write code for the handheld.
+tell it: "Read https://pocketvibe.cobanov.dev/agents.md and follow it. Then
+make me a PocketVibe game: ..." with your idea. AGENTS.md has the rules.
+
+  npx pocketvibe serve     play it on your own handheld
+  npx pocketvibe publish   send it to the store
+
+More: https://pocketvibe.cobanov.dev/make/
 `);
