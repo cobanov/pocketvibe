@@ -59,4 +59,9 @@ for (const [game, zip] of zips) {
   console.log(`play/${game.id} ${game.version}`);
 }
 writeFileSync(join(play, 'games.json'), JSON.stringify(playable));
+// What the page's game shelf and controls help show, for the playable games.
+const shelf = games
+  .filter((g) => playable.includes(g.id))
+  .map(({ id, title, genre, description, entry, controls }) => ({ id, title, genre, description, entry, controls }));
+writeFileSync(join(play, 'catalog.json'), JSON.stringify(shelf));
 console.log(`demo ${version}, ${playable.length} playable games`);

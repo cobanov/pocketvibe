@@ -12,9 +12,10 @@
   /* The handheld's plastic. */
   --shell: #ffc83d;
   --shell-hi: #ffe08a;
-  --shell-lo: #e9b12a;
+  --shell-lo: #f0b42c;
   --shell-edge: #c48a10;
-  --key: #232634;
+  --key: #262a38;
+  --key-hi: #41465e;
   --key-edge: #0b0c12;
   --gutter: clamp(16px, 4vw, 40px);
   color-scheme: dark;
@@ -123,7 +124,8 @@ footer.bar {
 
 h1 {
   margin: 0 0 24px;
-  font-size: clamp(36px, 4.3vw, 56px);
+  /* Sized so "Vibe-coded games," keeps to one line beside the handheld. */
+  font-size: clamp(36px, 3.8vw, 52px);
   font-weight: 800;
   line-height: 1.06;
   letter-spacing: -0.025em;
@@ -187,50 +189,145 @@ h1 span {
   font-size: 15px;
 }
 
+/* The handheld sets the column's width; the help under it wraps to fit. */
 .stage {
+  width: min-content;
   margin: 0;
 }
 
-figcaption {
-  max-width: 40em;
-  margin: 22px auto 0;
-  color: var(--muted);
-  font-size: 14px;
-  text-align: center;
+/* A note over the handheld, its arrow drawn once and then nudging at the
+   screen until someone plays. */
+.pointer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 460px;
+  height: 34px;
+  margin: 0 auto;
+  padding-left: 5%;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  animation: appear 400ms 300ms ease-out backwards;
+  transition: opacity 500ms, visibility 500ms;
+}
+
+.pointer svg {
+  flex: none;
+  width: 64px;
+  height: 56px;
+  margin-top: 8px;
+  overflow: visible;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: nudge 1.8s 1.6s ease-in-out infinite;
+}
+
+/* Both paths measure 1, so one dash hides or shows each whole. */
+.pointer path {
+  stroke-dasharray: 1;
+}
+
+.pointer .shaft {
+  animation: draw 600ms 700ms ease-out backwards;
+}
+
+.pointer .head {
+  animation: draw 250ms 1250ms ease-out backwards;
+}
+
+.stage.played .pointer {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes nudge {
+  50% {
+    transform: translate(2px, 4px);
+  }
 }
 
 /* ---------- The handheld ---------- */
 
-/* Everything on it is measured in em, and 1em is a 52nd of its width. */
+/* Everything on it is measured in em, and 1em is a 52nd of its width. The
+   lid stands up facing you and the base lies flat, so only the base shows
+   its thickness, as a darker band along its front. */
 .handheld {
-  --w: clamp(300px, min(42vw, calc((100svh - 150px) / 1.36)), 500px);
+  --w: clamp(300px, min(42vw, calc((100svh - 230px) / 1.3)), 500px);
+  position: relative;
+  isolation: isolate;
   width: var(--w);
   margin: 0 auto;
+  /* Room for the base's front edge, so the focus ring goes around it. */
+  padding-bottom: 1.4em;
   font-size: calc(var(--w) / 52);
-  border-radius: 3.2em;
+  border-radius: 3em;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 .handheld:focus-visible {
-  outline-offset: 8px;
+  outline-offset: 0.8em;
   border-radius: 3.4em;
+}
+
+/* Its shadow on the desk. */
+.handheld::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: 4%;
+  right: 4%;
+  bottom: -1.4em;
+  height: 4.4em;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.7), transparent);
 }
 
 .lid {
   position: relative;
-  padding: 2em 2em 2.4em;
-  border-radius: 3.2em 3.2em 1.2em 1.2em;
-  background: linear-gradient(180deg, var(--shell-hi), var(--shell) 9%, var(--shell) 90%, var(--shell-lo));
-  box-shadow: inset 0 0.25em 0 rgba(255, 255, 255, 0.35), 0 1.6em 3em rgba(0, 0, 0, 0.45);
+  z-index: 1;
+  padding: 1.9em 1.9em 1.7em;
+  border-radius: 3em 3em 1.6em 1.6em;
+  background:
+    radial-gradient(120% 70% at 20% 0%, rgba(255, 255, 255, 0.28), transparent 60%),
+    linear-gradient(180deg, var(--shell) 0%, var(--shell) 82%, var(--shell-lo));
+  box-shadow:
+    inset 0 0.22em 0 rgba(255, 255, 255, 0.5),
+    inset 0 -0.3em 0 rgba(150, 95, 0, 0.18),
+    0 0.2em 0.6em rgba(0, 0, 0, 0.25);
 }
 
+/* Black glass around the screen, with a faint reflection. */
 .bezel {
-  padding: 1.4em;
-  border-radius: 1.3em;
-  background: #101118;
-  box-shadow: inset 0 0 0 0.2em #1b1d27;
+  padding: 1.3em 1.3em 0;
+  border-radius: 1.4em;
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.07) 0 26%, transparent 42%),
+    #111218;
+  box-shadow:
+    inset 0 0 0 0.12em rgba(255, 255, 255, 0.05),
+    0 0.1em 0 rgba(255, 255, 255, 0.4);
 }
 
 .screen {
@@ -239,6 +336,17 @@ figcaption {
   overflow: hidden;
   border-radius: 0.3em;
   background: #000;
+}
+
+/* The glass edge falls on top of the picture without catching clicks. */
+.screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 0.25em 0.7em rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 
 .screen iframe {
@@ -258,9 +366,100 @@ figcaption {
   height: 100%;
 }
 
+.chin {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 3em;
+  color: #4d505f;
+  font-size: 1em;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* The power light: on while PocketVibe runs. */
+.led {
+  position: absolute;
+  left: 0.9em;
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: #5fd38d;
+  box-shadow: 0 0 0.5em rgba(95, 211, 141, 0.8);
+  transition: background 300ms, box-shadow 300ms;
+}
+
+.handheld:has(.off:not([hidden])) .led {
+  background: #2a2c36;
+  box-shadow: none;
+}
+
+/* Over the launcher until the first press: the whole screen presses A. */
+.start {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  padding: 0 0 1.4%;
+  border: 0;
+  background: linear-gradient(180deg, transparent 72%, rgba(15, 16, 22, 0.75));
+  cursor: pointer;
+}
+
+.start span {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.4em 1.1em 0.4em 1.2em;
+  border-radius: 99em;
+  background: var(--accent);
+  box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.5);
+  color: var(--ink);
+  font-size: 1.5em;
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+/* The A button's own cap. */
+.start b {
+  display: inline-grid;
+  place-items: center;
+  width: 1.55em;
+  height: 1.55em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, var(--key-hi), var(--key) 60%);
+  color: var(--accent);
+  font-size: 0.9em;
+}
+
+.start:hover span,
+.start:focus-visible span {
+  animation: none;
+  background: #ffd665;
+}
+
+.start:focus-visible {
+  outline: 0;
+}
+
+.start:focus-visible span {
+  outline: 0.15em solid var(--text);
+  outline-offset: 0.15em;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .off {
   position: absolute;
   inset: 0;
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -281,24 +480,56 @@ figcaption {
   color: var(--text);
 }
 
-.off[hidden],
 .screen [hidden] {
   display: none;
 }
 
+/* The lid turns on a barrel between two knuckles of the base, and L and R
+   sit on the knuckles. */
 .hinge {
   position: relative;
-  height: 1.7em;
-  margin: 0 1.4em;
-  background: linear-gradient(180deg, var(--shell-edge), var(--shell-lo));
+  height: 2.6em;
+  margin-top: -0.4em;
 }
 
-.base {
-  position: relative;
-  height: 25em;
-  border-radius: 1.2em 1.2em 3.8em 3.8em;
-  background: linear-gradient(180deg, var(--shell-lo), var(--shell) 7%, var(--shell) 88%, var(--shell-lo));
-  box-shadow: 0 1.6em 3em rgba(0, 0, 0, 0.45);
+.hinge::before,
+.hinge::after {
+  content: '';
+  position: absolute;
+  top: 0.4em;
+  bottom: -1em;
+  width: 11em;
+  border-radius: 1.4em 1.4em 0 0;
+  background: linear-gradient(180deg, var(--shell-lo), var(--shell) 40%);
+  box-shadow: inset 0 0.18em 0 rgba(255, 255, 255, 0.4);
+}
+
+.hinge::before {
+  left: 0;
+}
+
+.hinge::after {
+  right: 0;
+}
+
+.barrel {
+  position: absolute;
+  top: 0;
+  left: 11.5em;
+  right: 11.5em;
+  height: 2.6em;
+  border-radius: 0.6em;
+  background: linear-gradient(
+    180deg,
+    #9a6806 0%,
+    var(--shell-edge) 14%,
+    var(--shell) 34%,
+    #fff3c4 46%,
+    var(--shell) 58%,
+    var(--shell-edge) 86%,
+    #8a5d05 100%
+  );
+  box-shadow: inset 0.5em 0 0.5em -0.3em rgba(120, 75, 0, 0.5), inset -0.5em 0 0.5em -0.3em rgba(120, 75, 0, 0.5);
 }
 
 /* Buttons take the handheld's em, not the browser's button font. */
@@ -311,128 +542,201 @@ figcaption {
   cursor: pointer;
 }
 
-/* Every cap sits on a dark edge and sinks into it when pressed. */
+/* Caps are dark, domed plastic on a darker edge, and sink into it when
+   pressed. */
 .shoulder,
 .face button,
 .menu button {
   border: 0;
-  background: var(--key);
-  color: var(--muted);
-  box-shadow: 0 0.32em 0 var(--key-edge);
-  transition: transform 60ms ease-out, box-shadow 60ms ease-out;
+  background: radial-gradient(130% 120% at 40% 20%, var(--key-hi), var(--key) 55%, #1d2030);
+  color: #7f8399;
+  text-shadow: 0 -0.05em 0 rgba(0, 0, 0, 0.6);
+  box-shadow:
+    inset 0 0.06em 0 rgba(255, 255, 255, 0.14),
+    0 0.32em 0 var(--key-edge),
+    0 0.5em 0.6em rgba(110, 70, 0, 0.35);
+  transition: transform 60ms ease-out, box-shadow 60ms ease-out, color 60ms;
 }
 
 .shoulder.pressed,
 .face .pressed,
 .menu .pressed {
   transform: translateY(0.24em);
-  box-shadow: 0 0.08em 0 var(--key-edge);
+  box-shadow:
+    inset 0 0.06em 0 rgba(255, 255, 255, 0.14),
+    0 0.08em 0 var(--key-edge),
+    0 0.2em 0.3em rgba(110, 70, 0, 0.35);
   color: var(--accent);
 }
 
 .shoulder {
   position: absolute;
-  top: 0.1em;
-  width: 8em;
-  height: 1.8em;
-  border-radius: 0.9em 0.9em 0.4em 0.4em;
+  z-index: 1;
+  top: 0;
+  width: 8.4em;
+  height: 1.7em;
+  border-radius: 1em 1em 0.35em 0.35em;
+  font-size: 1em;
   line-height: 1;
 }
 
 .shoulder.l {
-  left: 0.6em;
+  left: 1.3em;
 }
 
 .shoulder.r {
-  right: 0.6em;
+  right: 1.3em;
+}
+
+.base {
+  position: relative;
+  height: 23em;
+  margin-top: -0.2em;
+  border-radius: 1.6em 1.6em 4em 4em;
+  background:
+    radial-gradient(90% 60% at 30% 0%, rgba(255, 255, 255, 0.22), transparent 70%),
+    linear-gradient(180deg, var(--shell-lo), var(--shell) 6%, var(--shell) 90%, var(--shell-lo));
+  box-shadow:
+    inset 0 0.2em 0 rgba(255, 255, 255, 0.35),
+    0 1.3em 0 var(--shell-edge),
+    0 1.3em 0 0.08em #a8730a,
+    0 2.4em 2.6em rgba(0, 0, 0, 0.45);
+}
+
+/* Shallow dishes the d-pad and the face buttons sit in. */
+.dpad,
+.face {
+  position: absolute;
+  top: 2.9em;
+  width: 14.6em;
+  height: 14.6em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, var(--shell-lo), var(--shell) 75%);
+  box-shadow:
+    inset 0 0.35em 0.6em rgba(140, 88, 0, 0.35),
+    inset 0 -0.15em 0.2em rgba(255, 245, 210, 0.7),
+    0 0.1em 0 rgba(255, 255, 255, 0.35);
 }
 
 .dpad {
-  position: absolute;
-  top: 5em;
-  left: 5.6em;
-  width: 11.4em;
-  height: 11.4em;
+  left: 4.2em;
 }
 
-/* The cross itself; the four buttons are its arms. */
-.dpad::before,
-.dpad::after {
+.face {
+  right: 4.2em;
+}
+
+/* The cross rocks toward the arm that is held down. */
+.cross {
+  position: absolute;
+  inset: 1.6em;
+  filter: drop-shadow(0 0.32em 0 var(--key-edge)) drop-shadow(0 0.5em 0.4em rgba(110, 70, 0, 0.4));
+  transition: transform 70ms ease-out;
+}
+
+/* Both bars paint one dome, so the cross reads as a single part. */
+.cross::before,
+.cross::after {
   content: '';
   position: absolute;
-  border-radius: 0.6em;
-  background: var(--key);
-  box-shadow: 0 0.32em 0 var(--key-edge);
+  border-radius: 0.7em;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.35) 0 1em, rgba(255, 255, 255, 0.06) 1.15em, transparent 1.8em),
+    radial-gradient(circle at 42% 30%, var(--key-hi), var(--key) 55%, #1d2030);
+  background-size: 11.4em 11.4em;
 }
 
-.dpad::before {
+.cross::before {
   top: 3.8em;
   left: 0;
-  width: 100%;
+  width: 11.4em;
   height: 3.8em;
+  background-position: 0 -3.8em;
 }
 
-.dpad::after {
+.cross::after {
   top: 0;
   left: 3.8em;
   width: 3.8em;
-  height: 100%;
+  height: 11.4em;
+  background-position: -3.8em 0;
 }
 
-.dpad button {
+.dpad:has([data-key='ArrowUp'].pressed) .cross {
+  transform: perspective(24em) rotateX(9deg);
+}
+
+.dpad:has([data-key='ArrowDown'].pressed) .cross {
+  transform: perspective(24em) rotateX(-9deg);
+}
+
+.dpad:has([data-key='ArrowLeft'].pressed) .cross {
+  transform: perspective(24em) rotateY(-9deg);
+}
+
+.dpad:has([data-key='ArrowRight'].pressed) .cross {
+  transform: perspective(24em) rotateY(9deg);
+}
+
+.cross button {
   position: absolute;
   z-index: 1;
   width: 3.8em;
   height: 3.8em;
-  padding: 0;
   border: 0;
   background: transparent;
 }
 
-.dpad button::after {
+/* An arrow pressed into each arm. */
+.cross button::after {
   content: '';
   position: absolute;
-  inset: 1.25em;
-  border-radius: 50%;
-  background: #3a3e52;
+  inset: 1.35em;
+  background: #50556e;
+  clip-path: polygon(50% 8%, 100% 92%, 0 92%);
+  transition: background 60ms;
 }
 
-.dpad button.pressed::after {
+.cross button.pressed::after {
   background: var(--accent);
 }
 
-.dpad [data-key='ArrowUp'] {
+.cross [data-key='ArrowUp'] {
   top: 0;
   left: 3.8em;
 }
 
-.dpad [data-key='ArrowDown'] {
+.cross [data-key='ArrowDown'] {
   top: 7.6em;
   left: 3.8em;
 }
 
-.dpad [data-key='ArrowLeft'] {
+.cross [data-key='ArrowDown']::after {
+  rotate: 180deg;
+}
+
+.cross [data-key='ArrowLeft'] {
   top: 3.8em;
   left: 0;
 }
 
-.dpad [data-key='ArrowRight'] {
+.cross [data-key='ArrowLeft']::after {
+  rotate: -90deg;
+}
+
+.cross [data-key='ArrowRight'] {
   top: 3.8em;
   left: 7.6em;
 }
 
-.face {
-  position: absolute;
-  top: 4.4em;
-  right: 5.2em;
-  width: 12.4em;
-  height: 12.4em;
+.cross [data-key='ArrowRight']::after {
+  rotate: 90deg;
 }
 
 .face button {
   position: absolute;
-  width: 34.7%;
-  height: 34.7%;
+  width: 29.5%;
+  height: 29.5%;
   border-radius: 50%;
   font-size: 1.7em;
   line-height: 1;
@@ -440,51 +744,261 @@ figcaption {
 
 /* The caps' em follows their larger letters, so they are placed in %. */
 .face .x {
-  top: 0;
-  left: 32.6%;
+  top: 6.5%;
+  left: 35.25%;
 }
 
 .face .y {
-  top: 32.6%;
-  left: 0;
+  top: 35.25%;
+  left: 6.5%;
 }
 
 .face .a {
-  top: 32.6%;
-  right: 0;
+  top: 35.25%;
+  right: 6.5%;
+  color: var(--accent);
 }
 
 .face .b {
-  bottom: 0;
-  left: 32.6%;
+  bottom: 6.5%;
+  left: 35.25%;
 }
 
-.face .a {
-  color: var(--accent);
+/* Until the first press, a ring keeps leaving A. */
+.handheld.attract .face .a::after {
+  content: '';
+  position: absolute;
+  inset: -0.12em;
+  border: 0.08em solid var(--accent);
+  border-radius: 50%;
+  animation: ring 1.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ring {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
 }
 
 .menu {
   position: absolute;
-  bottom: 3.4em;
+  bottom: 2.6em;
   left: 50%;
   display: grid;
   grid-template-columns: 5em 5em;
-  gap: 0.6em 2.6em;
+  gap: 0.7em 2.4em;
   justify-items: center;
   transform: translateX(-50%);
 }
 
 .menu button {
-  width: 5em;
+  width: 4.8em;
   height: 1.5em;
-  padding: 0;
   border-radius: 1em;
 }
 
+/* Words molded into the plastic. */
 .menu span {
-  color: var(--shell-edge);
-  font-size: 1.1em;
+  color: #b5800e;
+  font-size: 1em;
   font-weight: 800;
+  text-shadow: 0 0.08em 0 rgba(255, 240, 200, 0.6);
+}
+
+.speaker {
+  position: absolute;
+  right: 6em;
+  bottom: 2.4em;
+  width: 9.9em;
+  height: 3.3em;
+  background: radial-gradient(circle, #6e4a05 0 0.26em, rgba(255, 240, 200, 0.55) 0.28em 0.33em, transparent 0.37em) 0 0 / 1.1em 1.1em;
+  transform: skewX(-18deg);
+}
+
+/* ---------- Under the handheld: what to press ---------- */
+
+.help {
+  max-width: 34em;
+  margin: 44px auto 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+#status {
+  margin: 0;
+  color: var(--body);
+  font-size: 15px;
+}
+
+#keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  margin: 12px 0 0;
+}
+
+#keys:empty {
+  display: none;
+}
+
+#keys div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+#keys dt {
+  display: flex;
+  gap: 3px;
+}
+
+#keys dd {
+  margin: 0;
+}
+
+/* A game's controls read as a list: keys on the left, what they do. */
+#keys.controls {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 7px 14px;
+  width: fit-content;
+  margin: 14px auto 0;
+  text-align: left;
+}
+
+#keys.controls div {
+  display: contents;
+}
+
+#keys.controls dt {
+  justify-content: flex-end;
+}
+
+.help kbd {
+  font-size: 12px;
+  vertical-align: 0;
+  transition: color 60ms, border-color 60ms;
+}
+
+.help kbd.pressed,
+.help .btn.pressed {
+  color: var(--accent);
+}
+
+/* A handheld button, round like its cap. Start and Select are pills. */
+.btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75em;
+  height: 1.75em;
+  padding: 0 0.45em;
+  border-radius: 1em;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  transition: color 60ms;
+}
+
+#status b {
+  color: var(--text);
+}
+
+#status kbd,
+#status .btn {
+  margin: 0 1px;
+}
+
+/* ---------- The store's games ---------- */
+
+.shelf {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px var(--gutter);
+}
+
+.shelf > p {
+  max-width: 720px;
+  margin: 0 0 24px;
+  color: var(--body);
+}
+
+/* The launcher's own cards: a cover, a title, and the yellow edge of the
+   one you are on. */
+.covers {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 158px), 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.covers button {
+  display: block;
+  width: 100%;
+  padding: 0 0 8px;
+  overflow: hidden;
+  border: 3px solid transparent;
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.covers button:hover,
+.covers button:focus-visible,
+.covers button[aria-current='true'] {
+  border-color: var(--accent);
+}
+
+.covers button:focus-visible {
+  outline-offset: 2px;
+}
+
+.covers img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.covers strong,
+.covers span {
+  display: block;
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.covers strong {
+  padding-top: 7px;
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.covers span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.covers [aria-current='true'] span {
+  color: var(--accent);
 }
 
 /* ---------- Sections under the hero ---------- */
@@ -512,6 +1026,26 @@ h2 {
 .column > p {
   margin: 0 0 18px;
   color: var(--body);
+}
+
+/* Install has a part for each kind of handheld. */
+.column > .platform {
+  margin: 0 0 12px;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.column > .platform ~ .platform {
+  margin-top: 36px;
+}
+
+.soon {
+  margin: 0;
+  padding: 18px 22px;
+  border: 2px dashed var(--panel-2);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 16px;
 }
 
 .steps {
@@ -607,6 +1141,7 @@ h2 {
      the handheld's em is computed from it). */
   .stage {
     container-type: inline-size;
+    width: auto;
   }
 
   .handheld {
@@ -619,6 +1154,10 @@ h2 {
     display: none;
   }
 
+  h1 {
+    font-size: min(36px, 8.4vw);
+  }
+
   .lede {
     font-size: 17px;
   }
@@ -629,7 +1168,11 @@ h2 {
     scroll-behavior: auto;
   }
 
-  .handheld * {
+  .handheld *,
+  .handheld *::after,
+  .pointer,
+  .pointer * {
     transition: none !important;
+    animation: none !important;
   }
 }
