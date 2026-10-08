@@ -7,7 +7,7 @@
 - **Cihazdaki uygulama (Adım 2) hazır ve yayında:** Ports menüsünde PocketVibe. Library, Store, Settings; indirme halkası ve kutlama; kayıt yedekleme; Start + Select ile oyundan dönüş, 3 sn ile çıkış. Runtime (Debian + WPE) ayrı bir köke kurulu ve `runtime.py` ile kendi mount namespace'inde çalışıyor, WebKit sandbox'ı açık.
 - **Kurulum:** `PocketVibe.zip` dosyası `roms/ports` klasörüne açılıyor; ilk açılışta runtime GitHub'dan iniyor (147 MB, cihazda yaklaşık 100 sn). Uygulama kendini GitHub sürümlerinden güncelliyor, açılamayan bir güncellemede önceki sürüme dönüyor. 0.5.0 bu yolla cihazda güncellendi.
 - **Mağaza:** Cloudflare Worker (D1 + R2). `pocketvibe publish` ile yükleme; yönetici dışındaki yüklemeler onay bekliyor. 12 oyun yayında.
-- **Geliştirici kiti (Adım 3):** `npm create pocketvibe`, `AGENTS.md` kuralları, tarayıcıda 720×480 önizleme. npm paketleri hazır, yayını kullanıcıda (2FA).
+- **Geliştirici kiti (Adım 3):** `npm create pocketvibe`, `AGENTS.md` kuralları, tarayıcıda 720×480 önizleme. `create-pocketvibe` ve `pocketvibe` 0.1.0 npm'de yayında (2026-10-08).
 - **Cihaza gönderme (Adım 4):** son kullanıcı için mağaza üzerinden. Geliştirici için `device/play.sh` (SSH ile oyunu Library'ye koyup açıyor). `npm run push` henüz yok.
 - **Site:** https://pocketvibe.cobanov.dev gerçek launcher'ı tarayıcıda, oynanabilir bir konsol çiziminde çalıştırıyor; kurulum ve oyun yapma adımları orada.
 - **Denetim:** uygulama, mağaza, CLI ve site incelendi; önemli bulgular düzeltildi (yerel API'nin oyunlara kapatılması, mağazada kimlik sahipliği ve zip sınırları dahil). Kalanlar `docs/handoff.md`'de.

@@ -24,11 +24,7 @@ Bu dosyayı baştan sona oku, sonra "Kalan işler"den devam et. Önce `docs/plan
    - Her biri için `node packages/pocketvibe/cli.js publish games/<klasör>`. Sürümler 1.0.0, kimlikler mağazada boş.
    - Sonra `cd site && npm run deploy`, böylece demo da onları içerir.
    - `games/` ve `docs/upcoming-games.md` o ajanın. Dokunma.
-2. **npm yayını kullanıcıda** (2FA). Kullanıcıya şunları çalıştırmasını söyle:
-   - `! cd ~/Developer/openboy/packages/create-pocketvibe && npm publish --access public`
-   - `! cd ~/Developer/openboy/packages/pocketvibe && npm publish --access public`
-
-   Site ve README bu komutları gösteriyor; yayınlanana kadar `npm create pocketvibe` çalışmaz.
+2. **npm paketleri yayında:** `create-pocketvibe` ve `pocketvibe` 0.1.0 (2026-10-08). npm hesabında 2FA güvenlik anahtarıyla açık. Yeni sürüm için `script -q /dev/null npm publish --access public --browser=false` arka planda çalıştırılıp çıkan `npmjs.com/auth/cli/...` bağlantısı kullanıcıya verilir; onaydan sonra birkaç dakika ikinci yayın onay istemez.
 3. **Oyunların FPS'i:** Turbo Circuit (başlangıç çizgisi, 26.8k üçgen) ve Star Defender cihazda 48 fps, Sky Hopper 56 fps. Oyun ajanına iletilmeli.
 4. **Denetimden kalanlar (bilerek ertelendi):**
    - Mağaza: yönetici bekleyen bir yüklemenin zip'ini ve kapağını göremiyor (`pocketvibe review <id> <sürüm>` gibi bir komut gerekli); yükleme kotası ve hız sınırı yok; kimlikler GitHub kullanıcı adına bağlı (sayısal `user.id` olmalı); CLI geniş yetkili `gh` jetonunu gönderiyor (PocketVibe'a özel bir OAuth uygulaması ve device flow daha güvenli).
