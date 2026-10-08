@@ -57,6 +57,16 @@ Write a small module `src/input.js` and read input only through it:
 - Save progress in localStorage as JSON.
 - Keep the code in a few small ES modules under src/.
 
+## Store listing
+
+Create `pocketvibe.json` at the project root; it is the game's entry in the PocketVibe store:
+
+- `id`: unique, lowercase letters, digits and dashes (e.g. `star-defender`).
+- `title`, `author`, `version` (start at `1.0.0`), `description` (one or two sentences), `genre`.
+- `controls`: what each button does, e.g. `{ "D-pad": "Move", "A": "Jump", "START": "Pause" }`.
+
+Add a `cover.png` (480x270) at the project root; a screenshot of the title screen works well.
+
 ## Done when
 
 - `npm run dev` runs the game and it is fully playable with the button mapping above.

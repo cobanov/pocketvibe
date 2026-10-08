@@ -33,12 +33,13 @@ if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(manifest.id)) {
   throw new Error('id must be lowercase letters, digits and dashes');
 }
 
-console.log(`Building ${manifest.title}...`);
-execFileSync('npm', ['run', 'build'], { cwd: project, stdio: 'inherit' });
-
-// Stage dist/ plus the manifest and cover, then zip it.
+// Build straight into a temporary folder, so the project's own dist/ (and
+// anyone working in the project at the same time) is left alone.
 const stage = mkdtempSync(join(tmpdir(), 'pocketvibe-pack-'));
-execFileSync('cp', ['-R', join(project, 'dist') + '/.', stage]);
+console.log(`Building ${manifest.title}...`);
+execFileSync('npx', ['vite', 'build', '--outDir', stage, '--emptyOutDir'], { cwd: project, stdio: 'inherit' });
+
+// Add the manifest and cover to the build, then zip it.
 writeFileSync(join(stage, 'pocketvibe.json'), JSON.stringify({ entry: 'index.html', ...manifest }, null, 2));
 const cover = ['cover.png', 'cover.jpg'].map((n) => join(project, n)).find(existsSync);
 if (cover) copyFileSync(cover, join(stage, cover.endsWith('.png') ? 'cover.png' : 'cover.jpg'));
@@ -68,6 +69,8 @@ const entry = {
   author: manifest.author ?? '',
   version: manifest.version,
   description: manifest.description ?? '',
+  ...(manifest.genre && { genre: manifest.genre }),
+  ...(manifest.controls && { controls: manifest.controls }),
   entry: manifest.entry ?? 'index.html',
   size,
   sha256,

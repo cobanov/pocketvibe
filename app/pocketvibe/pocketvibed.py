@@ -189,6 +189,27 @@ def remove(gid):
     shutil.rmtree(GAMES / gid, ignore_errors=True)
 
 
+def device_status():
+    """Clock, battery and Wi-Fi for the launcher's header (local time zone)."""
+    battery, charging = None, False
+    for supply in Path('/sys/class/power_supply').glob('*'):
+        try:
+            if (supply / 'type').read_text().strip() != 'Battery':
+                continue
+            battery = int((supply / 'capacity').read_text())
+            charging = (supply / 'status').read_text().strip() in ('Charging', 'Full')
+            break
+        except (OSError, ValueError):
+            continue
+    wifi = False
+    for iface in Path('/sys/class/net').glob('wl*'):
+        try:
+            wifi = wifi or (iface / 'operstate').read_text().strip() == 'up'
+        except OSError:
+            pass
+    return {'time': time.strftime('%H:%M'), 'battery': battery, 'charging': charging, 'wifi': wifi}
+
+
 def cover_path(gid):
     """Cover image for a game: from the installed game, else cached from the store."""
     for name in ('cover.png', 'cover.jpg', 'cover.webp'):
@@ -337,6 +358,8 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return self.send_json(library())
         if route == '/api/store':
             return self.send_json(store())
+        if route == '/api/status':
+            return self.send_json(device_status())
         if route == '/api/jobs':
             with lock:
                 return self.send_json(dict(jobs))

@@ -1,7 +1,8 @@
 {
-  "id": "coin-rush",
-  "title": "Coin Rush",
-  "author": "PocketVibe",
-  "version": "1.0.0",
-  "description": "Collect as many coins as you can in 60 seconds. The example game from the starter project."
+  "id": "my-handheld-game",
+  "title": "My Handheld Game",
+  "author": "",
+  "version": "0.1.0",
+  "description": "",
+  "genre": ""
 }

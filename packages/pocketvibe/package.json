@@ -20,5 +20,11 @@
   "license": "MIT",
   "engines": {
     "node": ">=20"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cobanov/pocketvibe.git",
+    "directory": "packages/pocketvibe"
+  },
+  "homepage": "https://github.com/cobanov/pocketvibe"
 }

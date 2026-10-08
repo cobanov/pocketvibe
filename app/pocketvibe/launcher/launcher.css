@@ -72,7 +72,8 @@ nav {
 }
 
 #status {
-  width: 140px;
+  width: 170px;
+  white-space: pre;
   font-size: 14px;
   text-align: right;
   color: var(--muted);
@@ -209,6 +210,58 @@ main {
   display: block;
   height: 100%;
   background: var(--accent);
+}
+
+/* Detail screen */
+
+.detail-top {
+  display: flex;
+  gap: 20px;
+}
+
+.detail .cover {
+  flex: none;
+  width: 320px;
+  border-radius: 10px;
+}
+
+.detail-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.detail-title {
+  margin: 4px 0 6px;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.detail .state {
+  width: auto;
+  margin-top: 16px;
+  font-size: 18px;
+  text-align: left;
+}
+
+.description {
+  margin: 14px 0 8px;
+  font-size: 17px;
+  color: #d6d7e0;
+}
+
+.controls {
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.controls td {
+  padding: 2px 16px 2px 0;
+}
+
+.controls td:first-child {
+  font-weight: 700;
+  color: var(--accent);
 }
 
 footer {

@@ -28,6 +28,8 @@ const state = {
   storeLoaded: false,
   jobs: {},
   dialog: null, // { text, onYes }
+  detail: null, // id of the game whose detail screen is open
+  status: null, // { time, battery, charging, wifi }
 };
 
 function load(key, fallback) {
@@ -82,7 +84,7 @@ function coverHtml(game) {
 
 function loadCovers() {
   for (const el of ui.content.querySelectorAll('[data-id] .cover')) {
-    const id = el.parentElement.dataset.id;
+    const id = el.closest('[data-id]').dataset.id;
     if (covers.has(id)) continue;
     covers.set(id, 'loading');
     const img = new Image();
@@ -115,25 +117,77 @@ function stateHtml(game) {
   return `<div class="state">${sizeText(game.size) || 'Get'}</div>`;
 }
 
+function renderStatus() {
+  const s = state.status;
+  if (!s) return;
+  const parts = [s.time];
+  parts.push(s.wifi ? 'Wi-Fi' : 'No Wi-Fi');
+  if (s.battery !== null) parts.push(`${s.charging ? '⚡' : ''}${s.battery}%`);
+  ui.status.textContent = parts.join('   ');
+}
+
 function items() {
   return state.tab === 'library' ? state.library : state.store.games;
 }
 
+function detailGame() {
+  const id = state.detail;
+  return state.store.games.find((g) => g.id === id) ?? state.library.find((g) => g.id === id);
+}
+
+function detailStateHtml(game, installed) {
+  const job = state.jobs[game.id];
+  if (job && ['queued', 'downloading', 'installing', 'error'].includes(job.state)) return stateHtml(game);
+  if (game.update) return `<div class="state update">Update available</div>`;
+  if (installed) return `<div class="state installed">Installed</div>`;
+  return '';
+}
+
+function detailHtml(game) {
+  const installed = state.library.some((g) => g.id === game.id);
+  const meta = [game.author, game.genre, game.version && `v${game.version}`, sizeText(game.size)].filter(Boolean);
+  const controls = Object.entries(game.controls ?? {})
+    .slice(0, 6)
+    .map(([button, action]) => `<tr><td>${escapeHtml(button)}</td><td>${escapeHtml(action)}</td></tr>`)
+    .join('');
+  return `
+    <div class="detail" data-id="${game.id}">
+      <div class="detail-top">
+        ${coverHtml(game)}
+        <div class="detail-info">
+          <div class="detail-title">${escapeHtml(game.title)}</div>
+          <div class="meta">${meta.map(escapeHtml).join(' · ')}</div>
+          ${detailStateHtml(game, installed)}
+        </div>
+      </div>
+      ${game.description ? `<p class="description">${escapeHtml(game.description)}</p>` : ''}
+      ${controls ? `<table class="controls">${controls}</table>` : ''}
+    </div>`;
+}
+
 function render() {
   ui.tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === state.tab));
+  if (state.detail) {
+    const game = detailGame();
+    if (game) {
+      ui.content.innerHTML = detailHtml(game);
+      loadCovers();
+      renderHints();
+      return;
+    }
+    state.detail = null;
+  }
   const list = items();
   const focus = Math.min(state.focus[state.tab], Math.max(list.length - 1, 0));
   state.focus[state.tab] = focus;
 
   if (state.tab === 'library') {
-    ui.status.textContent = `${list.length} game${list.length === 1 ? '' : 's'}`;
     ui.content.innerHTML = list.length
       ? `<div class="grid">${list
           .map((g, i) => `<div class="card${i === focus ? ' focus' : ''}" data-id="${g.id}">${coverHtml(g)}<div class="title">${escapeHtml(g.title)}</div></div>`)
           .join('')}</div>`
       : `<div class="empty">No games yet.<br>Press R to open the Store.</div>`;
   } else {
-    ui.status.textContent = state.store.online ? 'Online' : 'Offline';
     ui.content.innerHTML = !state.storeLoaded
       ? `<div class="empty">Loading the store...</div>`
       : list.length
@@ -172,12 +226,17 @@ function renderHints() {
   const parts = [];
   if (state.dialog) {
     parts.push(hint('A', 'Yes'), hint('B', 'No'));
+  } else if (state.detail) {
+    const g = detailGame();
+    const installed = state.library.some((l) => l.id === g?.id);
+    if (g) parts.push(hint('A', g.update ? 'Update' : installed ? 'Play' : 'Download'));
+    if (installed) parts.push(hint('Y', 'Remove'));
+    parts.push(hint('B', 'Back'));
   } else if (state.tab === 'library') {
-    if (game) parts.push(hint('A', 'Play'), hint('Y', 'Remove'));
+    if (game) parts.push(hint('A', 'Play'), hint('X', 'Info'), hint('Y', 'Remove'));
     parts.push(hint('B', 'Quit'));
   } else {
-    if (game) parts.push(hint('A', game.installed && !game.update ? 'Play' : game.update ? 'Update' : 'Download'));
-    if (game?.installed) parts.push(hint('Y', 'Remove'));
+    if (game) parts.push(hint('A', 'Open'));
     parts.push(hint('X', 'Refresh'), hint('B', 'Quit'));
   }
   ui.hints.innerHTML = parts.join('');
@@ -282,6 +341,21 @@ function onButton(button) {
     return;
   }
 
+  if (state.detail) {
+    const g = detailGame();
+    const installed = state.library.some((l) => l.id === g?.id);
+    if (button === 'B') {
+      state.detail = null;
+      render();
+    } else if (button === 'A' && g) {
+      if (!installed || g.update) install(g);
+      else play(g);
+    } else if (button === 'Y' && g && installed) {
+      confirmRemove(g);
+    }
+    return;
+  }
+
   const list = items();
   const perRow = state.tab === 'library' ? COLUMNS : 1;
   const focus = state.focus[state.tab];
@@ -319,14 +393,21 @@ function onButton(button) {
       break;
     case 'A':
       if (!game) break;
-      if (state.tab === 'store' && (!game.installed || game.update)) install(game);
-      else play(game);
+      if (state.tab === 'store') {
+        state.detail = game.id;
+        render();
+      } else {
+        play(game);
+      }
       break;
     case 'Y':
       if (game && (state.tab === 'library' || game.installed)) confirmRemove(game);
       break;
     case 'X':
-      if (state.tab === 'store') {
+      if (state.tab === 'library' && game) {
+        state.detail = game.id;
+        render();
+      } else if (state.tab === 'store') {
         state.storeLoaded = false;
         render();
         refreshStore().then(render);
@@ -380,9 +461,20 @@ function poll(now) {
   requestAnimationFrame(poll);
 }
 
+async function refreshStatus() {
+  try {
+    state.status = await api('/api/status');
+    renderStatus();
+  } catch {
+    // The header simply keeps its last value.
+  }
+}
+
 // ---------- Start ----------
 
 (async () => {
+  refreshStatus();
+  setInterval(refreshStatus, 20000);
   render();
   await Promise.all([refreshLibrary(), refreshStore()]);
   render();
