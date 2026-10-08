@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PocketVibe</title>
+    <meta name="description" content="Make a three.js game with AI and play it on your ROCKNIX handheld. A launcher, a game store and a starter project for AI coding tools." />
+    <meta property="og:title" content="PocketVibe" />
+    <meta property="og:description" content="Make a game with AI. Play it on your handheld." />
+    <meta property="og:image" content="https://pocketvibe.cobanov.dev/img/og.png" />
+    <meta name="theme-color" content="#0f1016" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="/fonts/DejaVuSans-Bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts/fonts.css" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <a class="brand" href="/">PocketVibe</a>
+      <nav>
+        <a href="#install">Install</a>
+        <a href="#make">Make a game</a>
+        <a href="https://github.com/cobanov/pocketvibe">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="pitch">
+          <h1><span>Make a game with AI.</span> <span>Play it on your handheld.</span></h1>
+          <p class="lede">
+            PocketVibe puts three.js games on handhelds that run ROCKNIX. Get games from the
+            store, or describe your own to Claude, Cursor or any AI coding tool and publish it
+            for everyone.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="https://github.com/cobanov/pocketvibe/releases/latest/download/PocketVibe.zip"><kbd>A</kbd>Download PocketVibe</a>
+            <a class="button" href="#make"><kbd>B</kbd>Make a game</a>
+          </div>
+          <p class="small">Free and open source. Made on an Anbernic RG34XX SP.</p>
+        </div>
+
+        <figure class="stage">
+          <div class="handheld" tabindex="0" aria-label="A handheld running the PocketVibe launcher. Use its buttons or your keyboard.">
+            <div class="lid">
+              <div class="bezel">
+                <div class="screen">
+                  <iframe title="PocketVibe launcher" tabindex="-1" scrolling="no"></iframe>
+                  <img class="still" src="/img/launcher.png" alt="The PocketVibe launcher's Library" hidden />
+                  <button class="off" type="button" hidden>PocketVibe is closed.<span><kbd>A</kbd>Open it again</span></button>
+                </div>
+              </div>
+            </div>
+            <div class="hinge">
+              <button class="shoulder l" type="button" data-key="KeyQ" aria-label="L">L</button>
+              <button class="shoulder r" type="button" data-key="KeyW" aria-label="R">R</button>
+            </div>
+            <div class="base">
+              <div class="dpad">
+                <button type="button" data-key="ArrowUp" aria-label="Up"></button>
+                <button type="button" data-key="ArrowLeft" aria-label="Left"></button>
+                <button type="button" data-key="ArrowRight" aria-label="Right"></button>
+                <button type="button" data-key="ArrowDown" aria-label="Down"></button>
+              </div>
+              <div class="face">
+                <button type="button" class="x" data-key="KeyS">X</button>
+                <button type="button" class="y" data-key="KeyA">Y</button>
+                <button type="button" class="a" data-key="KeyX">A</button>
+                <button type="button" class="b" data-key="KeyZ">B</button>
+              </div>
+              <div class="menu">
+                <button type="button" data-key="ShiftLeft" aria-label="Select"></button>
+                <button type="button" data-key="Enter" aria-label="Start"></button>
+                <span>Select</span><span>Start</span>
+              </div>
+            </div>
+          </div>
+          <figcaption id="caption">
+            The real launcher, with the store's games. Press its buttons, or click the screen and
+            use your keyboard: arrows, X for A, Z for B, Q and W for L and R.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="column" id="install">
+        <h2>Put it on your handheld</h2>
+        <ol class="steps">
+          <li>
+            <kbd>1</kbd>
+            <div>
+              <h3><a href="https://github.com/cobanov/pocketvibe/releases/latest/download/PocketVibe.zip">Download PocketVibe.zip</a></h3>
+              <p>It is the app for handhelds that run ROCKNIX. The handheld needs Wi-Fi for the store.</p>
+            </div>
+          </li>
+          <li>
+            <kbd>2</kbd>
+            <div>
+              <h3>Unzip it into <code>roms/ports</code></h3>
+              <p>On the handheld's games SD card, or over its network share.</p>
+            </div>
+          </li>
+          <li>
+            <kbd>3</kbd>
+            <div>
+              <h3>Open Ports, then PocketVibe</h3>
+              <p>
+                The first start downloads the game engine, about 150 MB. After that PocketVibe opens in
+                seconds and keeps itself up to date.
+              </p>
+            </div>
+          </li>
+        </ol>
+        <p class="note">In a game, hold <kbd>Start</kbd> and <kbd>Select</kbd> to go back to PocketVibe.</p>
+      </section>
+
+      <section class="column" id="make">
+        <h2>Make your own game</h2>
+        <p>Start from a project that already knows the handheld.</p>
+        <div class="code">
+          <pre><code>npm create pocketvibe@latest my-game
+cd my-game
+npm install
+npm run dev</code></pre>
+          <button class="copy" type="button">Copy</button>
+        </div>
+        <p>
+          Describe your game to your AI coding tool. The project's <code>AGENTS.md</code> tells it the
+          screen size, the buttons and the performance budget measured on the handheld, so the game
+          runs at 60 fps there too. Your browser shows it at the handheld's 720 by 480, with its
+          buttons on your keyboard.
+        </p>
+        <p>When it plays well, publish it to the store. You sign in with GitHub, and a new game appears once it is reviewed.</p>
+        <div class="code">
+          <pre><code>npx pocketvibe publish</code></pre>
+          <button class="copy" type="button">Copy</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bar">
+      <span>PocketVibe is open source under the MIT license.</span>
+      <nav>
+        <a href="https://github.com/cobanov/pocketvibe">GitHub</a>
+        <a href="https://cobanov.dev">Made by Mert Cobanov</a>
+      </nav>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,18 @@
+/* DejaVu Sans, the handheld's own typeface, cut down to Latin text. */
+@font-face {
+  font-family: 'DejaVu Sans';
+  font-weight: 100 599;
+  font-display: swap;
+  src: url(/fonts/DejaVuSans.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'DejaVu Sans';
+  font-weight: 600 900;
+  font-display: swap;
+  src: url(/fonts/DejaVuSans-Bold.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'DejaVu Sans Mono';
+  font-display: swap;
+  src: url(/fonts/DejaVuSansMono.woff2) format('woff2');
+}

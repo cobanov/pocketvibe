@@ -2,8 +2,10 @@
 # Packages the handheld app (version from app/pocketvibe/config.json) into
 # dist/:
 #
-#   PocketVibe-<version>.zip         for people installing it: unzip into
-#                                     roms/ports on the handheld's SD card
+#   PocketVibe.zip                   for people installing it: unzip into
+#                                     roms/ports on the handheld's SD card. No
+#                                     version in the name, so the website can
+#                                     link to the latest release's copy.
 #   pocketvibe-app-<version>.zip     for updates: what installed apps download
 #
 # With --publish it also creates the GitHub release (NOTES="..." for notes).
@@ -35,7 +37,7 @@ copy_app "$STAGE/install/pocketvibe"
 cp "$REPO/app/PocketVibe.sh" "$STAGE/install/"
 mkdir -p "$STAGE/install/images"
 cp "$REPO/app/ports/pocketvibe-image.png" "$STAGE/install/images/"
-INSTALL="$OUT/PocketVibe-$VERSION.zip"
+INSTALL="$OUT/PocketVibe.zip"
 rm -f "$INSTALL"
 (cd "$STAGE/install" && zip -qr "$INSTALL" .)
 

@@ -1,0 +1,635 @@
+/* The launcher's own colors and parts: dark panels, the yellow of the active
+   tab, and button caps like the hints along its bottom bar. */
+:root {
+  --bg: #0f1016;
+  --panel: #1a1c26;
+  --panel-2: #232634;
+  --text: #f2f2f5;
+  --body: #d6d7e0;
+  --muted: #9a9db0;
+  --accent: #ffc83d;
+  --ink: #1a1400;
+  /* The handheld's plastic. */
+  --shell: #ffc83d;
+  --shell-hi: #ffe08a;
+  --shell-lo: #e9b12a;
+  --shell-edge: #c48a10;
+  --key: #232634;
+  --key-edge: #0b0c12;
+  --gutter: clamp(16px, 4vw, 40px);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 18px/1.55 'DejaVu Sans', Verdana, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+code {
+  font: 0.9em 'DejaVu Sans Mono', ui-monospace, monospace;
+}
+
+/* A button cap, as in the launcher's hints. */
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.7em;
+  height: 1.5em;
+  padding: 0 0.3em;
+  border: 2px solid currentColor;
+  border-radius: 0.35em;
+  font: 800 0.72em/1 'DejaVu Sans', Verdana, sans-serif;
+  vertical-align: 0.12em;
+}
+
+/* ---------- Top and bottom bars ---------- */
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px var(--gutter);
+}
+
+.bar nav {
+  display: flex;
+  gap: 22px;
+}
+
+.bar nav a {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.bar nav a:hover {
+  color: var(--text);
+}
+
+.brand {
+  color: var(--accent);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-decoration: none;
+}
+
+footer.bar {
+  margin-top: 48px;
+  padding-top: 28px;
+  padding-bottom: 40px;
+  border-top: 1px solid var(--panel-2);
+  color: var(--muted);
+  font-size: 15px;
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 56px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px var(--gutter) 72px;
+}
+
+h1 {
+  margin: 0 0 24px;
+  font-size: clamp(36px, 4.3vw, 56px);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+/* Each sentence starts its own line and wraps on its own. */
+h1 span {
+  display: block;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 34em;
+  margin: 0 0 32px;
+  color: var(--body);
+  font-size: 19px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 22px 0 14px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.button:hover {
+  background: #2d3142;
+}
+
+.button.primary {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.button.primary:hover {
+  background: #ffd665;
+}
+
+.button kbd {
+  font-size: 13px;
+  vertical-align: 0;
+}
+
+.small {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.stage {
+  margin: 0;
+}
+
+figcaption {
+  max-width: 40em;
+  margin: 22px auto 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---------- The handheld ---------- */
+
+/* Everything on it is measured in em, and 1em is a 52nd of its width. */
+.handheld {
+  --w: clamp(300px, min(42vw, calc((100svh - 150px) / 1.36)), 500px);
+  width: var(--w);
+  margin: 0 auto;
+  font-size: calc(var(--w) / 52);
+  border-radius: 3.2em;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.handheld:focus-visible {
+  outline-offset: 8px;
+  border-radius: 3.4em;
+}
+
+.lid {
+  position: relative;
+  padding: 2em 2em 2.4em;
+  border-radius: 3.2em 3.2em 1.2em 1.2em;
+  background: linear-gradient(180deg, var(--shell-hi), var(--shell) 9%, var(--shell) 90%, var(--shell-lo));
+  box-shadow: inset 0 0.25em 0 rgba(255, 255, 255, 0.35), 0 1.6em 3em rgba(0, 0, 0, 0.45);
+}
+
+.bezel {
+  padding: 1.4em;
+  border-radius: 1.3em;
+  background: #101118;
+  box-shadow: inset 0 0 0 0.2em #1b1d27;
+}
+
+.screen {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: 0.3em;
+  background: #000;
+}
+
+.screen iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 720px;
+  height: 480px;
+  border: 0;
+  transform-origin: 0 0;
+  background: var(--bg);
+}
+
+.screen .still {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.off {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8em;
+  width: 100%;
+  border: 0;
+  background: #000;
+  color: var(--muted);
+  font: 700 1.6em/1.3 'DejaVu Sans', Verdana, sans-serif;
+  cursor: pointer;
+}
+
+.off span {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  color: var(--text);
+}
+
+.off[hidden],
+.screen [hidden] {
+  display: none;
+}
+
+.hinge {
+  position: relative;
+  height: 1.7em;
+  margin: 0 1.4em;
+  background: linear-gradient(180deg, var(--shell-edge), var(--shell-lo));
+}
+
+.base {
+  position: relative;
+  height: 25em;
+  border-radius: 1.2em 1.2em 3.8em 3.8em;
+  background: linear-gradient(180deg, var(--shell-lo), var(--shell) 7%, var(--shell) 88%, var(--shell-lo));
+  box-shadow: 0 1.6em 3em rgba(0, 0, 0, 0.45);
+}
+
+/* Buttons take the handheld's em, not the browser's button font. */
+.handheld button {
+  padding: 0;
+  font: inherit;
+  font-weight: 800;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  cursor: pointer;
+}
+
+/* Every cap sits on a dark edge and sinks into it when pressed. */
+.shoulder,
+.face button,
+.menu button {
+  border: 0;
+  background: var(--key);
+  color: var(--muted);
+  box-shadow: 0 0.32em 0 var(--key-edge);
+  transition: transform 60ms ease-out, box-shadow 60ms ease-out;
+}
+
+.shoulder.pressed,
+.face .pressed,
+.menu .pressed {
+  transform: translateY(0.24em);
+  box-shadow: 0 0.08em 0 var(--key-edge);
+  color: var(--accent);
+}
+
+.shoulder {
+  position: absolute;
+  top: 0.1em;
+  width: 8em;
+  height: 1.8em;
+  border-radius: 0.9em 0.9em 0.4em 0.4em;
+  line-height: 1;
+}
+
+.shoulder.l {
+  left: 0.6em;
+}
+
+.shoulder.r {
+  right: 0.6em;
+}
+
+.dpad {
+  position: absolute;
+  top: 5em;
+  left: 5.6em;
+  width: 11.4em;
+  height: 11.4em;
+}
+
+/* The cross itself; the four buttons are its arms. */
+.dpad::before,
+.dpad::after {
+  content: '';
+  position: absolute;
+  border-radius: 0.6em;
+  background: var(--key);
+  box-shadow: 0 0.32em 0 var(--key-edge);
+}
+
+.dpad::before {
+  top: 3.8em;
+  left: 0;
+  width: 100%;
+  height: 3.8em;
+}
+
+.dpad::after {
+  top: 0;
+  left: 3.8em;
+  width: 3.8em;
+  height: 100%;
+}
+
+.dpad button {
+  position: absolute;
+  z-index: 1;
+  width: 3.8em;
+  height: 3.8em;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dpad button::after {
+  content: '';
+  position: absolute;
+  inset: 1.25em;
+  border-radius: 50%;
+  background: #3a3e52;
+}
+
+.dpad button.pressed::after {
+  background: var(--accent);
+}
+
+.dpad [data-key='ArrowUp'] {
+  top: 0;
+  left: 3.8em;
+}
+
+.dpad [data-key='ArrowDown'] {
+  top: 7.6em;
+  left: 3.8em;
+}
+
+.dpad [data-key='ArrowLeft'] {
+  top: 3.8em;
+  left: 0;
+}
+
+.dpad [data-key='ArrowRight'] {
+  top: 3.8em;
+  left: 7.6em;
+}
+
+.face {
+  position: absolute;
+  top: 4.4em;
+  right: 5.2em;
+  width: 12.4em;
+  height: 12.4em;
+}
+
+.face button {
+  position: absolute;
+  width: 34.7%;
+  height: 34.7%;
+  border-radius: 50%;
+  font-size: 1.7em;
+  line-height: 1;
+}
+
+/* The caps' em follows their larger letters, so they are placed in %. */
+.face .x {
+  top: 0;
+  left: 32.6%;
+}
+
+.face .y {
+  top: 32.6%;
+  left: 0;
+}
+
+.face .a {
+  top: 32.6%;
+  right: 0;
+}
+
+.face .b {
+  bottom: 0;
+  left: 32.6%;
+}
+
+.face .a {
+  color: var(--accent);
+}
+
+.menu {
+  position: absolute;
+  bottom: 3.4em;
+  left: 50%;
+  display: grid;
+  grid-template-columns: 5em 5em;
+  gap: 0.6em 2.6em;
+  justify-items: center;
+  transform: translateX(-50%);
+}
+
+.menu button {
+  width: 5em;
+  height: 1.5em;
+  padding: 0;
+  border-radius: 1em;
+}
+
+.menu span {
+  color: var(--shell-edge);
+  font-size: 1.1em;
+  font-weight: 800;
+}
+
+/* ---------- Sections under the hero ---------- */
+
+/* Under the hero, text keeps the hero's left edge and the handheld screen's
+   720 pixel width. */
+.column {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px var(--gutter);
+}
+
+.column > * {
+  max-width: 720px;
+}
+
+h2 {
+  margin: 0 0 20px;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+.column > p {
+  margin: 0 0 18px;
+  color: var(--body);
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.steps li {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 10px;
+  padding: 18px 22px 18px 18px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.steps li > kbd {
+  flex: none;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.steps h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.steps h3 a {
+  color: var(--accent);
+}
+
+.steps p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.note {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.code {
+  position: relative;
+  margin: 0 0 22px;
+  padding: 18px 22px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.code pre {
+  margin: 0;
+  overflow-x: auto;
+}
+
+.code code {
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.copy {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 2px 8px;
+  border: 2px solid var(--muted);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--muted);
+  font: 800 13px/1.4 'DejaVu Sans', Verdana, sans-serif;
+  cursor: pointer;
+}
+
+.copy:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 920px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+    padding-top: 8px;
+  }
+
+  /* The stage's width sets the handheld's size (a percentage would not:
+     the handheld's em is computed from it). */
+  .stage {
+    container-type: inline-size;
+  }
+
+  .handheld {
+    --w: min(100cqw, 460px);
+  }
+}
+
+@media (max-width: 560px) {
+  .bar nav a:not(:last-child) {
+    display: none;
+  }
+
+  .lede {
+    font-size: 17px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .handheld * {
+    transition: none !important;
+  }
+}
