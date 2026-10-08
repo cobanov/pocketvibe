@@ -442,13 +442,25 @@ footer b {
 #toast {
   position: fixed;
   left: 50%;
-  bottom: 52px;
+  bottom: 48px;
+  z-index: 10;
+  max-width: 640px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  background: var(--accent);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+  color: #1a1400;
+  font-size: 17px;
+  font-weight: 800;
   transform: translateX(-50%);
-  max-width: 600px;
-  padding: 10px 18px;
-  border-radius: 8px;
-  background: var(--panel-2);
-  font-size: 16px;
+  animation: toast-in 180ms ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
 }
 
 /* Settings */
@@ -641,4 +653,32 @@ footer b {
 
 .kb-hints b {
   margin-right: 6px;
+}
+
+/* App update */
+
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+.tab.active .dot {
+  background: #1a1400;
+}
+
+.update-badge {
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.bar.inline {
+  display: inline-block;
+  width: 90px;
+  margin: 0 0 0 8px;
+  vertical-align: middle;
 }

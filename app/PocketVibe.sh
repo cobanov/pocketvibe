@@ -31,6 +31,13 @@ while :; do
     exec cog -P wl --gamepad=manette --enable-write-console-messages-to-stdout=true \
       --media-playback-requires-user-gesture=false --bg-color=black http://127.0.0.1:8730/
   " >>/tmp/pocketvibe-cog.log 2>&1
+  if [ -e /tmp/pocketvibe-restart ]; then
+    # pocketvibed installed a new version: start again with the new files.
+    rm -f /tmp/pocketvibe-restart
+    kill $DAEMON 2>/dev/null
+    trap - EXIT INT TERM
+    exec sh /storage/roms/ports/PocketVibe.sh
+  fi
   [ -e "$QUIT_FLAG" ] && break
   # pocketvibed may close the browser to restore saved data; wait for it.
   while [ -e /tmp/pocketvibe-busy ]; do sleep 0.2; done

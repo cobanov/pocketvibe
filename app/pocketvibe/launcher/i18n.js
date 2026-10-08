@@ -92,6 +92,15 @@ const STRINGS = {
   about: { en: 'About', tr: 'Hakkında' },
   version: { en: 'Version', tr: 'Sürüm' },
   madeBy: { en: 'Made by', tr: 'Yapan' },
+  appUpdate: { en: 'App update', tr: 'Uygulama güncellemesi' },
+  upToDate: { en: 'Up to date', tr: 'Güncel' },
+  versionAvailable: { en: '{version} available', tr: '{version} çıktı' },
+  updateCheckFailed: { en: 'Could not check', tr: 'Kontrol edilemedi' },
+  check: { en: 'Check', tr: 'Kontrol et' },
+  updateAvailableToast: { en: 'PocketVibe {version} is available. Update it in Settings.', tr: "PocketVibe {version} çıktı. Ayarlar'dan güncelleyebilirsin." },
+  updateConfirm: { en: 'Update to {version}? PocketVibe restarts.', tr: '{version} sürümüne güncellensin mi? PocketVibe yeniden başlar.' },
+  updatedTo: { en: 'PocketVibe is now {version}.', tr: 'PocketVibe artık {version}.' },
+  updateFailed: { en: 'Update failed: {error}', tr: 'Güncelleme başarısız: {error}' },
 
   // On-screen keyboard
   storeAddress: { en: 'Store address', tr: 'Mağaza adresi' },

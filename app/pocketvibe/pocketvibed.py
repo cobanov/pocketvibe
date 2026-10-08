@@ -39,6 +39,10 @@ CACHE = HOME / 'cache'
 PORT = 8730
 CONFIG = json.loads((APP / 'config.json').read_text())
 VERSION = CONFIG.get('version', '0.1.0')
+# Where new versions of the app are announced: GitHub's "latest release" API.
+# A file named dev-update-url in HOME overrides it, for testing updates.
+UPDATE_URL = os.environ.get('POCKETVIBE_UPDATES') or CONFIG.get('update_url', '')
+UPDATE_CHECK_EVERY = 6 * 3600  # seconds between checks, so GitHub is not asked on every start
 DEFAULT_STORE = os.environ.get('POCKETVIBE_STORE', CONFIG['store_url'])
 SETTINGS_FILE = HOME / 'settings.json'
 PLAYS_FILE = HOME / 'plays.json'  # when each game was last played, for "Recently played"
@@ -55,10 +59,13 @@ GAME_ID = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
 CHROOT = HOME.parent / 'debian'
 SESSION_BUS = 'unix:path=/run/0-runtime-dir/bus'
 QUIT_FLAG = Path('/tmp/pocketvibe-quit')  # tells PocketVibe.sh not to restart the browser
+RESTART_FLAG = Path('/tmp/pocketvibe-restart')  # tells PocketVibe.sh to start again (after an update)
 BUSY_FLAG = Path('/tmp/pocketvibe-busy')  # PocketVibe.sh waits for it to go before reopening the browser
 WEB_DATA = CHROOT / 'root' / '.local' / 'share' / 'wpe'  # WebKit's data; storage/ holds every game's saves
 BACKUPS = HOME / 'backups'
 BACKUP_NAME = re.compile(r'saves-\d{8}-\d{6}\.zip')
+AUDIO_CACHE = CACHE / 'audio'  # audio the launcher rendered once (menu music)
+AUDIO_NAME = re.compile(r'[a-z0-9-]{1,64}\.wav')
 
 EV_SYN, EV_KEY = 0, 1
 BTN_SELECT, BTN_START = 314, 315
@@ -390,6 +397,105 @@ class GameHandler(SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+def version_tuple(text):
+    return tuple(int(n) for n in re.findall(r'\d+', text or '')[:3])
+
+
+def update_url():
+    override = HOME / 'dev-update-url'
+    return override.read_text().strip() if override.exists() else UPDATE_URL
+
+
+def check_update(force=False):
+    """The newest app release, compared with this one. Cached for a while."""
+    cached = CACHE / 'update.json'
+    if not force and cached.exists() and time.time() - cached.stat().st_mtime < UPDATE_CHECK_EVERY:
+        release = json.loads(cached.read_text())
+    else:
+        request = urllib.request.Request(update_url(), headers={
+            'Accept': 'application/vnd.github+json', 'User-Agent': f'PocketVibe/{VERSION}'})
+        with urllib.request.urlopen(request, timeout=10) as r:
+            data = json.loads(r.read())
+        asset = next((a for a in data.get('assets', [])
+                      if a.get('name', '').startswith('pocketvibe-app-') and a['name'].endswith('.zip')), None)
+        if not asset:
+            raise ValueError('the latest release has no app package')
+        # The checksum comes from GitHub's asset digest, or a "sha256: ..." line in the notes.
+        digest = (asset.get('digest') or '').removeprefix('sha256:')
+        noted = re.search(r'sha256:\s*([0-9a-f]{64})', data.get('body') or '')
+        release = {
+            'version': data.get('tag_name', '').lstrip('v'),
+            'notes': re.sub(r'\s*sha256:\s*[0-9a-f]{64}\s*', '', data.get('body') or '').strip(),
+            'url': asset['browser_download_url'],
+            'size': asset.get('size', 0),
+            'sha256': digest or (noted.group(1) if noted else ''),
+        }
+        CACHE.mkdir(parents=True, exist_ok=True)
+        cached.write_text(json.dumps(release))
+    return {**release, 'current': VERSION,
+            'available': version_tuple(release['version']) > version_tuple(VERSION)}
+
+
+def install_update():
+    """Download the new app, check it, swap it in and restart PocketVibe."""
+    try:
+        release = check_update()
+        if not release['available']:
+            raise ValueError('already up to date')
+        if not re.fullmatch(r'[0-9a-f]{64}', release['sha256']):
+            raise ValueError('the release has no checksum')
+        set_job('__app__', state='downloading', progress=0, error=None)
+        package = HOME / '.app-update.zip'
+        digest = hashlib.sha256()
+        with urllib.request.urlopen(release['url'], timeout=30) as r, open(package, 'wb') as out:
+            total = int(r.headers.get('Content-Length') or release['size'] or 0)
+            done = 0
+            while chunk := r.read(1 << 16):
+                out.write(chunk)
+                digest.update(chunk)
+                done += len(chunk)
+                if total:
+                    set_job('__app__', progress=min(done / total, 1))
+        if digest.hexdigest() != release['sha256']:
+            raise ValueError('download is corrupted (checksum mismatch)')
+
+        set_job('__app__', state='installing', progress=1)
+        staging = HOME / '.app-update'
+        shutil.rmtree(staging, ignore_errors=True)
+        staging.mkdir()
+        with zipfile.ZipFile(package) as archive:
+            safe_extract(archive, staging)
+        package.unlink()
+        if not (staging / 'app' / 'pocketvibed.py').exists():
+            raise ValueError('the package has no app')
+
+        # Swap the app folder; the previous one stays as app.old for a rollback.
+        shutil.rmtree(HOME / 'app.old', ignore_errors=True)
+        (HOME / 'app').rename(HOME / 'app.old')
+        (staging / 'app').rename(HOME / 'app')
+        if (staging / 'debian-chroot.sh').exists():
+            shutil.copy(staging / 'debian-chroot.sh', HOME / 'debian-chroot.sh')
+        ports = Path('/storage/roms/ports')
+        if (staging / 'PocketVibe.sh').exists() and ports.is_dir():
+            shutil.copy(staging / 'PocketVibe.sh', ports / 'PocketVibe.sh')
+        if (staging / 'ports' / 'pocketvibe-image.png').exists() and (ports / 'images').is_dir():
+            shutil.copy(staging / 'ports' / 'pocketvibe-image.png', ports / 'images' / 'pocketvibe-image.png')
+        shutil.rmtree(staging, ignore_errors=True)
+        set_job('__app__', state='done')
+        (CACHE / 'update.json').unlink(missing_ok=True)
+        global notice
+        notice = f'updated:{release["version"]}'
+        (HOME / 'notice').write_text(notice)  # survives the restart
+
+        # PocketVibe.sh sees the flag when the browser closes and starts over.
+        RESTART_FLAG.touch()
+        time.sleep(1.5)  # let the launcher see "done"
+        subprocess.run(['pkill', '-x', 'cog'], check=False)
+        threading.Thread(target=launcher_server.shutdown, daemon=True).start()
+    except Exception as e:  # reported to the launcher
+        set_job('__app__', state='error', error=str(e))
+
+
 def game_url(gid):
     """Start (once) the game's own server and return its address."""
     game_dir = GAMES / gid
@@ -553,6 +659,22 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return self.send_json(device_info())
         if route == '/api/saves':
             return self.send_json(list_backups())
+        if route.startswith('/api/cache/'):
+            path = AUDIO_CACHE / route.rsplit('/', 1)[1]
+            if not AUDIO_NAME.fullmatch(path.name) or not path.exists():
+                return self.send_json({'error': 'not cached'}, 404)
+            data = path.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', 'audio/wav')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return None
+        if route == '/api/update':
+            try:
+                return self.send_json(check_update(force='force' in self.path))
+            except (OSError, ValueError, KeyError) as e:
+                return self.send_json({'current': VERSION, 'available': False, 'error': str(e)})
         if route == '/api/notice':
             global notice
             message, notice = notice, None
@@ -581,10 +703,27 @@ class LauncherHandler(SimpleHTTPRequestHandler):
         except ValueError:
             return {}
 
+    def do_PUT(self):
+        route = self.path.split('?', 1)[0]
+        name = route.rsplit('/', 1)[1]
+        length = int(self.headers.get('Content-Length') or 0)
+        if not route.startswith('/api/cache/') or not AUDIO_NAME.fullmatch(name) or not 0 < length <= 8 << 20:
+            return self.send_json({'error': 'not allowed'}, 400)
+        AUDIO_CACHE.mkdir(parents=True, exist_ok=True)
+        (AUDIO_CACHE / name).write_bytes(self.rfile.read(length))
+        return self.send_json({'ok': True})
+
     def do_POST(self):
         route = self.path.split('?', 1)[0]
         if route == '/api/settings':
             return self.send_json(save_settings(self.read_json()))
+        if route == '/api/update/install':
+            with lock:
+                busy = jobs.get('__app__', {}).get('state') in ('queued', 'downloading', 'installing')
+            if not busy:
+                set_job('__app__', state='queued', progress=0, error=None)
+                threading.Thread(target=install_update, daemon=True).start()
+            return self.send_json({'ok': True})
         if route == '/api/unlock-audio':
             return self.send_json({'ok': audio_key.tap()})
         if route == '/api/saves/backup':
@@ -626,7 +765,11 @@ class LauncherHandler(SimpleHTTPRequestHandler):
 
 
 def main():
-    global launcher_server
+    global launcher_server, notice
+    saved_notice = HOME / 'notice'
+    if saved_notice.exists():
+        notice = saved_notice.read_text()
+        saved_notice.unlink()
     GAMES.mkdir(parents=True, exist_ok=True)
     QUIT_FLAG.unlink(missing_ok=True)
     threading.Thread(target=watch_buttons, daemon=True).start()

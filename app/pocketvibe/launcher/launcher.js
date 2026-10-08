@@ -49,6 +49,7 @@ const state = {
   storeLoaded: false,
   settings: null,
   info: null,
+  update: null, // { current, version, available, notes, error }
   jobs: {},
   dialog: null, // { text, onYes }
   picker: null, // { title, items: [{ label, value }], focus, onPick }
@@ -346,9 +347,32 @@ function settingsSections() {
     {
       title: t('about'),
       note: CREDITS,
-      rows: [{ id: 'version', label: 'PocketVibe', value: info.version ? `${t('version')} ${info.version}` : '' }],
+      rows: [
+        { id: 'update', label: t('appUpdate'), value: updateValue() },
+        { id: 'version', label: 'PocketVibe', value: info.version ? `${t('version')} ${info.version}` : '' },
+      ],
     },
   ];
+}
+
+function updateValue() {
+  const job = state.jobs.__app__;
+  if (job && ACTIVE_JOB.includes(job.state)) {
+    const label = job.state === 'installing' ? t('installing') : t('downloading');
+    return `${label} <span class="bar inline"><span style="width:${Math.round(job.progress * 100)}%"></span></span>`;
+  }
+  const u = state.update;
+  if (!u) return '';
+  if (u.available) return `<span class="update-badge">${escapeHtml(t('versionAvailable', { version: u.version }))}</span>`;
+  return u.error ? t('updateCheckFailed') : t('upToDate');
+}
+
+async function checkUpdate(force = false) {
+  try {
+    state.update = await api(`/api/update${force ? '?force' : ''}`);
+  } catch {
+    state.update = { available: false, error: 'offline' };
+  }
 }
 
 function renderSettings() {
@@ -457,6 +481,18 @@ function settingsAction(button) {
       .catch((e) => toast(e.message));
   } else if (id === 'restore' && button === 'A') {
     pickBackup();
+  } else if (id === 'update' && button === 'A') {
+    if (state.update?.available) {
+      showDialog(t('updateConfirm', { version: state.update.version }), async () => {
+        await api('/api/update/install', 'POST');
+        pollJobs();
+      });
+    } else {
+      checkUpdate(true).then(() => {
+        render();
+        toast(state.update.available ? t('updateAvailableToast', { version: state.update.version }) : t(state.update.error ? 'updateCheckFailed' : 'upToDate'));
+      });
+    }
   }
 }
 
@@ -475,7 +511,8 @@ function renderTabs() {
     tab.classList.toggle('active', name === state.tab);
     const loaded = name === 'library' || (name === 'store' && state.storeLoaded);
     const count = loaded ? ` <span class="count">${tabGames(name).length}</span>` : '';
-    tab.innerHTML = `${t(name)}${count}`;
+    const dot = name === 'settings' && state.update?.available ? ' <span class="dot"></span>' : '';
+    tab.innerHTML = `${t(name)}${count}${dot}`;
   }
 }
 
@@ -593,6 +630,7 @@ function renderHints() {
     const id = state.settingRows[state.focus.settings] ?? '';
     if (['music', 'uiSounds', 'showFps', 'musicVolume', 'language'].includes(id)) parts.push(hint('A', t('change')));
     if (['addStore', 'backup', 'restore'].includes(id)) parts.push(hint('A', t('select')));
+    if (id === 'update') parts.push(hint('A', state.update?.available ? t('update') : t('check')));
     if (id.startsWith('store:')) parts.push(hint('Y', t('remove')));
     parts.push(hint('B', t('quit')));
   } else {
@@ -644,7 +682,7 @@ function toast(text) {
   ui.toast.textContent = text;
   ui.toast.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (ui.toast.hidden = true), 3500);
+  toastTimer = setTimeout(() => (ui.toast.hidden = true), 4500);
 }
 
 // ---------- Data ----------
@@ -687,6 +725,10 @@ async function pollJobs() {
     const before = state.jobs;
     state.jobs = await api('/api/jobs');
     for (const [id, job] of Object.entries(state.jobs)) {
+      if (id === '__app__') {
+        if (before[id]?.state !== job.state && job.state === 'error') toast(t('updateFailed', { error: job.error }));
+        continue;
+      }
       if (before[id]?.state !== job.state && job.state === 'done') {
         await Promise.all([refreshLibrary(), refreshStore()]);
         const game = state.store.games.find((g) => g.id === id);
@@ -970,8 +1012,13 @@ async function unlockAudio() {
   render();
   const { notice } = await api('/api/notice').catch(() => ({}));
   if (notice === 'restored') toast(t('restored'));
+  else if (notice?.startsWith('updated:')) toast(t('updatedTo', { version: notice.slice(8) }));
   else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }));
   pollJobs();
   requestAnimationFrame(poll);
   if (state.settings?.music || state.settings?.uiSounds) unlockAudio();
+  await checkUpdate();
+  renderTabs();
+  if (state.tab === 'settings') render();
+  if (state.update?.available && !notice) toast(t('updateAvailableToast', { version: state.update.version }));
 })();
