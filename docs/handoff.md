@@ -23,31 +23,43 @@ geçmişinde (`git log -- docs/handoff.md`).
 - **Mağaza:** Coin Rush kaldırıldı (D1 `games` satırı silindi, sürümü "removed from the store"
   notuyla `rejected`, R2 dosyaları silindi). Yeni `GET /api/admin/files/<key>`: yönetici bekleyen
   yüklemenin zip ve kapağını alabiliyor.
-- **CLI ve starter (npm'de yayında):** `pocketvibe` 0.2.0 (`serve`: oyunu bilgisayarda küçük bir
-  mağaza olarak sunar, handheld'de Ayarlar > Stores > Add a store; oyun `<id>-dev`, "(dev)" adıyla
-  ayrı kayıtlarla kurulur, her değişiklik güncelleme olur. `review <id> <sürüm>`: bekleyen yüklemeyi
-  aynı yolla yöneticinin cihazına getirir) ve `create-pocketvibe` 0.1.1 (yeni kurallar, rehber).
-  npm'den sıfırdan denendi. Mac mini'de npm oturumu açık (`cobanov`); yayın iki adımlı doğrulama
-  için web onayı istiyor: komutu `expect` ile sanal terminalde çalıştır, çıkan
-  `npmjs.com/auth/cli/...` bağlantısını kullanıcıya aç (`open <url>`).
+- **Mağaza F-Droid modelinde (2026-10-09):** `github.com/cobanov/pocketvibe-store` (yerelde
+  `~/Developer/pocketvibe-store`). Her oyun `games/<id>.json`: `owner` (GitHub kullanıcısı) ve
+  `source` (`repo`, oyunun klasörüne dokunan son `commit`, `path`). 21 oyun ana repodaki
+  `games/<klasör>`'e sabitli. `scripts/build-game.mjs` oyunu kaynaktan derleyip kontrol ediyor
+  (id, sürüm mağazadakinden yüksek mi, commit değiştiyse sürüm de değişmeli, kapak, boyut, sahiplik,
+  LICENSE yoksa uyarı). `check.yml` her PR'da derleyip zip'i artifact olarak ekliyor (sır yok);
+  `publish.yml` main'e push'ta derleyip `scripts/publish-games.mjs` ile mağazanın
+  `POST /api/ci/publish` adresine gönderiyor (repo sırrı `POCKETVIBE_STORE_TOKEN`, sunucu sırrı
+  `CI_TOKEN`, Mac mini Anahtar Zinciri'nde `pocketvibe-store-ci`). Aynı sürüm "Already published".
+- **CLI (npm'de):** `pocketvibe` 0.3.0: `publish` oyunun derlendiğini, kapağı, commit/push'u ve
+  reponun herkese açık olduğunu denetleyip mağaza reposuna PR açar (bakımcı değilse fork'tan),
+  `review <PR numarası>` PR'ın derlediği zip'i el konsoluna sunar, `serve`, `status`.
+  `create-pocketvibe` 0.1.2. Eski `/api/publish` (onay bekleyen yükleme) hâlâ çalışıyor ama
+  belgelerde yok. Mac mini'de npm oturumu açık (`cobanov`); yayın 2FA web onayı istiyor:
+  `expect` ile sanal terminalde çalıştır, çıkan `npmjs.com/auth/cli/...` bağlantısını `open` ile aç.
+- **Alan adı:** site `pocketvibe.dev` ve `www.pocketvibe.dev`'de de yayında (park kayıtları
+  silindi). `pocketvibe.cobanov.dev` kalıcı: paylaşılan linkler ve uygulamanın motor indirmesi
+  ona bağlı. Geçiş yavaş yavaş yapılacak.
 
 ## Sıradaki işler
 
-Teknik işler GitHub issue'larında (#1-#16, 2026-10-08): https://github.com/cobanov/pocketvibe/issues.
-Aşağıdaki liste kısa özet.
+Teknik işler GitHub issue'larında (#1-#20): https://github.com/cobanov/pocketvibe/issues.
 
-1. `serve`'i gerçek bir handheld'de denemek (Ayarlar > Stores > Add a store, Mac mini'nin
-   Tailscale adresi `http://100.70.248.21:8740`).
-2. İnceleme ölçütlerini (`/make/#review`, `agents.md` 7. bölüm) kullanıcı onaylamadı; ben yazdım.
-3. Çökmenin asıl sebebi (WPEWebProcess SIGTRAP, coredump yok) bilinmiyor; launcher her
-   yüklemede müziği yeniden çözüyor (~38 MB).
-4. SP'deki eski kayıtlar ve oyun listesi `/storage/pv-backup-20261008`'de; kullanıcı isterse geri
-   yüklenecek.
-5. Starter projenin örnek oyunu hâlâ Coin Rush (yalnızca mağaza ve siteden kaldırıldı).
-6. Kurulum pürüzleri (belgelere yazıldı): yeni ROCKNIX'te Samba kapalı geliyor; tek kartta `roms`
-   ext4, Mac ve Windows açamıyor.
-7. RG34XX'te kurulum testinden kalan Mac gizli dosyaları (`._*`, `.DS_Store`) `roms/ports`'ta var mı
-   bakılmadı (cihaz uykudaydı); varsa ES'de sahte port olarak görünebilir.
+1. **Android, cihaz gerekli (Retroid Pocket 3+ USB ile bağlanıyor):**
+   - #20 eski WebView'de boş ekran: `MainActivity`'de WebView sürümü 94'ün altındaysa yerel bir
+     ekranla Play Store'a yönlendir.
+   - #18 Start + Select bazen çalışmıyor (GammaOS'ta Select başka bir tuş kodu olabilir; tuş
+     eşlemesini `dumpsys input` ile oku).
+   - #19 iki ekranlı Android (AYN Thor, GammaOS'lu RG DS): ilk adım ikinci ekranda Presentation
+     ile kontrol kartı ve launcher detayı; iki ekranlı oyunlar (tek WebGL bağlamı) ayrı iş.
+     Retroid'de Geliştirici seçenekleri > "İkincil ekranları simüle et" ile denenebilir.
+   - #17: 21 oyunun 19'unda hiç ses yok; Pole Star ve Pulse Dash'in Android'de ses çaldığı
+     doğrulanmalı. Starter projeye bir ses yardımcısı düşünülebilir.
+2. `serve`'ü ve yeni `publish` akışını gerçek bir kullanıcı gibi baştan sona denemek (yeni bir
+   oyun reposuyla).
+3. İnceleme ölçütlerini kullanıcı onaylamadı (sitede, rehberde ve mağaza README'sinde).
+4. Kurulum pürüzleri belgelerde: yeni ROCKNIX'te Samba kapalı; tek kartta `roms` ext4.
 
 ## Cihazlar
 
