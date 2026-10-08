@@ -1,7 +1,10 @@
 // Drives the launcher in headless Chrome with key presses and saves screenshots.
 // Usage: node ui-shots.mjs <url> <outDir> <step>...   step = "key:KeyW" | "shot:name" | "wait:ms"
+// FONTS=<dir> loads DejaVuSans.ttf and DejaVuSans-Bold.ttf from that folder (copy
+// them from the handheld's runtime, usr/share/fonts/truetype/dejavu) so text
+// takes the same space as on the handheld.
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,6 +34,14 @@ const send = (method, params = {}) => new Promise((r) => { const i = ++id; pendi
 await send('Runtime.enable');
 await send('Page.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: 720, height: 480, deviceScaleFactor: 1, mobile: false });
+if (process.env.FONTS) {
+  const face = (file, weight) =>
+    `@font-face { font-family: 'DejaVu Sans'; font-weight: ${weight}; src: url(data:font/ttf;base64,${readFileSync(join(process.env.FONTS, file)).toString('base64')}); }`;
+  const css = face('DejaVuSans.ttf', '100 599') + face('DejaVuSans-Bold.ttf', '600 900');
+  await send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = ${JSON.stringify(css)}; document.head.append(s); });`,
+  });
+}
 await send('Page.navigate', { url });
 await sleep(2500);
 for (const step of steps) {

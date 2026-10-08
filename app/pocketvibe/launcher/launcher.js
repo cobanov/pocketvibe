@@ -345,10 +345,15 @@ function detailGame() {
   return state.store.games.find((g) => g.id === id) ?? state.library.find((g) => g.id === id);
 }
 
-function detailStateHtml(game, installed) {
-  if (downloading(game.id) || state.jobs[game.id]?.state === 'error') return stateHtml(game);
-  if (game.update) return `<div class="state update">${t('updateAvailable')}</div>`;
-  if (installed) return `<div class="state installed">${t('installed')}</div>`;
+// Over the detail screen's cover, like on the store's cards: the download
+// ring with its label, or the install state.
+function detailBadgeHtml(game, installed) {
+  if (downloading(game.id)) {
+    return `<div class="downloading">${ringHtml(game.id)}<span data-ring-label="${game.id}">${downloadLabel(game.id)}</span></div>`;
+  }
+  if (state.jobs[game.id]?.state === 'error') return `<div class="badge error">${t('failed')}</div>`;
+  if (game.update) return `<div class="badge update">${t('updateAvailable')}</div>`;
+  if (installed) return `<div class="badge installed">${t('installed')}</div>`;
   return '';
 }
 
@@ -356,20 +361,19 @@ function detailHtml(game) {
   const installed = state.library.some((g) => g.id === game.id);
   const meta = [game.author, game.genre, game.version && `v${game.version}`, sizeText(game.size)].filter(Boolean);
   const controls = Object.entries(game.controls ?? {})
-    .slice(0, 6)
+    .slice(0, 8)
     .map(([button, action]) => `<tr><td>${escapeHtml(button)}</td><td>${escapeHtml(action)}</td></tr>`)
     .join('');
   return `
     <div class="detail" data-id="${game.id}">
       <div class="detail-top">
-        ${coverHtml(game)}
+        <div class="cover-wrap">${coverHtml(game)}${detailBadgeHtml(game, installed)}</div>
         <div class="detail-info">
           <div class="detail-title">${escapeHtml(game.title)}</div>
           <div class="meta">${meta.map(escapeHtml).join(' · ')}</div>
-          ${detailStateHtml(game, installed)}
+          ${game.description ? `<p class="description">${escapeHtml(game.description)}</p>` : ''}
         </div>
       </div>
-      ${game.description ? `<p class="description">${escapeHtml(game.description)}</p>` : ''}
       ${controls ? `<table class="controls">${controls}</table>` : ''}
     </div>`;
 }
@@ -666,35 +670,58 @@ function render() {
   renderHints();
 }
 
-// Scroll just enough to show the focused item (and its section title when it
-// is in a section's first row), then update the scrollbar and position.
+// Where the view may start for an item: the top of its row, or of its
+// section's title when it is in the section's first row.
+function anchorOf(el) {
+  const title = el.parentElement.previousElementSibling;
+  if (title?.classList.contains('section-title') && el.offsetTop - el.parentElement.offsetTop < 10) {
+    return title.offsetTop;
+  }
+  return el.offsetTop;
+}
+
+// Hide what the bottom edge of the view would cut, so only whole rows show.
+function hideCut(edge) {
+  for (const el of ui.content.querySelectorAll('[data-index], .section-title, .note')) {
+    el.classList.toggle('cut', el.offsetTop + el.offsetHeight > edge + 1);
+  }
+  // A title whose first row is hidden would sit alone at the bottom.
+  for (const title of ui.content.querySelectorAll('.section-title')) {
+    if (title.nextElementSibling?.querySelector('[data-index]')?.classList.contains('cut')) title.classList.add('cut');
+  }
+}
+
+// Scroll just enough to show the focused item, always starting the view at an
+// anchor so no row or title is cut at the top. Then update the scrollbar and
+// position.
 function scrollToFocus(instant = false) {
   const count = state.rows.reduce((n, r) => n + r.length, 0);
   const focus = state.focus[state.tab];
-  const viewport = ui.main.clientHeight - 12;
+  const viewport = ui.main.clientHeight;
   const total = ui.content.scrollHeight;
+  const anchors = [...new Set([...ui.content.querySelectorAll('[data-index]')].map(anchorOf))].sort((a, b) => a - b);
+  // The first anchor at or below a position, so everything above it shows.
+  const anchorFrom = (y) => anchors.find((a) => a >= y) ?? y;
   const el = ui.content.querySelector(`[data-index="${focus}"]`);
   if (el) {
-    let top = el.offsetTop;
-    const title = el.parentElement.previousElementSibling;
-    if (title?.classList.contains('section-title') && el.offsetTop - el.parentElement.offsetTop < 10) {
-      top = title.offsetTop; // first item of a section: keep its title in view
-    }
-    let bottom = el.offsetTop + el.offsetHeight + 8;
+    const top = anchorOf(el);
+    let bottom = el.offsetTop + el.offsetHeight;
     if (focus === count - 1) bottom = total; // the last item: show any notes after it too
     if (top < state.scroll) state.scroll = top;
-    else if (bottom > state.scroll + viewport) state.scroll = bottom - viewport;
+    else if (bottom > state.scroll + viewport) state.scroll = Math.min(anchorFrom(bottom - viewport), top);
   }
-  state.scroll = Math.max(0, Math.min(state.scroll, Math.max(0, total - viewport)));
+  state.scroll = Math.max(0, Math.min(state.scroll, anchorFrom(total - viewport)));
   ui.content.style.transition = instant ? 'none' : '';
   ui.content.style.transform = `translateY(${-state.scroll}px)`;
+  hideCut(state.scroll + viewport);
 
   ui.scrollbar.hidden = total <= viewport;
   if (!ui.scrollbar.hidden) {
     const track = ui.scrollbar.clientHeight;
     const thumb = Math.max(28, (viewport / total) * track);
     ui.thumb.style.height = `${thumb}px`;
-    ui.thumb.style.transform = `translateY(${(state.scroll / (total - viewport)) * (track - thumb)}px)`;
+    // The view can stop past the end to start at a row, so cap the thumb.
+    ui.thumb.style.transform = `translateY(${Math.min(state.scroll / (total - viewport), 1) * (track - thumb)}px)`;
   }
   ui.position.textContent = count && state.tab !== 'settings' ? `${focus + 1} / ${count}` : '';
 }
