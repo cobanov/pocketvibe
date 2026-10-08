@@ -4,6 +4,7 @@
 //   GET  /catalog.json              published games, for the handheld app
 //   GET  /files/games/<id>/<file>   a published game zip or cover (zips are counted)
 //   POST /api/publish               upload a game zip (GitHub token)
+//   POST /api/ci/publish            publish a game the pocketvibe-store repository merged (CI token)
 //   GET  /api/me                    your games and uploads (GitHub token)
 //   GET  /api/admin/pending         uploads waiting for review (admin)
 //   GET  /api/admin/files/<key>     an upload's zip or cover, to try it before review (admin)
@@ -21,6 +22,7 @@ interface Env {
   FILES: R2Bucket;
   ADMIN_LOGIN: string;
   STORE_NAME: string;
+  CI_TOKEN?: string; // the pocketvibe-store repository's publishing workflow
 }
 
 interface Manifest {
@@ -214,15 +216,11 @@ async function upsertGame(env: Env, owner: string, manifest: Manifest, release: 
     .run();
 }
 
-async function publish(request: Request, env: Env) {
-  const login = await githubLogin(request);
-  if (Number(request.headers.get('Content-Length') ?? 0) > MAX_ZIP) throw new HttpError(413, 'the zip is larger than 50 MB');
-  const data = new Uint8Array(await request.arrayBuffer());
+// A game zip's manifest and cover, checked. Only the manifest and the cover
+// are unpacked, and sizes are checked first: a tiny zip can claim gigabytes.
+function readGameZip(data: Uint8Array) {
   if (data.length === 0) throw new HttpError(400, 'send the game zip as the request body');
   if (data.length > MAX_ZIP) throw new HttpError(413, 'the zip is larger than 50 MB');
-
-  // Read the file list, and only the manifest and cover out of the zip. Sizes
-  // are checked before anything is unpacked: a tiny zip can claim gigabytes.
   const names: string[] = [];
   let unpacked = 0;
   let tooBig = '';
@@ -256,32 +254,24 @@ async function publish(request: Request, env: Env) {
     throw new HttpError(400, 'pocketvibe.json is not valid JSON');
   }
   validateManifest(manifest, names);
+  return { manifest, cover: files['cover.png'] ?? files['cover.jpg'] };
+}
 
-  // The owner is whoever published the game. An id nobody has published yet
-  // is held by the first upload still waiting for review; the admin can always
-  // take an unpublished id.
-  const existing = await env.DB.prepare('SELECT owner, version FROM games WHERE id = ?').bind(manifest.id).first<{ owner: string; version: string }>();
-  const waiting = await env.DB.prepare("SELECT uploader FROM releases WHERE game_id = ? AND status = 'pending' ORDER BY created_at LIMIT 1")
-    .bind(manifest.id)
-    .first<{ uploader: string }>();
-  const isAdmin = login === env.ADMIN_LOGIN;
-  const owner = existing?.owner ?? (isAdmin ? login : (waiting?.uploader ?? login));
-  if (owner !== login && !isAdmin) throw new HttpError(403, `the id "${manifest.id}" belongs to another developer`);
-  // Higher than every version published or waiting, so an approval can never go backwards.
-  const { results: versions } = await env.DB.prepare("SELECT version FROM releases WHERE game_id = ? AND status != 'rejected'")
-    .bind(manifest.id)
-    .all<{ version: string }>();
-  const highest = versions.map((r) => r.version).sort(compareVersions).at(-1);
-  if (highest && compareVersions(manifest.version, highest) <= 0) {
-    throw new HttpError(409, `version must be higher than ${highest}; bump it in pocketvibe.json`);
-  }
+// The highest version published or waiting; a new one must be above it, so
+// an approval can never go backwards.
+async function highestVersion(env: Env, id: string) {
+  const { results } = await env.DB.prepare("SELECT version FROM releases WHERE game_id = ? AND status != 'rejected'").bind(id).all<{ version: string }>();
+  return results.map((r) => r.version).sort(compareVersions).at(-1);
+}
 
+// Stores an upload's files and its release row; published releases also
+// become the game's listing.
+async function storeRelease(env: Env, upload: ReturnType<typeof readGameZip>, data: Uint8Array, uploader: string, owner: string, status: 'pending' | 'published') {
+  const { manifest, cover } = upload;
   const zipKey = `games/${manifest.id}/${manifest.version}.zip`;
-  const cover = files['cover.png'] ?? files['cover.jpg'];
   const png = cover ? cover[0] === 0x89 && cover[1] === 0x50 : false;
   const coverKey = cover ? `games/${manifest.id}/${manifest.version}.${png ? 'png' : 'jpg'}` : null;
   const release = { size: data.length, sha256: await sha256(data), zip_key: zipKey, cover_key: coverKey };
-  const status = isAdmin ? 'published' : 'pending';
   const now = new Date().toISOString();
   // The row claims the version first (its primary key), so two uploads of the
   // same version cannot both write the files.
@@ -290,7 +280,7 @@ async function publish(request: Request, env: Env) {
       `INSERT INTO releases (game_id, version, uploader, status, manifest, size, sha256, zip_key, cover_key, created_at, reviewed_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(manifest.id, manifest.version, login, 'pending', JSON.stringify(manifest), release.size, release.sha256, zipKey, coverKey, now, null)
+      .bind(manifest.id, manifest.version, uploader, 'pending', JSON.stringify(manifest), release.size, release.sha256, zipKey, coverKey, now, null)
       .run();
   } catch {
     throw new HttpError(409, `version ${manifest.version} was already uploaded; bump it in pocketvibe.json`);
@@ -302,17 +292,77 @@ async function publish(request: Request, env: Env) {
     await env.DB.prepare('DELETE FROM releases WHERE game_id = ? AND version = ?').bind(manifest.id, manifest.version).run();
     throw e;
   }
-  if (isAdmin) {
+  if (status === 'published') {
     await upsertGame(env, owner, manifest, release);
     await env.DB.prepare("UPDATE releases SET status = 'published', reviewed_at = ? WHERE game_id = ? AND version = ?").bind(now, manifest.id, manifest.version).run();
   }
+}
 
+async function publish(request: Request, env: Env) {
+  const login = await githubLogin(request);
+  if (Number(request.headers.get('Content-Length') ?? 0) > MAX_ZIP) throw new HttpError(413, 'the zip is larger than 50 MB');
+  const data = new Uint8Array(await request.arrayBuffer());
+  const upload = readGameZip(data);
+  const { manifest } = upload;
+
+  // The owner is whoever published the game. An id nobody has published yet
+  // is held by the first upload still waiting for review; the admin can always
+  // take an unpublished id.
+  const existing = await env.DB.prepare('SELECT owner, version FROM games WHERE id = ?').bind(manifest.id).first<{ owner: string; version: string }>();
+  const waiting = await env.DB.prepare("SELECT uploader FROM releases WHERE game_id = ? AND status = 'pending' ORDER BY created_at LIMIT 1")
+    .bind(manifest.id)
+    .first<{ uploader: string }>();
+  const isAdmin = login === env.ADMIN_LOGIN;
+  const owner = existing?.owner ?? (isAdmin ? login : (waiting?.uploader ?? login));
+  if (owner !== login && !isAdmin) throw new HttpError(403, `the id "${manifest.id}" belongs to another developer`);
+  const highest = await highestVersion(env, manifest.id);
+  if (highest && compareVersions(manifest.version, highest) <= 0) {
+    throw new HttpError(409, `version must be higher than ${highest}; bump it in pocketvibe.json`);
+  }
+
+  const status = isAdmin ? 'published' : 'pending';
+  await storeRelease(env, upload, data, login, owner, status);
   return json({
     status,
     id: manifest.id,
     version: manifest.version,
     message: status === 'published' ? 'Published.' : 'Uploaded. It goes live after a review.',
   });
+}
+
+// A game the pocketvibe-store repository reviewed and merged: its workflow
+// builds the zip from the game's source and sends it here with the CI token
+// and the owner named in the repository. Published at once; the same version
+// again is not an error, so the workflow can run as often as it likes.
+async function ciPublish(request: Request, env: Env) {
+  const token = (request.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  if (!env.CI_TOKEN || !(await sameText(token, env.CI_TOKEN))) throw new HttpError(401, 'not the store repository');
+  const owner = request.headers.get('X-PocketVibe-Owner') ?? '';
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(owner)) throw new HttpError(400, 'X-PocketVibe-Owner must be a GitHub login');
+  if (Number(request.headers.get('Content-Length') ?? 0) > MAX_ZIP) throw new HttpError(413, 'the zip is larger than 50 MB');
+  const data = new Uint8Array(await request.arrayBuffer());
+  const upload = readGameZip(data);
+  const { manifest } = upload;
+  const published = await env.DB.prepare('SELECT version FROM games WHERE id = ?').bind(manifest.id).first<{ version: string }>();
+  if (published && published.version === manifest.version) {
+    return json({ status: 'unchanged', id: manifest.id, version: manifest.version, message: 'Already published.' });
+  }
+  const highest = await highestVersion(env, manifest.id);
+  if (highest && compareVersions(manifest.version, highest) <= 0) {
+    throw new HttpError(409, `version must be higher than ${highest}`);
+  }
+  await storeRelease(env, upload, data, owner, owner, 'published');
+  return json({ status: 'published', id: manifest.id, version: manifest.version, message: 'Published.' });
+}
+
+// Compares two secrets without giving away how much of them matched.
+async function sameText(a: string, b: string) {
+  const [x, y] = await Promise.all([a, b].map((t) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(t))));
+  const u = new Uint8Array(x);
+  const v = new Uint8Array(y);
+  let diff = 0;
+  for (let i = 0; i < u.length; i++) diff |= u[i] ^ v[i];
+  return diff === 0;
 }
 
 async function me(request: Request, env: Env) {
@@ -417,6 +467,7 @@ export default {
       if (request.method === 'GET' && pathname === '/catalog.json') return await catalog(env, url.origin);
       if (request.method === 'GET' && pathname.startsWith('/files/')) return await file(request, env, pathname.slice(7), ctx);
       if (request.method === 'POST' && pathname === '/api/publish') return await publish(request, env);
+      if (request.method === 'POST' && pathname === '/api/ci/publish') return await ciPublish(request, env);
       if (request.method === 'GET' && pathname === '/api/me') return await me(request, env);
       if (request.method === 'GET' && pathname === '/api/admin/pending') return await pending(request, env);
       if (request.method === 'GET' && pathname.startsWith('/api/admin/files/')) return await adminFile(request, env, pathname.slice(17));
