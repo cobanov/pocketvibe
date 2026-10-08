@@ -49,7 +49,8 @@ On your handheld:
 3. Restart the handheld and open **Ports**, then **PocketVibe**. The first start downloads the game engine, about 150 MB, over Wi-Fi.
 
 To make your own game, run `npm create pocketvibe@latest my-game` and follow
-[Get started](docs/getting-started.md).
+[Get started](docs/getting-started.md). [Making games that run well](docs/performance.md)
+has the handheld's measured limits.
 
 **Made on an Anbernic RG34XX SP** with ROCKNIX. Other ROCKNIX handhelds may work, but are
 not tested yet.
@@ -61,6 +62,7 @@ Debian root. The store is a Cloudflare Worker with D1 and R2; the website is sta
 
 [Development](docs/development.md) ·
 [Rules for AI tools](template/AGENTS.md) ·
+[Performance guide](docs/performance.md) ·
 [Command line tool](packages/pocketvibe/README.md) ·
 [Benchmarks](bench/README.md)
 

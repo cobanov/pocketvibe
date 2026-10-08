@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://pocketvibe.cobanov.dev"><strong>PocketVibe</strong></a> ·
   <a href="https://github.com/cobanov/pocketvibe/blob/main/docs/getting-started.md">Get started</a> ·
+  <a href="https://github.com/cobanov/pocketvibe/blob/main/docs/performance.md">Performance guide</a> ·
   <a href="AGENTS.md">Rules for AI tools</a>
 </p>
 
@@ -42,7 +43,9 @@ for its buttons:
 | Select | Shift |
 
 **P** shows the performance overlay: frame rate, draw calls and triangles. It turns red when the
-game is too heavy for the handheld.
+game is too heavy for the handheld. The
+[performance guide](https://github.com/cobanov/pocketvibe/blob/main/docs/performance.md)
+explains the handheld's limits and how to stay inside them.
 
 ## Put it on the handheld
 

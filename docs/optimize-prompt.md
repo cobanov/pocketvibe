@@ -17,6 +17,8 @@ The old rule said 60,000 triangles. It was wrong: the earlier benchmark's triang
 - Updating many HTML elements per frame, `backdrop-filter`, and redrawing a canvas texture every frame are all expensive.
 - `createHandheld({ resolution: 0.5 })` draws the 3D scene at 360×240; a 20,000-triangle scene went from 27 to 60 fps.
 
+The triangle limit comes from the graphics driver in PocketVibe's current engine (Mesa 25.0). Newer drivers draw geometry 10 to 18 times faster, and a later engine update should raise the limit a lot, so do not strip a game's look to reach 10,000 triangles yet. Do everything else first (bugs, loading, non-indexed merged geometry, draw calls, materials, lights, shadows, effects, HUD), then report each game's triangle count in its busiest moment and what cutting it would cost visually; the user decides.
+
 Earlier device runs of the older games: Turbo Circuit 48 fps (26.8k triangles at the start line), Star Defender 48 fps, Sky Hopper 56 fps, the rest 60 fps on their opening screens. The nine newest games (maze-chase, tank-brigade, tower-stack, pulse-dash, cloud-climber, snow-slalom, mini-golf, tile-merge, crate-pusher) have not run on the device yet.
 
 ## For every game

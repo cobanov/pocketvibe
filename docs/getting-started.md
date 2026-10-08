@@ -75,6 +75,9 @@ the rules that keep a game at 60 fps on the handheld: the screen, the buttons, t
 use, and the budget for draw calls and triangles. The starter project comes with a small
 example game, Coin Rush, to change or replace.
 
+[Making games that run well](performance.md) explains the handheld's measured limits and how
+to stay inside them, and how to measure a game on a handheld.
+
 ### Publish it to the store
 
 Fill in `pocketvibe.json`, the game's store listing:

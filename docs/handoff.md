@@ -33,6 +33,8 @@ Sıradakiler:
 3. Uygulamada: oyundan oyuna geçince web sürecinin GPU belleği birikiyor mu (`/proc/<WPEWebProcess>/fdinfo` `drm-total-memory`).
 4. Yapıldı: rapor `bench/results/2026-10-08-limits.md`; `template/AGENTS.md` yeni bütçe ve "Loading" bölümü; `template/src/handheld.js` ölçülen bütçe, `resolution: 0.5` seçeneği ve `?perflog` (PERF satırları); `device/run-game.sh <id> "&perflog"`; oyun optimizasyon ajanı için `docs/optimize-prompt.md`. Template değiştiği için `create-pocketvibe` için yeni bir npm sürümü (0.1.1) gerekiyor (kullanıcının onayıyla, `script -q /dev/null npm publish --access public --browser=false`).
 5. Cihaz artık Tailscale'de: `root@100.86.26.111` (`rg34xx-sp`), her ağdan erişilebiliyor.
+6. Sürücü bulgusu (`bench/results/2026-10-08-limits.md`, "Sürücü" bölümü): Mesa 25.2+ geometride 10-18 kat hızlı ama Cog 0.18/WPEBackend-fdo ile çalışmıyor. Cihazda iki test kopyası var: `/storage/pv-runtime-m25` (Mesa 25.1.7, glmark2, mesa-utils) ve `/storage/pv-runtime-m26` (Mesa 26.1.6, fdo 1.16.1, Cog 0.18.5, forky kaynağı). `/storage/pv-swap.sh <dizin>` bir kopyayı uygulamanın altına koyar, `/storage/pv-swap.sh back` geri alır. Runtime-v2 kararı kullanıcıda.
+7. Geliştiriciler için rehber: `docs/performance.md` (README, template README ve getting-started bağlantı veriyor). `create-pocketvibe` 0.1.1 yayını bekliyor (template değişti).
 
 ## Kalan işler (sırayla)
 
