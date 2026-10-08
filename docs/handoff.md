@@ -86,7 +86,8 @@ Aşağıdaki liste kısa özet.
 ## Tanıtım (2026-10-08)
 
 - Tweet (TR ve EN) atıldı. Reddit: r/handheldsTR ve r/SBCGaming gönderiyi kaldırdı (SBCGaming: önce
-  subreddit'te katılım, sonra AI beyanıyla tekrar; kullanıcı moderatörlere istisna için yazdı).
+  subreddit'te katılım, sonra AI beyanıyla tekrar). Moderatör istisna vermedi: yaklaşık bir aylık
+  yorum ya da gönderi geçmişi şart; 8-10 Kasım 2026 civarında AI beyanıyla tekrar atılacak.
   r/vibecoding ve r/threejs ayakta, r/ANBERNIC'e atılacak (AI yasağı yok). r/SideProject gönderisi
   Reddit'in spam filtresine takıldı (kısa sürede çok yerde aynı linkler); modmail ile onay istendi.
   Bundan sonra günde en fazla bir iki yer, aralarda yorum.
