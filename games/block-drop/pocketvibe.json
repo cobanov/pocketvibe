@@ -1,7 +1,17 @@
 {
-  "id": "coin-rush",
-  "title": "Coin Rush",
-  "author": "PocketVibe",
-  "version": "1.0.0",
-  "description": "Collect as many coins as you can in 60 seconds. The example game from the starter project."
+  "id": "block-drop",
+  "title": "Block Drop",
+  "author": "cobanov",
+  "version": "1.0.1",
+  "description": "Falling-block puzzle with chunky 3D pieces. Clear lines, chain combos and keep the stack low.",
+  "genre": "Puzzle",
+  "controls": {
+    "LEFT / RIGHT": "Move (hold to slide)",
+    "DOWN": "Soft drop",
+    "UP": "Hard drop",
+    "A": "Rotate clockwise; start / play again",
+    "B": "Rotate counter-clockwise; back to title (paused or game over)",
+    "L / R": "Hold the piece",
+    "START": "Pause / resume"
+  }
 }

@@ -28,7 +28,7 @@ function appleGeometry() {
 function starGeometry() {
   const shape = new THREE.Shape();
   for (let i = 0; i < 10; i++) {
-    const r = i % 2 === 0 ? 0.46 : 0.2;
+    const r = i % 2 === 0 ? 0.5 : 0.22;
     const a = (i / 10) * Math.PI * 2 + Math.PI / 2;
     if (i === 0) shape.moveTo(Math.cos(a) * r, Math.sin(a) * r);
     else shape.lineTo(Math.cos(a) * r, Math.sin(a) * r);
@@ -142,7 +142,7 @@ export function createFood(scene, snake) {
     clear() {
       this.appleOn = false;
       this.bonusOn = false;
-      this.draw(0, 0);
+      this.draw(0);
     },
 
     // Advances the animations and, if countdown is set, the star's timer.
@@ -166,7 +166,7 @@ export function createFood(scene, snake) {
       appleShadow.visible = this.appleOn;
       if (this.appleOn) {
         const pop = elastic(this.appleAge / POP_TIME);
-        const s = pop * (1 - 0.45 * squash * squash);
+        const s = Math.max(0.01, pop * (1 - 0.45 * squash * squash));
         const x = cellX(this.appleX);
         const z = cellZ(this.appleZ);
         apple.position.set(x, 0.36 + Math.sin(time * 3.2) * 0.05 * pop, z);

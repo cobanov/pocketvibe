@@ -1,7 +1,15 @@
 {
-  "id": "coin-rush",
-  "title": "Coin Rush",
-  "author": "PocketVibe",
-  "version": "1.0.0",
-  "description": "Collect as many coins as you can in 60 seconds. The example game from the starter project."
+  "id": "rock-blaster",
+  "title": "Rock Blaster",
+  "author": "cobanov",
+  "version": "1.0.1",
+  "description": "Blast tumbling space rocks into smaller and smaller pieces, dodge the saucer's shots and survive wave after wave.",
+  "genre": "Arcade shooter",
+  "controls": {
+    "LEFT / RIGHT": "Turn",
+    "UP": "Thrust",
+    "A": "Fire; start / play again",
+    "B": "Hyperspace; back to title (paused or game over)",
+    "START": "Pause / resume"
+  }
 }

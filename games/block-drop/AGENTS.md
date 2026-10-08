@@ -73,6 +73,17 @@ How to stay under it:
 - Save progress with `hh.save('key', value)` and load it with `hh.load('key', fallback)`.
 - The game must work offline: import `three` from npm (`import * as THREE from 'three'`), never from a CDN, and do not load fonts, scripts or data from the internet.
 
+## Store listing
+
+`pocketvibe.json` at the project root is the game's entry in the PocketVibe store. When you start a new game, fill it in:
+
+- `id`: unique, lowercase letters, digits and dashes (e.g. `star-defender`).
+- `title`, `author`, `version` (start at `1.0.0`), `description` (one or two sentences).
+- `genre`: one of `Arcade`, `Shooter`, `Racing`, `Puzzle`, `Platformer`, `Sports`. The store groups games by it.
+- `controls`: what each button does, e.g. `{ "D-pad": "Move", "A": "Jump", "START": "Pause" }`.
+
+Add a `cover.png` (480×270) at the project root; a screenshot of the title screen works well.
+
 ## Before you finish
 
 Run `npm run dev`, play the game with the keyboard, and check that:

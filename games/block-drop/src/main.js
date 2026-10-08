@@ -132,7 +132,7 @@ function react() {
   const ev = game.ev;
   if (ev.hardRows > 0) {
     shake = Math.max(shake, 0.14);
-    kick = Math.min(0.5, 0.12 + ev.hardRows * 0.02);
+    kick = Math.min(0.35, 0.1 + ev.hardRows * 0.015);
     for (let i = 0; i < 4; i++) {
       const cell = ev.lockedCells[i];
       const col = cell % COLS;

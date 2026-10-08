@@ -29,8 +29,8 @@ const COLORS = {
   k: 0xff6fc8,
 };
 const STEEL = [0, 0xeef3fa, 0xa9b5c9, 0x6f7c96]; // by hits left: lighter as it cracks
-const GOLD = 0xe8a92c;
-const GOLD_H = 1.5; // gold bricks stand taller so they read as different
+const GOLD = 0xf2b52a;
+const GOLD_H = 1.9; // gold bricks stand taller and carry rivets so they read as different
 
 const POP_TIME = 0.16;
 const FLASH_TIME = 0.14;
@@ -45,6 +45,16 @@ function brickGeometry() {
     box(1.16, 0.4, 0.56, 0, 0.2, 0, 0xc4c4c4),
     box(1.0, 0.1, 0.42, 0, 0.44, 0, 0xffffff),
   ]);
+}
+
+// Four rivets on the top of a gold brick (sized for a brick of height 0.5,
+// then scaled with the brick).
+function rivetGeometry() {
+  const parts = [];
+  for (let k = 0; k < 4; k++) {
+    parts.push(box(0.12, 0.05, 0.1, k < 2 ? -0.38 : 0.38, 0.5, k % 2 ? -0.12 : 0.12, 0xfff4cf));
+  }
+  return mergeGeometries(parts);
 }
 
 export function createBricks(scene) {
@@ -67,6 +77,11 @@ export function createBricks(scene) {
   shadows.frustumCulled = false;
   scene.add(shadows);
 
+  // Rivets: decoration for gold bricks, instance i on cell i like the bricks.
+  const rivets = new THREE.InstancedMesh(rivetGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true }), CELLS);
+  rivets.frustumCulled = false;
+  scene.add(rivets);
+
   const hp = new Int8Array(CELLS); // 0 empty, -1 gold, otherwise hits left
   const maxHp = new Int8Array(CELLS);
   const color = new Uint32Array(CELLS);
@@ -88,6 +103,7 @@ export function createBricks(scene) {
     mesh.setMatrixAt(i, ZERO);
     mesh.setColorAt(i, WHITE);
     shadows.setMatrixAt(i, ZERO);
+    rivets.setMatrixAt(i, ZERO);
   }
 
   const cellX = (i) => GRID_X0 + ((i % COLS) + 0.5) * CELL_W;
@@ -97,6 +113,7 @@ export function createBricks(scene) {
     if (hp[i] === 0 && dying[i] <= 0) {
       mesh.setMatrixAt(i, ZERO);
       shadows.setMatrixAt(i, ZERO);
+      rivets.setMatrixAt(i, ZERO);
       return;
     }
     const x = cellX(i);
@@ -111,6 +128,7 @@ export function createBricks(scene) {
     const sy = hp[i] < 0 ? GOLD_H * s : s;
     m.makeScale(s, sy, s).setPosition(x, y, z);
     mesh.setMatrixAt(i, m);
+    rivets.setMatrixAt(i, hp[i] < 0 ? m : ZERO);
 
     c.setHex(color[i]);
     if (dying[i] > 0) c.copy(WHITE);
@@ -120,7 +138,7 @@ export function createBricks(scene) {
     if (dying[i] > 0) {
       shadows.setMatrixAt(i, ZERO);
     } else {
-      const off = hp[i] < 0 ? 0.2 : 0.12;
+      const off = hp[i] < 0 ? 0.24 : 0.12;
       m.makeScale(t, 1, t).setPosition(x + off, 0.02, z + off * 1.2);
       shadows.setMatrixAt(i, m);
     }
@@ -258,6 +276,7 @@ export function createBricks(scene) {
         mesh.instanceMatrix.needsUpdate = true;
         mesh.instanceColor.needsUpdate = true;
         shadows.instanceMatrix.needsUpdate = true;
+        rivets.instanceMatrix.needsUpdate = true;
       }
     },
   };

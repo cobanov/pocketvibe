@@ -8,14 +8,10 @@ export const ROWS = 20; // visible rows of the well
 export const BOARD_ROWS = 24; // rows 20..23 are hidden spawn space
 export const DRAW_ROWS = 22; // rows drawn; the two above the well peek out
 
-// Piece types are 1..7; 0 is an empty cell and GREY the colour of a lost stack.
+// Piece types are 1..7 (I O T S Z J L); 0 is an empty cell and GREY the
+// colour of a lost stack.
 export const I = 1;
 export const O = 2;
-export const T = 3;
-export const S = 4;
-export const Z = 5;
-export const J = 6;
-export const L = 7;
 export const GREY = 8;
 
 export const PIECE_HEX = [
@@ -72,21 +68,6 @@ export function bake(geometry, hex) {
     colors[i * 3] = tmpColor.r * s;
     colors[i * 3 + 1] = tmpColor.g * s;
     colors[i * 3 + 2] = tmpColor.b * s;
-  }
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return geometry;
-}
-
-// Gives a geometry one flat vertex colour, so differently coloured parts can
-// be merged into one mesh with one material and one draw call.
-export function paint(geometry, hex) {
-  tmpColor.setHex(hex);
-  const n = geometry.attributes.position.count;
-  const colors = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) {
-    colors[i * 3] = tmpColor.r;
-    colors[i * 3 + 1] = tmpColor.g;
-    colors[i * 3 + 2] = tmpColor.b;
   }
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   return geometry;

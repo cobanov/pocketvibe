@@ -20,7 +20,7 @@ export const STYLE = {
   slingbody: MAGENTA,
   sling: YELLOW,
   gate: ORANGE,
-  bank: LIME,
+  bank: VIOLET,
   divider: CYAN,
   target: LIME,
 };

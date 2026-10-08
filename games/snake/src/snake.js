@@ -89,7 +89,7 @@ export function createSnake(scene) {
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
 
-  let colorsFor = -1; // body length the instance colors were made for
+  let colorsFor = -1; // length and color mode the instance colors were made for
   let flash = 0;
   let gulp = 0;
   let yaw = 0;
@@ -154,10 +154,6 @@ export function createSnake(scene) {
       return this.grow === 0 && cx === bx[t] && cz === bz[t];
     },
 
-    occupies(cx, cz) {
-      return cx >= 0 && cx < COLS && cz >= 0 && cz < ROWS && grid[cz * COLS + cx] === 1;
-    },
-
     // Queues a turn. Turning back into the neck or repeating the same
     // direction is ignored; up to QUEUE turns wait for the next steps, so two
     // quick taps (a U-turn) both count.
@@ -166,10 +162,6 @@ export function createSnake(scene) {
       const ref = queued > 0 ? queue[queued - 1] : this.dir;
       if (d === ref || d === (ref + 2) % 4) return;
       queue[queued++] = d;
-    },
-
-    clearTurns() {
-      queued = 0;
     },
 
     // Moves one cell. Returns false (and does not move) when the head would

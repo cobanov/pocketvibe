@@ -1,8 +1,10 @@
 {
   "id": "sky-hopper",
   "title": "Sky Hopper",
+  "author": "cobanov",
+  "version": "1.0.1",
   "description": "Flap a low-poly bird through endless gaps between pipes high above the clouds and chase the gold medal.",
-  "genre": "arcade",
+  "genre": "Arcade",
   "controls": {
     "A": "Flap / confirm",
     "UP": "Flap",

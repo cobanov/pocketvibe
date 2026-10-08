@@ -164,6 +164,10 @@ export function createHero(scene, particles) {
       if (this.y >= MAX_Y) {
         this.y = MAX_Y;
         if (this.vy > 0) this.vy = 0;
+        // Sparks while scraping along the ceiling.
+        if (thrust && Math.random() < dt * 25) {
+          particles.emit(HERO_X + 0.1, CEIL_Y - 0.08, 0.3, -3 - Math.random() * 3, -1 - Math.random() * 2, 0.3, 0.12, 0xffffff, 0xffb02e, 12);
+        }
       }
       const wasGrounded = this.grounded;
       if (this.y <= 0) {

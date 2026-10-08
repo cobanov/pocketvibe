@@ -78,35 +78,34 @@ export function createFx(scene) {
     },
 
     update(dt) {
-      // Dead particles keep their slot but are drawn with zero scale; with a
-      // ring buffer, slot order never changes, so colors stay valid.
-      let top = 0;
+      let top = 0; // one past the last live slot
       for (let i = 0; i < MAX; i++) {
-        if (life[i] <= 0) {
-          dummy.scale.setScalar(0);
-        } else {
-          life[i] -= dt;
-          vy[i] -= GRAVITY * dt;
-          px[i] += vx[i] * dt;
-          py[i] += vy[i] * dt;
-          pz[i] += vz[i] * dt;
-          if (py[i] < FLOOR && vy[i] < 0) {
-            py[i] = FLOOR;
-            vy[i] *= -0.4;
-            vx[i] *= 0.6;
-            vz[i] *= 0.6;
-          }
-          const k = Math.max(0, life[i] / maxLife[i]);
-          dummy.position.set(px[i], py[i], pz[i]);
-          dummy.rotation.set(life[i] * 9, life[i] * 6, 0);
-          dummy.scale.setScalar(Math.min(1, k * 1.8));
-          top = i + 1;
+        if (life[i] <= 0) continue;
+        life[i] -= dt;
+        vy[i] -= GRAVITY * dt;
+        px[i] += vx[i] * dt;
+        py[i] += vy[i] * dt;
+        pz[i] += vz[i] * dt;
+        if (py[i] < FLOOR && vy[i] < 0) {
+          py[i] = FLOOR;
+          vy[i] *= -0.4;
+          vx[i] *= 0.6;
+          vz[i] *= 0.6;
         }
+        top = i + 1;
+      }
+      // Slots keep their order (colors stay valid); dead slots below the last
+      // live one are drawn with zero scale, nothing past it is drawn at all.
+      for (let i = 0; i < top; i++) {
+        const k = Math.max(0, life[i] / maxLife[i]);
+        dummy.position.set(px[i], py[i], pz[i]);
+        dummy.rotation.set(life[i] * 9, life[i] * 6, 0);
+        dummy.scale.setScalar(life[i] > 0 ? Math.min(1, k * 1.8) : 0);
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
       }
-      mesh.count = top; // nothing past the last live slot is drawn
-      mesh.instanceMatrix.needsUpdate = true;
+      if (top > 0 || mesh.count > 0) mesh.instanceMatrix.needsUpdate = true;
+      mesh.count = top;
 
       ringAge += dt;
       ring.visible = ringAge < RING_TIME;

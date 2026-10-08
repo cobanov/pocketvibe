@@ -1,6 +1,6 @@
 # Sky Hopper
 
-A flappy-bird-style game for handheld consoles running ROCKNIX (first target: Anbernic RG SP), built on the OpenBoy template.
+A flappy-bird-style game for handheld consoles running ROCKNIX (first target: Anbernic RG SP), built on the PocketVibe template.
 
 Keep a little low-poly bird in the air above a grassy ledge in the clouds. Each flap kicks it upward, gravity pulls it back down, and pairs of green pipes scroll in from the right with a gap at a random height. Fly through a gap for 1 point; touching a pipe or the ground ends the run. The gaps slowly get narrower and the pipes faster as the score climbs. Reach 10 points for a bronze medal, 25 for silver and 50 for gold.
 

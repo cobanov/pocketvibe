@@ -24,7 +24,7 @@ export const CAR_COLORS = [
   { body: 0x8a4fff, stripe: 0xffffff, css: '#b28cff' },
 ];
 
-const AI_SKILLS = [0.955, 0.925, 0.895];
+const AI_SKILLS = [0.945, 0.915, 0.885];
 const PLAYER_SLOT = 3; // the player starts at the back of the grid
 const ATTRACT_SKILL = 0.9;
 
@@ -76,13 +76,16 @@ export function createRace(scene, track, fx, scenery) {
     const sideX = -car.fz * 0.62;
     const sideZ = car.fx * 0.62;
     const side = Math.random() < 0.5 ? -1 : 1;
-    if (car.surface === SURFACE_GRASS && speed > 4 && Math.random() < dt * 40) {
+    // Particles keep most of the car's speed, so they trail just behind it
+    // and fade before the chase camera reaches them.
+    if (car.surface === SURFACE_GRASS && speed > 4 && Math.random() < dt * 30) {
       fx.spawn(rearX + sideX * side, 0.3, rearZ + sideZ * side,
-        -car.vx * 0.15 + (Math.random() - 0.5) * 3, 2 + Math.random() * 3, -car.vz * 0.15 + (Math.random() - 0.5) * 3,
-        0.32, 0.5, Math.random() < 0.5 ? DIRT : GRASS, 16);
-    } else if ((Math.abs(car.lat) > 5.5 || (car.brake > 0 && car.fwd > 16)) && Math.random() < dt * 35) {
-      fx.spawn(rearX + sideX * side, 0.25, rearZ + sideZ * side,
-        (Math.random() - 0.5) * 2, 1.2 + Math.random(), (Math.random() - 0.5) * 2, 0.55, 0.55, SMOKE, -1);
+        car.vx * 0.6 + (Math.random() - 0.5) * 3, 2 + Math.random() * 3, car.vz * 0.6 + (Math.random() - 0.5) * 3,
+        0.3, 0.4, Math.random() < 0.5 ? DIRT : GRASS, 16);
+    } else if ((Math.abs(car.lat) > 7.5 || (car.brake > 0 && car.fwd > 16)) && Math.random() < dt * 24) {
+      fx.spawn(rearX + sideX * side, 0.22, rearZ + sideZ * side,
+        car.vx * 0.75 + (Math.random() - 0.5) * 2, 1 + Math.random(), car.vz * 0.75 + (Math.random() - 0.5) * 2,
+        0.42, 0.45, SMOKE, -1);
     }
     if (car.boost > 0 && Math.random() < dt * 50) {
       fx.spawn(rearX + (Math.random() - 0.5) * 0.4, 0.45, rearZ + (Math.random() - 0.5) * 0.4,
@@ -147,7 +150,7 @@ export function createRace(scene, track, fx, scenery) {
           // Rubber band: rivals far ahead of the player ease off a little,
           // rivals far behind push a little harder.
           const gap = car.progress - player.progress;
-          const rubber = gap > 0 ? 1 - Math.min(gap / 220, 1) * 0.13 : 1 + Math.min(-gap / 220, 1) * 0.06;
+          const rubber = gap > 0 ? 1 - Math.min(gap / 150, 1) * 0.16 : 1 + Math.min(-gap / 220, 1) * 0.06;
           driveAI(car, track, time, cars, car.finished ? 0.75 : rubber, dt);
         }
         const laps = car.laps;

@@ -310,6 +310,8 @@ hh.run((realDt) => {
   } else if (state === 'play') {
     if (input.pressed('START')) {
       state = 'paused';
+      toastTimer = 0;
+      hud.toast('');
       hud.message(`<div class="title">PAUSED</div><div>Press START to resume</div><div class="small">B quit to title</div>`);
     } else {
       // LEFT turns counter-clockwise, which is a positive angle.

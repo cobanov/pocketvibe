@@ -1,7 +1,14 @@
 {
-  "id": "coin-rush",
-  "title": "Coin Rush",
-  "author": "PocketVibe",
-  "version": "1.0.0",
-  "description": "Collect as many coins as you can in 60 seconds. The example game from the starter project."
+  "id": "brick-breaker",
+  "title": "Brick Breaker",
+  "author": "cobanov",
+  "version": "1.0.1",
+  "description": "Bounce the ball, smash every brick and catch the falling power-ups before they hit the floor.",
+  "genre": "Arcade",
+  "controls": {
+    "D-pad": "Move the paddle",
+    "A": "Launch the ball; start / play again",
+    "B": "Back to title (paused or game over)",
+    "START": "Pause / resume"
+  }
 }

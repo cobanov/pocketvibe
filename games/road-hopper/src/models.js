@@ -113,21 +113,22 @@ export function lilyGeometry() {
 
 export function engineGeometry() {
   return mergeGeometries([
-    box(2.9, 0.22, 0.9, 0, 0.17, 0, DARK), // chassis
-    box(2.8, 0.92, 0.86, -0.02, 0.73, 0, 0xe53f4b, 0xf05a63),
-    box(2.82, 0.14, 0.88, -0.02, 0.5, 0, 0xffd23f), // stripe
-    box(0.96, 0.32, 0.9, -0.82, 1.32, 0, 0xc0303c, 0xd94450), // cab roof
-    box(0.06, 0.3, 0.66, 1.4, 0.86, 0, WINDOW), // front window
-    box(0.98, 0.24, 0.92, -0.82, 0.98, 0, WINDOW), // side windows
+    box(2.9, 0.22, 0.78, 0, 0.17, 0, DARK), // chassis
+    box(2.8, 0.92, 0.74, -0.02, 0.73, 0, 0xe53f4b, 0xf05a63),
+    box(2.82, 0.14, 0.76, -0.02, 0.5, 0, 0xffd23f), // stripe
+    box(0.96, 0.32, 0.78, -0.82, 1.32, 0, 0xc0303c, 0xd94450), // cab roof
+    box(0.06, 0.3, 0.56, 1.4, 0.86, 0, WINDOW), // front window
+    box(0.98, 0.24, 0.8, -0.82, 0.98, 0, WINDOW), // side windows
+    box(0.08, 0.14, 0.18, 1.42, 0.42, 0, 0xfff3b0), // headlight
   ]);
 }
 
 export function wagonGeometry() {
   return mergeGeometries([
-    box(2.9, 0.22, 0.9, 0, 0.17, 0, DARK),
-    box(2.76, 0.88, 0.86, 0, 0.7, 0, 0x3d7fe0, 0x5d98ef),
-    box(2.4, 0.22, 0.88, 0, 0.82, 0, WINDOW),
-    box(2.78, 0.1, 0.88, 0, 0.46, 0, 0xf4f4f4),
+    box(2.9, 0.22, 0.78, 0, 0.17, 0, DARK),
+    box(2.76, 0.88, 0.74, 0, 0.7, 0, 0x3d7fe0, 0x5d98ef),
+    box(2.4, 0.22, 0.76, 0, 0.82, 0, WINDOW),
+    box(2.78, 0.1, 0.76, 0, 0.46, 0, 0xf4f4f4),
   ]);
 }
 
@@ -159,14 +160,13 @@ export function dashGeometry(halfWidth) {
 export function poleGeometry() {
   return mergeGeometries([
     box(0.1, 1.3, 0.1, 0, 0.65, 0, 0x7d838c),
-    box(0.62, 0.3, 0.14, 0, 1.3, 0, 0x2b2b31),
-    box(0.5, 0.1, 0.06, 0, 0.95, 0, 0xf4f4f4), // crossbuck bar
+    box(0.56, 0.3, 0.1, 0, 1.3, 0, 0x2b2b31),
+    box(0.46, 0.1, 0.06, 0, 0.95, 0, 0xf4f4f4), // crossbuck bar
   ]);
 }
 
 export function lampGeometry() {
-  const g = new THREE.BoxGeometry(0.2, 0.2, 0.06);
-  return g;
+  return new THREE.BoxGeometry(0.2, 0.2, 0.06);
 }
 
 export function coinGeometry() {

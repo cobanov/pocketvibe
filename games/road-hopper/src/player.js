@@ -45,6 +45,7 @@ export function createPlayer(scene, world, shadowMaterial) {
     faceTarget: 0,
     squash: 0, // landing squash, 1 right after landing
     bump: 0, // a little shake when hopping into a tree
+    snapOff: 0, // drawn offset that eases out after settling on a log cell
     queued: -1, // a direction pressed mid-hop, used on landing
     sinceHop: 1,
     idle: 0, // seconds since the last hop
@@ -67,6 +68,7 @@ export function createPlayer(scene, world, shadowMaterial) {
       this.faceTarget = 0;
       this.squash = 0;
       this.bump = 0;
+      this.snapOff = 0;
       this.queued = -1;
       this.sinceHop = 1;
       this.idle = 0;
@@ -109,6 +111,13 @@ export function createPlayer(scene, world, shadowMaterial) {
       return true;
     },
 
+    // Moves the chicken onto x (the middle of a log cell or lily pad) and
+    // lets the model slide there instead of jumping.
+    settle(x) {
+      this.snapOff += this.x - x;
+      this.x = x;
+    },
+
     // input is null when the game is not taking controls (title screen).
     update(dt, input) {
       this.landed = false;
@@ -117,6 +126,7 @@ export function createPlayer(scene, world, shadowMaterial) {
       this.idle += dt;
       this.squash = Math.max(0, this.squash - dt * 7);
       this.bump = Math.max(0, this.bump - dt * 6);
+      this.snapOff *= Math.max(0, 1 - dt * 18);
 
       if (this.dead) {
         this.deathT += dt;
@@ -223,11 +233,12 @@ export function createPlayer(scene, world, shadowMaterial) {
         sx = sz = 1 + 0.2 * this.squash + 0.06 * this.bump;
       }
       mesh.scale.set(sx, sy, sz);
-      mesh.position.set(this.x, this.y, -this.rowPos);
+      const x = this.x + this.snapOff;
+      mesh.position.set(x, this.y, -this.rowPos);
       mesh.rotation.set(0, this.face + Math.sin(this.bump * 12) * 0.25 * this.bump, 0);
 
       const lift = this.y - this.baseY;
-      shadow.position.set(this.x, this.baseY + 0.014, -this.rowPos);
+      shadow.position.set(x, this.baseY + 0.014, -this.rowPos);
       shadow.scale.setScalar(Math.max(0.5, 1 - lift * 0.8));
     },
   };

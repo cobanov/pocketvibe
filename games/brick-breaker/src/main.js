@@ -15,8 +15,8 @@ import { LEVELS } from './levels.js';
 
 const START_LIVES = 3;
 const MAX_LIVES = 5;
-const BASE_SPEED = 10; // ball speed on level 1, units per second
-const LEVEL_SPEED = 0.45; // added for each level
+const BASE_SPEED = 11; // ball speed on level 1, units per second
+const LEVEL_SPEED = 0.4; // added for each level
 const LOOP_SPEED = 0.15; // speed multiplier added each time the levels loop
 const RAMP = 0.04; // speed gained per second of play within a level
 const RAMP_MAX = 2.5;
@@ -24,7 +24,7 @@ const MAX_SPEED = 19;
 const SLOW_FACTOR = 0.62;
 const WIDE_TIME = 15;
 const SLOW_TIME = 10;
-const DROP_CHANCE = 0.16;
+const DROP_CHANCE = 0.15;
 const MAX_PILLS_FALLING = 2;
 const BRICK_POINTS = 50;
 const COMBO_POINTS = 10; // extra per brick broken in a row without touching the paddle
@@ -58,6 +58,7 @@ const powerups = createPowerups(scene);
 const hud = createHud(hh.hud);
 
 let state = 'title'; // title | play | lost | clear | paused | over
+let pausedFrom = 'play'; // the state to go back to after a pause
 let demo = true; // the title screen plays by itself and scores nothing
 let level = 0;
 let score = 0;
@@ -72,9 +73,10 @@ let demoWait = 0;
 let shake = 0;
 let aiOffset = 0;
 let titleTime = 0;
-let best = hh.load(SAVE_KEY, { best: 0 }).best;
+let best = hh.load(SAVE_KEY, { best: 0 })?.best || 0;
 
 const HINT = '◀ ▶ move · A launch · START pause';
+const CONFETTI = [0xff5d73, 0xff9f45, 0xffdc4a, 0x6fdc6a, 0x34d6c4, 0x4d9dff, 0xa66bff, 0xff6fc8];
 
 // Called by the ball physics.
 const events = {
@@ -89,6 +91,7 @@ const events = {
       if (!demo) {
         score += BRICK_POINTS * bricks.maxHp(cell) + Math.min(combo, 20) * COMBO_POINTS;
         combo++;
+        if (combo % 5 === 0) hud.callout(`COMBO ×${combo}`, '#ffd84a');
         maybeDrop(x, z);
       }
     } else if (result === 1) {
@@ -122,7 +125,7 @@ const balls = createBalls(scene, bricks, paddle, events);
 function maybeDrop(x, z) {
   if (Math.random() > DROP_CHANCE || powerups.falling() >= MAX_PILLS_FALLING) return;
   const r = Math.random();
-  let kind = r < 0.32 ? WIDE : r < 0.62 ? MULTI : r < 0.86 ? SLOW : LIFE;
+  let kind = r < 0.32 ? WIDE : r < 0.62 ? MULTI : r < 0.88 ? SLOW : LIFE;
   if (kind === LIFE && lives >= MAX_LIVES) kind = WIDE;
   if (kind === MULTI && balls.alive() >= MAX_ALIVE) kind = SLOW;
   powerups.spawn(x, z, kind);
@@ -214,6 +217,7 @@ function start() {
 }
 
 function pause() {
+  pausedFrom = state;
   state = 'paused';
   hud.message(
     `<div class="title">PAUSED</div><div>Press START to resume</div><div class="small">B quit to title</div>`,
@@ -241,6 +245,10 @@ function levelClear() {
   }
   balls.reset();
   powerups.clear();
+  for (let i = 0; i < CONFETTI.length; i++) {
+    effects.burst(-6 + i * 1.7, -5 + Math.random() * 4, CONFETTI[i], 7);
+  }
+  shake = 0.2;
   hud.banner('CLEAR!', `+${CLEAR_BONUS} bonus`);
   hud.hint('');
 }
@@ -310,7 +318,7 @@ function updateDemo(dt) {
 toTitle();
 
 hh.run((dt) => {
-  stateTime += dt;
+  if (state !== 'paused') stateTime += dt;
 
   if (state === 'title') {
     titleTime += dt;
@@ -321,25 +329,33 @@ hh.run((dt) => {
     else updatePlay(dt);
   } else if (state === 'lost') {
     // A short beat to see the ball drop, then serve again or end the game.
-    paddle.update(dt, input.dpad.x);
-    balls.update(dt, speed);
-    if (stateTime > 1.0) {
-      if (lives > 0) {
-        state = 'play';
-        balls.serve();
-      } else {
-        gameOver();
+    if (input.pressed('START')) {
+      pause();
+    } else {
+      paddle.update(dt, input.dpad.x);
+      balls.update(dt, speed);
+      if (stateTime > 1.0) {
+        if (lives > 0) {
+          state = 'play';
+          balls.serve();
+        } else {
+          gameOver();
+        }
       }
     }
   } else if (state === 'clear') {
-    paddle.update(dt, input.dpad.x);
-    if (stateTime > 1.8) {
-      state = 'play';
-      startLevel(level + 1);
+    if (input.pressed('START')) {
+      pause();
+    } else {
+      paddle.update(dt, input.dpad.x);
+      if (stateTime > 1.8) {
+        state = 'play';
+        startLevel(level + 1);
+      }
     }
   } else if (state === 'paused') {
     if (input.pressed('START')) {
-      state = 'play';
+      state = pausedFrom;
       hud.message('');
     } else if (input.pressed('B')) {
       toTitle();
@@ -364,7 +380,7 @@ hh.run((dt) => {
 
   // Fixed camera with a hint of parallax, a slow sway on the title screen and
   // a shake on hits.
-  const jitter = shake * 0.7;
+  const jitter = state === 'paused' ? 0 : shake * 0.7;
   const sway = state === 'title' ? Math.sin(titleTime * 0.4) * 1.2 : 0;
   camera.position.set(
     paddle.x * 0.05 + sway + (Math.random() - 0.5) * jitter,

@@ -61,7 +61,7 @@ export function createFx(scene) {
           t,
           (Math.random() - 0.5) * 10 * power + x * 0.6,
           4 + Math.random() * 8 * power,
-          0.3 + Math.random() * 0.2,
+          0.36 + Math.random() * 0.24,
           0.6 + Math.random() * 0.4,
         );
       }
@@ -105,7 +105,7 @@ export function createFx(scene) {
         dummy.updateMatrix();
         mesh.setMatrixAt(n, dummy.matrix);
         // Starts bright, settles into the piece colour.
-        const f = Math.max(0, (life[i] / ttl[i] - 0.6) * 2.5);
+        const f = Math.max(0, (life[i] / ttl[i] - 0.8) * 5);
         const k = type[i] * 3;
         colors[n * 3] = PIECE_RGB[k] + (1 - PIECE_RGB[k]) * f;
         colors[n * 3 + 1] = PIECE_RGB[k + 1] + (1 - PIECE_RGB[k + 1]) * f;

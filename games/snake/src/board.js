@@ -70,7 +70,7 @@ function rock(x, y, z, s) {
 
 function flower(x, y, z) {
   const hex = [0xff6b8a, 0xffe14d, 0xffffff, 0xb784ff][Math.floor(rand() * 4)];
-  return [box(0.06, 0.3, 0.06, x, y + 0.15, z, 0x3a8f3a), box(0.22, 0.12, 0.22, x, y + 0.32, z, hex)];
+  return [box(0.1, 0.45, 0.1, x, y + 0.22, z, 0x3a8f3a), box(0.4, 0.16, 0.4, x, y + 0.5, z, hex)];
 }
 
 export function createBoard(scene) {
@@ -118,12 +118,20 @@ export function createBoard(scene) {
   ground.translate(0, -PLINTH_H, 0);
   parts.push(paint(ground, GRASS));
 
-  // Decoration in a ring around the plinth. Only the edges of it are on screen.
+  // Decoration around the plinth, placed in the strips that are on screen:
+  // a wide one behind the board and narrow ones on both sides.
   const gy = -PLINTH_H;
-  for (let i = 0; i < 90; i++) {
-    const x = (rand() * 2 - 1) * 30;
-    const z = -22 + rand() * 38;
-    if (Math.abs(x) < plinthW / 2 + 1.2 && Math.abs(z) < plinthD / 2 + 1.2) continue;
+  for (let i = 0; i < 64; i++) {
+    let x;
+    let z;
+    if (i < 28) {
+      x = -20 + rand() * 40;
+      z = -16 + rand() * 6;
+    } else {
+      x = (i % 2 === 0 ? -1 : 1) * (14.4 + rand() * 4.5);
+      z = -10 + rand() * 19;
+    }
+    if (Math.abs(x) < plinthW / 2 + 0.8 && Math.abs(z) < plinthD / 2 + 0.8) continue;
     const r = rand();
     const s = 0.7 + rand() * 0.6;
     const list = r < 0.4 ? tree(x, gy, z, s) : r < 0.65 ? bush(x, gy, z, s) : r < 0.8 ? rock(x, gy, z, s) : flower(x, gy, z);

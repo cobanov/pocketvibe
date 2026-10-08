@@ -173,21 +173,17 @@ body.handheld #legend {
 }
 
 .balls span {
-  color: #3a2a6a;
+  color: #8a7cc8;
 }
 
 .balls span.now {
   color: #fff;
-  text-shadow: 0 0 8px #2de2ff, 0 2px 0 #000;
+  text-shadow: 0 0 8px #2de2ff, 0 0 3px #2de2ff, 0 2px 0 #000;
 }
 
 .balls span.used {
-  color: #3a2a6a;
+  color: #2e2358;
   text-shadow: none;
-}
-
-.balls span:not(.used):not(.now) {
-  color: #e9eeff;
 }
 
 .mult {
@@ -297,4 +293,8 @@ body.handheld #legend {
   right: auto;
   bottom: 6px;
   left: 6px;
+}
+
+#hint .skill {
+  color: #2de2ff;
 }

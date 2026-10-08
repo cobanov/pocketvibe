@@ -147,7 +147,7 @@ export function createFloorTexture() {
     const l = lamps[LAMP_MULT + i];
     text(`${i + 2}X`, l.x, l.y - 0.62, 0.42, YELLOW, 0.75, false);
   }
-  text('SHOOT AGAIN', 0, 0.05, 0.36, RED, 0.8, false);
+  text('SHOOT AGAIN', 0, 0.42, 0.34, RED, 0.85, false);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;

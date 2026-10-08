@@ -1,6 +1,6 @@
 # Rock Blaster
 
-An asteroids-style shooter for handheld consoles running ROCKNIX (first target: Anbernic RG SP), built on the OpenBoy template.
+An asteroids-style shooter for handheld consoles running ROCKNIX (first target: Anbernic RG SP), built on the PocketVibe template.
 
 Pilot a small ship over a wrap-around starfield and blast the tumbling rocks. Large rocks split into two medium ones, medium into two small ones. Every wave starts with more and faster rocks, and from wave 2 a saucer crosses the screen and takes shots at you, aiming better each wave. The ship drifts with inertia, so use thrust sparingly. When things get tight, B jumps to hyperspace. After a crash you come back in the centre once it is clear, blinking and shielded for a few seconds. Large rocks are worth 20 points, medium 50, small 100 and the saucer 500. You start with 3 ships and get another every 10,000 points.
 

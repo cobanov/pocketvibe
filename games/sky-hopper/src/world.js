@@ -200,7 +200,7 @@ export function createWorld(scene) {
 
   const islands = createLayer(scene, islandGeometry(), material, 5, 66, 0.9, (p) => {
     const s = rand(0.8, 1.4);
-    p.y = rand(-1, 6.5);
+    p.y = rand(-1.5, 4.5);
     p.z = rand(-26, -18);
     p.sx = s;
     p.sy = s;

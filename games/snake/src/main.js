@@ -13,8 +13,8 @@ import { createFx } from './fx.js';
 import { createHud } from './hud.js';
 
 const START_TICK = 0.14; // seconds per cell at the start
-const MIN_TICK = 0.072; // top speed
-const SPEEDUP = 0.975; // tick multiplier per apple
+const MIN_TICK = 0.075; // top speed
+const SPEEDUP = 0.978; // tick multiplier per apple
 const START_DELAY = 0.4; // a beat before the first move
 const DEMO_TICK = 0.11; // the snake on the title screen
 const DEMO_MAX_LEN = 26;
@@ -55,7 +55,7 @@ let overTime = 0;
 let overShown = false;
 let record = false;
 let shake = 0;
-let best = hh.load('snake', { best: 0 }).best;
+let best = hh.load('snake', null)?.best || 0;
 
 const HINT = 'D-pad steer · START pause';
 const screenPos = new THREE.Vector3();
@@ -154,7 +154,7 @@ function showOver() {
   hud.message(
     `<div class="title">${record ? 'NEW BEST!' : 'GAME OVER'}</div>` +
       `<div>Score ${score}</div>` +
-      `<div class="small">Length ${snake.len} · Best ${best}</div>` +
+      `<div class="small">Length ${snake.len + snake.grow} · Best ${best}</div>` +
       `<div>Press A to play again</div>` +
       `<div class="small">B title</div>`,
   );
@@ -242,7 +242,7 @@ hh.run((dt) => {
   fx.update(animDt);
 
   shake = Math.max(0, shake - dt);
-  const jitter = shake * 0.9;
+  const jitter = state === 'paused' ? 0 : shake * 0.9;
   camera.position.set(
     (Math.random() - 0.5) * jitter,
     CAM_Y + (Math.random() - 0.5) * jitter,

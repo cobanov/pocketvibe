@@ -116,12 +116,12 @@ export function createWell(scene) {
   for (let i = 0; i < 4; i++) ghost.setColorAt(i, white);
   scene.add(ghost);
 
-  // Identity matrices; put() only writes the scale and translation entries.
+  // Instance matrices start as identity; blocks are never rotated, so put()
+  // only writes the scale and translation entries.
   const blockM = blocks.instanceMatrix.array;
   const blockC = blocks.instanceColor.array;
   const ghostM = ghost.instanceMatrix.array;
   const ghostC = ghost.instanceColor.array;
-  for (let i = 0; i < MAX_BLOCKS; i++) blockM[i * 16 + 15] = 1;
 
   // Per-cell and per-row animation state.
   const cellFlash = new Float32Array(COLS * BOARD_ROWS); // 1 -> 0 after a lock
@@ -133,7 +133,7 @@ export function createWell(scene) {
   let offX = 0; // the falling piece eases into its new column
   let offY = 0;
   let pop = 0; // a small scale pop on rotation
-  let danger = 0;
+  let danger = 0; // 0..1 as the stack nears the top
   let time = 0;
 
   function put(m, c, i, x, y, z, s, r, g, b) {
@@ -204,11 +204,6 @@ export function createWell(scene) {
   }
 
   return {
-    // Grid tint, 0..1 as the stack nears the top. main.js also uses it.
-    get danger() {
-      return danger;
-    },
-
     reset() {
       cellFlash.fill(0);
       rowFall.fill(0);
@@ -252,7 +247,7 @@ export function createWell(scene) {
         if (clearing) {
           // Flash white and swell, then shrink away.
           const p = game.clearProgress;
-          flashRow = Math.min(1, p * 6) * (0.8 + 0.2 * Math.cos(p * 45));
+          flashRow = Math.min(1, p * 8) * (0.88 + 0.12 * Math.cos(p * 50));
           scale = p < 0.6 ? BLOCK_SCALE + p * 0.2 : (BLOCK_SCALE + 0.12) * (1 - (p - 0.6) / 0.4);
         }
         for (let c = 0; c < COLS; c++) {
@@ -315,7 +310,7 @@ export function createWell(scene) {
       const target = game.phase === 'idle' ? 0 : Math.min(1, Math.max(0, (highest - 13) / 5));
       danger += (target - danger) * Math.min(1, dt * 4);
       const pulse = danger * (0.6 + 0.4 * Math.sin(time * 7));
-      gridMaterial.color.setRGB(1 + pulse * 7, 1 - pulse * 0.55, 1 - pulse * 0.7);
+      gridMaterial.color.setRGB(1 + pulse * 5, 1 - pulse * 0.45, 1 - pulse * 0.6);
     },
   };
 }

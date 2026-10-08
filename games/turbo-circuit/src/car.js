@@ -124,8 +124,12 @@ export function stepCar(car, dt, track) {
   const rate = car.steerTarget === 0 ? STEER_OUT : STEER_IN;
   const ds = car.steerTarget - car.steer;
   car.steer += Math.abs(ds) < rate * dt ? ds : Math.sign(ds) * rate * dt;
-  const grip = Math.min(1, Math.abs(fwd) / 7) * Math.sign(fwd);
-  const yaw = TURN * grip * (1 - 0.3 * Math.min(Math.abs(fwd) / TOP_SPEED, 1.3));
+  let turn = Math.min(1, Math.abs(fwd) / 7) * Math.sign(fwd);
+  // Nearly stopped (say, nose against the barrier): a pedal lets the car
+  // pivot so it can always drive away.
+  const pedal = car.throttle > 0 ? 1 : car.brake > 0 ? -1 : 0;
+  if (pedal !== 0 && Math.abs(fwd) < 3) turn = pedal * Math.max(0.45, Math.abs(turn));
+  const yaw = TURN * turn * (1 - 0.3 * Math.min(Math.abs(fwd) / TOP_SPEED, 1.3));
 
   // Sideways sliding fades out with grip; the old heading's sideways part is
   // what makes the car drift a little in corners.
@@ -176,8 +180,9 @@ function trackCar(car, track) {
     car.z -= nz * (a - LIMIT);
     const vn = car.vx * nx + car.vz * nz;
     if (vn > 0) {
-      car.vx -= nx * vn * 1.5;
-      car.vz -= nz * vn * 1.5;
+      // Bounce off a little and lose some speed scraping along.
+      car.vx = (car.vx - nx * vn * 1.3) * 0.985;
+      car.vz = (car.vz - nz * vn * 1.3) * 0.985;
       car.wallHit = vn;
     }
   }

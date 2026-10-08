@@ -20,6 +20,7 @@ import {
   segments,
   slings,
   targets,
+  wedges,
 } from './table.js';
 import { BG, BUMPER_COLORS, CYAN, LIME, MAGENTA, STYLE, VIOLET, YELLOW, bar, post, shaded, slab } from './shared.js';
 import { createFloorTexture } from './floor.js';
@@ -92,19 +93,20 @@ function staticGeometry() {
   }
 
   // Filled tops of the slingshots and the drop target wedges.
-  for (let i = 0; i < 2; i++) {
-    const s = i === 0 ? -1 : 1;
-    parts.push(slab([[s * 2.95, 6.35], [s * 2.95, 4.99], [s * 1.93, 3.88]], WALL_H - 0.03, 0x4a1458));
-    parts.push(slab([[s * 4.9, 7.2], [s * 3.95, 9.9], [s * 4.9, 10.7]], WALL_H - 0.03, 0x163f22));
-  }
+  for (let i = 0; i < wedges.length; i++) parts.push(slab(wedges[i].points, WALL_H - 0.03, wedges[i].color));
 
   // Apron over the drain, with a neon edge. The ball disappears under it.
-  parts.push(bar(-4.45, -0.85, 4.45, -0.85, 1.1, 0.55, 0, 0x1c0f45, 0.6, 0.05));
-  parts.push(bar(-4.92, -0.3, 4.92, -0.3, 0.07, 0.03, 0.55, MAGENTA, 1, 0.3));
+  parts.push(bar(-4.45, -0.85, 4.45, -0.85, 1.1, 0.55, 0, 0x150a38, 0.7, 0));
+  parts.push(bar(-4.92, -0.3, 4.92, -0.3, 0.08, 0.03, 0.55, MAGENTA, 1, 0.3));
+  parts.push(bar(-4.92, -1.36, 4.92, -1.36, 0.08, 0.03, 0.55, CYAN, 1, 0.2));
+  for (let i = 0; i < 7; i++) {
+    const x = -3.6 + i * 1.2;
+    parts.push(bar(x - 0.3, -0.83, x + 0.3, -0.83, 0.1, 0.02, 0.55, i % 2 ? CYAN : MAGENTA, 1, 0.1));
+  }
 
   // Cabinet side walls.
-  parts.push(bar(-5.3, BOUNDS.y0, -5.3, ARC.y, 0.2, 0.75, 0, VIOLET, 0.35, 0.1));
-  parts.push(bar(6.95, BOUNDS.y0, 6.95, ARC.y, 0.2, 0.75, 0, VIOLET, 0.35, 0.1));
+  parts.push(bar(-5.3, BOUNDS.y0, -5.3, ARC.y, 0.2, 0.75, 0, VIOLET, 0.35, 0));
+  parts.push(bar(6.95, BOUNDS.y0, 6.95, ARC.y, 0.2, 0.75, 0, VIOLET, 0.35, 0));
 
   const merged = mergeGeometries(parts);
   for (let i = 0; i < parts.length; i++) parts[i].dispose();
@@ -122,7 +124,6 @@ function plungerGeometry() {
 }
 
 export function createView(scene) {
-  scene.background = null;
   scene.fog = new THREE.Fog(BG, 36, 70);
 
   const camera = new THREE.PerspectiveCamera(30, 720 / 480, 1, 70);
@@ -171,6 +172,7 @@ export function createView(scene) {
   // Bumper caps flash white when hit.
   const capGeo = post(0, 0, 0.6, 0.12, 0, 0xffffff, 0.55, 0, 16);
   const caps = new THREE.InstancedMesh(capGeo, vertexMat, bumpers.length);
+  caps.frustumCulled = false; // instances pop and move, so cached bounds would be wrong
   scene.add(caps);
 
   // Slingshot rubbers.
@@ -178,6 +180,7 @@ export function createView(scene) {
   rubberGeo.deleteAttribute('uv');
   shaded(rubberGeo, 0xffffff, 0.6, 0);
   const rubbers = new THREE.InstancedMesh(rubberGeo, vertexMat, 2);
+  rubbers.frustumCulled = false;
   scene.add(rubbers);
 
   // Drop targets sink into the floor when hit.
@@ -191,6 +194,7 @@ export function createView(scene) {
 
   // Floor lamps.
   const lampMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 18), new THREE.MeshBasicMaterial(), LAMP_COUNT);
+  lampMesh.frustumCulled = false;
   scene.add(lampMesh);
 
   // Soft glows: ball, trail, bumpers, slings, lamps and sparks in one draw.

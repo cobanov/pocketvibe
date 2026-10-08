@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 const MAX = 140;
 
-export const SMOKE = 0xe9edf2;
+export const SMOKE = 0xd5dbe3;
 export const DIRT = 0x8a6a3e;
 export const GRASS = 0x4f9a3c;
 export const SPARK = 0xffd23f;
@@ -27,6 +27,7 @@ export function createFx(scene) {
   const total = new Float32Array(MAX);
   const size = new Float32Array(MAX);
   const gravity = new Float32Array(MAX);
+  const shown = new Uint8Array(MAX).fill(1); // drawn last frame
   const color = new THREE.Color();
   const dummy = new THREE.Object3D();
   let next = 0;
@@ -66,10 +67,15 @@ export function createFx(scene) {
     },
 
     update(dt) {
+      let changed = false;
       for (let i = 0; i < MAX; i++) {
         if (life[i] <= 0) {
+          // Hide a particle once when it dies; idle slots cost nothing.
+          if (!shown[i]) continue;
+          shown[i] = 0;
           dummy.scale.setScalar(0);
         } else {
+          shown[i] = 1;
           life[i] -= dt;
           vy[i] -= gravity[i] * dt;
           x[i] += vx[i] * dt;
@@ -85,8 +91,9 @@ export function createFx(scene) {
         }
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
+        changed = true;
       }
-      mesh.instanceMatrix.needsUpdate = true;
+      if (changed) mesh.instanceMatrix.needsUpdate = true;
     },
   };
 }

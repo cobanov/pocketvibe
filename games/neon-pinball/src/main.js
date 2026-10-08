@@ -282,7 +282,8 @@ function updatePlay(dt) {
     if (lanesFlash <= 0) lanesLit.fill(0);
   }
   hud.score(score);
-  hud.hint(phase === 'lane' && physics.inLane() ? 'Hold ▼ to pull<br>Release to launch' : '');
+  const waiting = phase === 'lane' && physics.inLane() && physics.ball.y < 3;
+  hud.hint(waiting ? 'Hold ▼ to pull<br>Release to launch<br><span class="skill">Skill shot:<br>blinking lane</span>' : '');
 }
 
 // The demo ball in attract mode: flips when the ball drops near a flipper.

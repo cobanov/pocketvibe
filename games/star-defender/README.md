@@ -1,6 +1,6 @@
 # Star Defender
 
-A fixed-screen shooter for handheld consoles running ROCKNIX (first target: Anbernic RG SP), built on the OpenBoy template.
+A fixed-screen shooter for handheld consoles running ROCKNIX (first target: Anbernic RG SP), built on the PocketVibe template.
 
 Fifty aliens in five rows march sideways across a tilted neon playfield, drop a row at every edge and speed up as their numbers thin. Slide your ship along the bottom, fire up through the gaps and hide behind four bunkers that crumble block by block under bombs and stray shots. Pink stingers are worth 30, blue crabs 20 and yellow jellies 10; the mystery saucer that crosses the far end now and then is worth up to 300. Shooting a bomb cancels it. You have three ships and earn another every 2,500 points; every cleared wave warps you to a faster formation that starts a little closer. If the aliens reach your line, the game is over.
 

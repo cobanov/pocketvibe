@@ -1,0 +1,14 @@
+{
+  "id": "jet-rush",
+  "title": "Jet Rush",
+  "author": "cobanov",
+  "version": "1.0.1",
+  "description": "Fly a jetpack through an endless lab corridor, dodging electric zappers and incoming missiles while grabbing coins.",
+  "genre": "Endless runner",
+  "controls": {
+    "A": "Hold to fly up, let go to fall; start",
+    "UP": "Fly up (same as A)",
+    "START": "Pause / resume",
+    "B": "Back to title (paused or game over)"
+  }
+}

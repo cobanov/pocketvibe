@@ -34,13 +34,13 @@ const FLIP_UP_SPEED = 24; // rad/s while the button is held
 const FLIP_DOWN_SPEED = 14; // rad/s falling back
 const FLIP_E = 0.3; // flipper rubber restitution
 
-const BUMPER_KICK = 16; // speed a pop bumper throws the ball away with
+const BUMPER_KICK = 14; // speed a pop bumper throws the ball away with
 const SLING_KICK = 12; // extra speed from a slingshot
 const SLING_MIN = 2.5; // impact speed that fires a slingshot
 const TARGET_MIN = 2.0; // impact speed that drops a target
 const POST_E = 0.6;
 
-const PULL_TIME = 1.1; // seconds to pull the plunger all the way back
+const PULL_TIME = 1.2; // seconds to pull the plunger all the way back
 const LAUNCH_MIN = 15;
 const LAUNCH_MAX = 36;
 
@@ -325,7 +325,12 @@ export function createPhysics(onEvent) {
       } else if (plunger.pull > 0) {
         const onPlunger = ball.x > LANE_WALL_X && ball.y < plunger.y + BALL_R + 0.3;
         if (onPlunger && plunger.pull > 0.04) {
-          ball.vy = LAUNCH_MIN + (LAUNCH_MAX - LAUNCH_MIN) * plunger.pull;
+          // S-shaped power curve (cubic, 0 -> 1): flat in the middle of the
+          // pull, where the launch speeds that reach the top lanes are, so a
+          // skill shot is a matter of timing rather than luck.
+          const p = plunger.pull;
+          const power = p * (3.06 + p * (-4.66 + p * 2.6));
+          ball.vy = LAUNCH_MIN + (LAUNCH_MAX - LAUNCH_MIN) * power;
           ball.y = PLUNGER_Y + BALL_R + 0.1;
           onEvent(EV_LAUNCH, 0, ball.x, ball.y);
         }

@@ -12,7 +12,7 @@ import { SURFACE_GRASS } from './car.js';
 import { createHud } from './hud.js';
 
 const COUNTDOWN = 3; // seconds of 3-2-1 before GO
-const FINISH_GRACE = 30; // seconds left to finish once the winner is home
+const FINISH_GRACE = 40; // seconds left to finish once the winner is home
 const RESULTS_DELAY = 1.6; // the FINISH banner plays before the results
 const SAVE_KEY = 'turbo-circuit';
 
@@ -121,7 +121,7 @@ function showResults() {
   if (dnf) {
     hud.message(
       `<div class="title">TIME UP</div>` +
-        `<div>The winner was home 30 seconds ago</div>` +
+        `<div>The winner was home ${FINISH_GRACE} seconds ago</div>` +
         `<div>Press A to race again</div>` +
         `<div class="small">B title</div>`,
     );

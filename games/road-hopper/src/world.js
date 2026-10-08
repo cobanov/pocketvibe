@@ -7,8 +7,8 @@ import * as THREE from 'three';
 import { COLS, GRASS, HALF, LILY_Y, LOG_Y, RAIL, RIVER, ROAD, WATER_Y, clamp, randInt } from './shared.js';
 import * as models from './models.js';
 
-export const ROWS = 30; // row slots in the pool
-export const BEHIND = 8; // rows kept behind the camera row
+export const ROWS = 20; // row slots in the pool: all the screen shows, and a little more
+export const BEHIND = 6; // rows kept behind the camera row
 
 const MAX_MOVERS = 6; // cars, trucks, logs or lily pads per row
 const WRAP = 13; // movers loop over x in [-WRAP, WRAP)
@@ -28,6 +28,7 @@ const TRAIN_SPEED = 26;
 const TRAIN_W = 17; // trains appear and vanish this far out, beyond the fog
 const WARN_TIME = 1.2; // the lamps flash this long before a train sets off
 const POLE_X = HALF + 0.9;
+const POLE_Z = 0.44; // beside the track, clear of the train
 
 // What stands on a grass cell.
 const FREE = 0;
@@ -60,6 +61,8 @@ const GROUND = [
 
 const LAMP_ON = new THREE.Color(0xff2a2a);
 const LAMP_OFF = new THREE.Color(0x4a1c1c);
+const RAIL_WARN = new THREE.Color(1, 0.22, 0.22);
+const RAIL_CALM = new THREE.Color(1, 1, 1);
 
 function makeRow() {
   return {
@@ -144,7 +147,7 @@ export function createWorld(scene, shadowMaterial) {
   const staticShadows = instanced(shadowGeometry, shadowMaterial, ROWS * (COLS + EDGE * 2));
   const moverShadows = instanced(shadowGeometry, shadowMaterial, ROWS * MAX_MOVERS);
   const dashes = instanced(models.dashGeometry(VIEW_HALF), new THREE.MeshBasicMaterial({ color: 0xe9e9ee }), ROWS);
-  const rails = instanced(models.railGeometry(VIEW_HALF), lambert, ROWS);
+  const rails = instanced(models.railGeometry(VIEW_HALF), lambert, ROWS, true);
   const poles = instanced(models.poleGeometry(), lambert, ROWS);
   const lamps = instanced(models.lampGeometry(), new THREE.MeshBasicMaterial(), ROWS * 2, true);
   const coinMesh = instanced(
@@ -206,10 +209,10 @@ export function createWorld(scene, shadowMaterial) {
       return;
     }
     const roll = Math.random();
-    if (r >= 3 && roll < 0.0 && chunkType !== RIVER) {
+    if (r >= 10 && roll < 0.3 && chunkType !== RIVER) {
       chunkType = RIVER;
       chunkLeft = randInt(1, 2 + Math.round(d * 1.5));
-    } else if (r >= 3 && roll < 0.95 && chunkType !== RAIL) {
+    } else if (r >= 16 && roll < 0.48 && chunkType !== RAIL) {
       chunkType = RAIL;
       chunkLeft = Math.random() < 0.2 + 0.3 * d ? 2 : 1;
     } else {
@@ -420,7 +423,7 @@ export function createWorld(scene, shadowMaterial) {
       } else if (row.type === RAIL) {
         m.makeTranslation(0, 0, z);
         rails.setMatrixAt(nrail, m);
-        m.makeTranslation(POLE_X, 0, z + 0.36);
+        m.makeTranslation(POLE_X, 0, z + POLE_Z);
         poles.setMatrixAt(nrail, m);
         nrail++;
       }
@@ -452,6 +455,7 @@ export function createWorld(scene, shadowMaterial) {
     let nwagon = 0;
     let ncoin = 0;
     let nlamp = 0;
+    let nrail = 0;
     for (let s = 0; s < ROWS; s++) {
       const row = rows[s];
       const z = -row.index;
@@ -485,15 +489,18 @@ export function createWorld(scene, shadowMaterial) {
           addShadow(trainShadows, ntrain, row.trainX, 0.012, z, TRAIN_LEN, 0.9);
           ntrain++;
         }
-        // The two lamps flash in turn while a train is coming or passing.
+        // The two lamps flash in turn while a train is coming or passing,
+        // and the track blinks red so the warning reads on a small screen.
+        // Rails are listed in slot order, the same order rebuildStatics uses.
         const warn = row.trainRun || row.trainTimer < WARN_TIME;
         const blink = Math.floor(time * 7) & 1;
         for (let k = 0; k < 2; k++) {
-          m.makeTranslation(POLE_X + (k ? 0.16 : -0.16), 1.3, z + 0.44);
+          m.makeTranslation(POLE_X + (k ? 0.14 : -0.14), 1.3, z + POLE_Z + 0.07);
           lamps.setMatrixAt(nlamp, m);
           lamps.setColorAt(nlamp, warn && blink === k ? LAMP_ON : LAMP_OFF);
           nlamp++;
         }
+        rails.setColorAt(nrail++, warn && blink ? RAIL_WARN : RAIL_CALM);
       }
       if (row.coin >= 0) {
         dummy.position.set(row.coin - HALF, 0.42 + Math.sin(time * 3 + row.index) * 0.06, z);
@@ -520,6 +527,7 @@ export function createWorld(scene, shadowMaterial) {
     lamps.count = nlamp;
     lamps.instanceMatrix.needsUpdate = true;
     lamps.instanceColor.needsUpdate = true;
+    rails.instanceColor.needsUpdate = true;
   }
 
   function updateTrain(row, dt) {

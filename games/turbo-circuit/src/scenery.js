@@ -284,7 +284,6 @@ export function createScenery(scene, track) {
   }
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
-  console.info(`trees ${spots[0].length + spots[1].length}`);
   for (let k = 0; k < 2; k++) {
     const list = spots[k];
     const trees = new THREE.InstancedMesh(kinds[k], treeMaterial, list.length);

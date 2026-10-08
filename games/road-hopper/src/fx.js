@@ -96,7 +96,7 @@ export function createFx(scene, shadowMaterial) {
   function placeHawk(x, y, z, dx, dy, dz) {
     hawk.position.set(x, y, z);
     // Face the flight direction (the model faces -z), nose a little down or up.
-    hawk.rotation.set(-Math.atan2(dy, Math.hypot(dx, dz)) * 0.6, Math.atan2(-dx, -dz), 0, 'YXZ');
+    hawk.rotation.set(-Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)) * 0.6, Math.atan2(-dx, -dz), 0, 'YXZ');
     hawkShadow.position.set(x, 0.015, z);
     hawkShadow.scale.setScalar(Math.max(0.4, 1.6 - y * 0.12));
   }

@@ -14,7 +14,7 @@ const CAM_OFFSET = new THREE.Vector3(1.6, 12, 6.4);
 const LEAD = 2.2; // the camera looks this many rows ahead of the chicken
 const CREEP = 0.3; // rows per second the camera moves forward on its own
 const CREEP_MAX = 0.6;
-const BEHIND_LIMIT = 3.4; // fall this far behind the camera and the hawk comes
+const BEHIND_LIMIT = 2.2; // fall this far behind the camera (the screen's bottom edge) and the hawk comes
 const IDLE_LIMIT = 9; // so it does after this many seconds without a hop
 const SAVE_KEY = 'road-hopper';
 const DIRECTIONS = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
@@ -84,6 +84,7 @@ function toTitle() {
       `<div>Press A to start</div>` +
       `<div class="small">D-pad hop · START pause</div>` +
       (best > 0 || bank > 0 ? `<div class="small">Best ${best} · <span class="coin">●</span> ${bank}</div>` : ''),
+    'high',
   );
 }
 
@@ -124,21 +125,30 @@ function die(kind) {
   }
 }
 
-function gameOver() {
-  state = 'over';
-  stateT = 0;
+// Banks the run's coins and best score. Returns true for a new best.
+function endRun() {
   bank += coins;
+  coins = 0;
   const record = score > best;
   if (record) best = score;
   hh.save(SAVE_KEY, { best, coins: bank });
+  return record;
+}
+
+function gameOver() {
+  state = 'over';
+  stateT = 0;
+  const runCoins = coins;
+  const record = endRun();
   hud.best(best);
   hud.message(
     `<div class="title">${DEATH_TITLES[deathKind]}</div>` +
       `<div class="big">${score}</div>` +
       (record ? `<div class="record">NEW BEST!</div>` : `<div class="small">Best ${best}</div>`) +
-      `<div class="small"><span class="coin">●</span> ${coins} this run · ${bank} total</div>` +
+      `<div class="small"><span class="coin">●</span> ${runCoins} this run · ${bank} total</div>` +
       `<div>Press A to play again</div>` +
       `<div class="small">B title</div>`,
+    'high',
   );
 }
 
@@ -155,7 +165,7 @@ function play(dt) {
         die('water');
         return;
       }
-      player.x = x;
+      player.settle(x);
       world.dip(r);
       fx.splash(x, player.baseY, z, false);
     } else {
@@ -191,7 +201,7 @@ function play(dt) {
     die('hawk');
     return;
   }
-  hud.warn(behind > BEHIND_LIMIT - 1.3 || player.idle > IDLE_LIMIT - 3);
+  hud.warn(behind > BEHIND_LIMIT - 1.1 || player.idle > IDLE_LIMIT - 3);
   if (world.trainNear(player.row, player.x)) shake = Math.max(shake, 0.07);
   world.advance(camRow);
 }
@@ -238,6 +248,7 @@ hh.run((dt) => {
       state = 'play';
       hud.message('');
     } else if (input.pressed('B')) {
+      endRun();
       toTitle();
     }
   } else if (state === 'dying') {

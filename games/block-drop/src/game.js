@@ -34,6 +34,10 @@ export function createGame() {
   let dasTimer = 0;
   let arrTimer = 0;
   let clearTimer = 0;
+  // Buttons pressed while rows clear, applied to the next piece when it appears.
+  let pendingRot = 0;
+  let pendingShift = 0;
+  let pendingHold = false;
 
   const g = {
     board,
@@ -118,6 +122,8 @@ export function createGame() {
     resets = 0;
     lowestY = g.y;
     g.phase = 'fall';
+    // A blocked spawn gets one row of leeway above the well before the game ends.
+    if (!fits(type, 0, g.x, g.y)) g.y++;
     if (!fits(type, 0, g.x, g.y)) {
       g.phase = 'dead';
       ev.dead = true;
@@ -272,6 +278,31 @@ export function createGame() {
     spawn(takeNext());
   }
 
+  // Hold: swap with the held piece (or take the next one) once per piece.
+  function doHold() {
+    if (!g.canHold || g.phase !== 'fall') return;
+    const current = g.type;
+    const incoming = g.hold === 0 ? takeNext() : g.hold;
+    g.hold = current;
+    g.canHold = false;
+    ev.held = true;
+    spawn(incoming);
+  }
+
+  function applyPending() {
+    if (g.phase === 'fall') {
+      if (pendingHold) doHold();
+      const turns = ((pendingRot % 4) + 4) % 4;
+      if (turns === 3) rotate(-1);
+      else for (let i = 0; i < turns; i++) rotate(1);
+      for (; pendingShift < 0; pendingShift++) shift(-1);
+      for (; pendingShift > 0; pendingShift--) shift(1);
+    }
+    pendingRot = 0;
+    pendingShift = 0;
+    pendingHold = false;
+  }
+
   function updateGhost() {
     let y = g.y;
     while (fits(g.type, g.rot, g.x, y - 1)) y--;
@@ -344,6 +375,9 @@ export function createGame() {
       g.clearProgress = 0;
       g.lockProgress = 0;
       dasDir = 0;
+      pendingRot = 0;
+      pendingShift = 0;
+      pendingHold = false;
       resetEvents();
       spawn(takeNext());
       updateGhost();
@@ -377,21 +411,23 @@ export function createGame() {
       if (g.phase === 'clear') {
         clearTimer += dt;
         g.clearProgress = Math.min(1, clearTimer / CLEAR_TIME);
+        if (input.pressed('A')) pendingRot++;
+        if (input.pressed('B')) pendingRot--;
+        if (input.pressed('L') || input.pressed('R')) pendingHold = true;
+        if (input.pressed('LEFT')) pendingShift--;
+        if (input.pressed('RIGHT')) pendingShift++;
         handleShift(dt, input);
-        if (clearTimer >= CLEAR_TIME) collapse();
+        if (clearTimer >= CLEAR_TIME) {
+          collapse();
+          applyPending();
+        }
         if (g.phase === 'fall') updateGhost();
         return;
       }
       if (g.phase !== 'fall') return;
 
-      // Hold: swap with the held piece (or take the next one) once per piece.
-      if ((input.pressed('L') || input.pressed('R')) && g.canHold) {
-        const current = g.type;
-        const incoming = g.hold === 0 ? takeNext() : g.hold;
-        g.hold = current;
-        g.canHold = false;
-        ev.held = true;
-        spawn(incoming);
+      if (input.pressed('L') || input.pressed('R')) {
+        doHold();
         if (g.phase === 'dead') return;
       }
 
@@ -414,7 +450,9 @@ export function createGame() {
       const soft = input.down('DOWN');
       const fall = gravity(g.level);
       const interval = soft ? Math.min(fall, SOFT_DROP) : fall;
-      fallTimer += dt;
+      // Time saved up under slow gravity must not turn into a jump of
+      // several rows the moment DOWN is pressed.
+      fallTimer = Math.min(fallTimer + dt, interval + dt);
       while (fallTimer >= interval) {
         fallTimer -= interval;
         if (!stepDown()) {

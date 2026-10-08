@@ -69,8 +69,10 @@ export function createHud(root) {
       flashEl.className = kind;
     },
 
-    // html is a fixed string from main.js; '' hides the message.
-    message(html) {
+    // html is a fixed string from main.js; '' hides the message. 'high'
+    // places the panel near the top so the chicken stays in view.
+    message(html, place = '') {
+      messageEl.className = place;
       messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
     },
   };

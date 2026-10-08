@@ -29,6 +29,7 @@ export const segments = [];
 export const posts = []; // passive round posts { x, y, r }
 export const bumpers = []; // pop bumpers { x, y, r }
 export const slings = []; // kicker faces for the view { ax, ay, bx, by, nx, ny }
+export const wedges = []; // filled triangles for the view: slingshots and target banks
 export const targets = []; // drop targets { x, y, angle, bank }
 export const lanes = []; // rollover lane sensors { x, x0, x1, y0, y1 }
 export const lamps = []; // floor lights { x, y, r, color }
@@ -89,11 +90,16 @@ export const ARC = { x: ARC_CX, y: ARC_CY, r: ARC_R };
 
 // --- Lower playfield, mirrored for both sides ------------------------------
 
+// Bottom of the drop target wedges. Its tip half covers the outlane entrance;
+// tuned in simulation (higher lets far more balls into the outlanes, lower
+// closes the gap below a ball's width).
+export const BANK_Y = 7.0;
+
 for (let s = -1; s <= 1; s += 2) {
   const side = s < 0 ? 0 : 1;
   // Outlane divider and inlane guide that feeds the flipper.
-  poly([[s * 3.95, 6.55], [s * 3.95, 4.6], [s * 2.25, 2.75]], 'guide');
-  posts.push({ x: s * 3.95, y: 6.6, r: 0.18 });
+  poly([[s * 4.1, 6.55], [s * 4.1, 4.6], [s * 2.25, 2.75]], 'guide');
+  posts.push({ x: s * 4.1, y: 6.6, r: 0.15 });
 
   // Slingshot: a triangle whose long face kicks the ball away.
   const top = [s * 2.95, 6.35];
@@ -102,6 +108,7 @@ for (let s = -1; s <= 1; s += 2) {
   seg(top[0], top[1], bl[0], bl[1], 'slingbody');
   seg(bl[0], bl[1], br[0], br[1], 'slingbody');
   seg(top[0], top[1], br[0], br[1], 'sling', SLING, side, 0.5);
+  wedges.push({ points: [top, bl, br], color: 0x4a1458 });
   const kx = br[0] - top[0];
   const ky = br[1] - top[1];
   const kl = Math.hypot(kx, ky);
@@ -110,9 +117,11 @@ for (let s = -1; s <= 1; s += 2) {
 
   // Drop target bank: a wedge against the side wall with three targets in
   // front of its lower face.
-  const a = [s * 4.9, 7.2];
-  const b = [s * 3.95, 9.9];
-  poly([a, b, [s * 4.9, 10.7]], 'bank');
+  const a = [s * 4.9, BANK_Y];
+  const b = [s * 3.95, BANK_Y + 2.7];
+  const c = [s * 4.9, BANK_Y + 3.5];
+  poly([a, b, c], 'bank');
+  wedges.push({ points: [a, b, c], color: 0x2a1660 });
   const ux = (b[0] - a[0]) / Math.hypot(b[0] - a[0], b[1] - a[1]);
   const uy = (b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]);
   const nx = s < 0 ? uy : -uy; // outward normal, towards the playfield
@@ -129,7 +138,7 @@ for (let s = -1; s <= 1; s += 2) {
 
 // --- Upper playfield -------------------------------------------------------
 
-bumpers.push({ x: -1.7, y: 13.2, r: 0.7 }, { x: 1.7, y: 13.2, r: 0.7 }, { x: 0, y: 11.0, r: 0.7 });
+bumpers.push({ x: -1.75, y: 14.0, r: 0.7 }, { x: 1.75, y: 14.0, r: 0.7 }, { x: 0, y: 12.0, r: 0.7 });
 
 // Rollover lanes at the top, between four short dividers.
 for (let i = 0; i < 4; i++) {
@@ -156,7 +165,7 @@ export const LAMP_MULT = lamps.length; // 4: 2x, 3x, 4x, 5x
 for (let i = 0; i < 4; i++) lamps.push({ x: -1.5 + i, y: 6.9, r: 0.27, color: 0xffd23f });
 
 export const LAMP_SAVE = lamps.length; // 1, shoot again
-lamps.push({ x: 0, y: 0.75, r: 0.32, color: 0xff3b6b });
+lamps.push({ x: 0, y: 1.05, r: 0.3, color: 0xff3b6b });
 
 export const LAMP_POWER = lamps.length; // 6, plunger power meter beside the lane
 for (let i = 0; i < 6; i++) lamps.push({ x: 6.62, y: 0.7 + i * 0.62, r: 0.17, color: i < 4 ? 0x3cf0ff : 0xff3fd2 });
