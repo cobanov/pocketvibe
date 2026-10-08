@@ -1,28 +1,40 @@
 // Tower Stack: drop sliding slabs onto the tower. Whatever hangs over the
 // edge is sliced off, so the slabs get smaller unless the drops are perfect.
 // A or UP drops, START pauses. Miss the tower completely and the run is over.
+// Every 25 layers the sky moves on (golden hour, sunset, starry night...).
 
 import * as THREE from 'three';
 import { createHandheld } from './handheld.js';
-import { LH, SIZE, slabGeometry } from './shared.js';
+import { LH, SIZE, slabFrontGeometry, slabGeometry } from './shared.js';
 import { createTower } from './tower.js';
 import { CUT, MISS, PERFECT, createStack } from './stack.js';
 import { createDebris } from './debris.js';
 import { createFx } from './fx.js';
-import { createSky } from './sky.js';
+import { PHASE_LAYERS, createSky, phaseName } from './sky.js';
 import { createClouds } from './clouds.js';
 import { createHud } from './hud.js';
+import { createSound } from './sound.js';
 
-const BASE_SPEED = 2.9; // slide speed of the first slab, units per second
-const SPEED_RAMP = 0.045; // added per layer
-const MAX_SPEED = 7.4;
+// The slide speed eases from BASE_SPEED towards TOP_SPEED (units per second)
+// as the tower grows, 63% of the way there after SPEED_LAYERS layers: about
+// 4.1 at 25 layers, 4.9 at 50, 5.8 at 100. A linear ramp used to reach 7.4,
+// a slab crossing the tower in under half a second.
+const BASE_SPEED = 2.9;
+const TOP_SPEED = 6.3;
+const SPEED_LAYERS = 55;
 const FAR_SIDE_FROM = 8; // from this height slabs sometimes come from the front
 const FAR_SIDE_CHANCE = 0.3;
-const MILESTONE = 25; // a callout every 25 layers
+const STREAK = 5; // every fifth perfect drop in a row gets a flourish
 const OVER_DELAY = 1.8; // the zoom out plays before the game-over panel
-const DROP_GUARD = 0.15; // seconds after a slab appears before it can be dropped
-const DEMO_SKIES = [40, 0, 86]; // sky offsets (in layers) for the demo runs
+const SKIP_AFTER = 0.8; // from then on A shows the panel at once
+// A press this soon after a slab appears is ignored while the slab is still
+// clear of the tower (a double tap, a bouncy button): it could only miss.
+const DROP_GUARD = 0.15;
+const DEMO_SKIES = [30, 0, 62]; // sky offsets (in layers) for the demo runs
 const SAVE_KEY = 'tower-stack';
+// The perfect chime climbs F major with the streak (semitones above F5).
+const CHIME = [0, 2, 4, 5, 7, 9, 11, 12];
+const MARKER_BACK = 8; // the best-height line runs this far behind the tower
 
 // Orthographic camera at a fixed angle: isometric-looking, rising with the
 // tower. VIEW_H is the visible height in world units at zoom 1 on the 3:2
@@ -53,6 +65,7 @@ const TALL = SHOWN_H / VIEW_H;
 const OVER_SHIFT = SHOWN_W * 0.2 * TALL; // tower to the left of the game-over panel
 const OFFSET = new THREE.Vector3(DIST * COS_E * Math.SQRT1_2, DIST * SIN_E, DIST * COS_E * Math.SQRT1_2);
 const RIGHT = new THREE.Vector3(1, 0, -1).normalize(); // screen right, on the ground
+const BACK = new THREE.Vector3(-1, 0, -1).normalize(); // away from the camera, on the ground
 const UPWARD = new THREE.Vector3(); // screen up, in the world
 camera.position.copy(OFFSET);
 camera.lookAt(0, 0, 0);
@@ -65,13 +78,28 @@ sun.position.set(-2.5, 10, 6); // lights the top and the left face, leaves the r
 scene.add(sun);
 
 const slab = slabGeometry();
-const tower = createTower(scene, slab);
+const slabFront = slabFrontGeometry();
+const tower = createTower(scene, slabFront);
 const debris = createDebris(scene, slab);
-const stack = createStack(scene, slab, tower, debris);
+const stack = createStack(scene, slabFront, tower, debris);
 const fx = createFx(scene);
 const sky = createSky(camera, SHOWN_W, SHOWN_H, scene.fog);
 const clouds = createClouds(scene, COS_E, SIN_E, SHOWN_W, SHOWN_H);
 const hud = createHud(hh.hud);
+const sound = createSound(hh, {
+  // Loaded in this order: the sounds of every drop first.
+  sfx: ['drop', 'cut', 'perfect', 'move', 'select', 'back', 'start', 'pause', 'grow', 'streak', 'miss', 'gameover', 'record', 'best', 'milestone', 'wind'],
+  music: 'theme',
+});
+const wind = sound.loop('wind'); // louder and higher the taller the tower
+
+// The best run's height while climbing: a thin gold line across the screen
+// behind the tower, facing the camera so it shows as a flat line (the HUD
+// puts a tag on it at the right edge).
+const marker = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0xffe066, fog: false }));
+marker.quaternion.copy(camera.quaternion);
+marker.scale.set(SHOWN_W * 1.4, 0.07, 1);
+scene.add(marker);
 
 let state = 'title'; // title | play | paused | falling | over
 let stateT = 0;
@@ -82,6 +110,8 @@ let record = false;
 let best = hh.load(SAVE_KEY, null)?.best || 0;
 let shake = 0;
 let punch = 0; // a short zoom-in on perfect drops
+let menu = 'main'; // the title's menu: main | options
+let sel = 0; // the highlighted entry of the menu on screen
 
 // Camera, eased towards the goals below.
 let camX = 0;
@@ -94,6 +124,7 @@ let goalY = 0;
 let goalZ = 0;
 let goalZoom = TITLE_ZOOM;
 let goalShift = 0;
+let camU = 0; // how far right of the tower's axis the view is centred
 let skyLevel = DEMO_SKIES[0];
 let skyOffset = 0;
 
@@ -115,7 +146,12 @@ const TITLE = [...'TOWER STACK']
   .join('');
 
 function speedFor(n) {
-  return Math.min(MAX_SPEED, BASE_SPEED + n * SPEED_RAMP);
+  return TOP_SPEED - (TOP_SPEED - BASE_SPEED) * Math.exp(-n / SPEED_LAYERS);
+}
+
+// A little random spread for repeated sounds, so they do not machine-gun.
+function vary(k) {
+  return 1 + (Math.random() * 2 - 1) * k;
 }
 
 // Floating text above a point of the tower.
@@ -148,9 +184,15 @@ function landFx(kind, loud) {
     if (combo >= 6) fx.ring(r.x, base, r.z, r.w, r.d, hex, 0.24);
     fx.sparkle(r.x, base, r.z, r.w, r.d, hex, 10 + Math.min(combo, 8) * 3, 2 + Math.min(combo, 8) * 0.2);
     punch = Math.max(punch, 0.02 + Math.min(combo, 8) * 0.005);
+    const streak = combo % STREAK === 0;
+    if (streak) {
+      // Every fifth in a row: a gold burst and a harder punch.
+      fx.sparkle(r.x, base, r.z, r.w, r.d, 0xffe066, 26, 3.6);
+      punch = Math.max(punch, 0.08);
+    }
     if (loud) {
       const text = combo >= 2 ? `PERFECT ×${combo}` : 'PERFECT';
-      popupAt(text, r.x, r.y + LH * 2, r.z, r.grew);
+      popupAt(text, r.x, r.y + LH * 2, r.z, r.grew || streak);
     }
   } else if (kind === CUT) {
     tower.colorOf(tower.n, tmpColor);
@@ -159,18 +201,81 @@ function landFx(kind, loud) {
   }
 }
 
+// The sounds of a drop that landed: a thud that rises slowly with the tower,
+// then the slice, or the perfect chime climbing F major with the streak.
+function landSound(kind) {
+  const r = stack.last;
+  const lift = 1 + Math.min(0.3, tower.n * 0.0025);
+  if (kind === PERFECT) {
+    const combo = stack.combo;
+    sound.play('drop', { volume: 0.7, rate: lift * vary(0.03) });
+    sound.play('perfect', { rate: 2 ** (CHIME[Math.min(combo, CHIME.length) - 1] / 12) });
+    if (r.grew) sound.play('grow', { delay: 0.08, rate: vary(0.03) });
+    if (combo % STREAK === 0) sound.play('streak', { delay: 0.12 });
+  } else {
+    sound.play('drop', { rate: lift * vary(0.04) });
+    sound.play('cut', { volume: 0.55 + Math.min(0.45, r.cut * 0.35), rate: vary(0.04), pan: r.side * 0.35 });
+  }
+}
+
+// Menus. Entries are picked with A; the D-pad moves up and down, and LEFT /
+// RIGHT also flip an On / Off entry.
+function onOff(on) {
+  return on ? 'On' : 'Off';
+}
+
+function optionItems() {
+  return [`Sound: ${onOff(sound.sfxOn)}`, `Music: ${onOff(sound.musicOn)}`];
+}
+
+// Moves the highlight through n entries; true if it moved.
+function menuMove(n) {
+  const d = input.pressed('DOWN') - input.pressed('UP');
+  if (!d) return false;
+  sel = (sel + d + n) % n;
+  sound.play('move');
+  return true;
+}
+
+function flipPressed() {
+  return input.pressed('A') || input.pressed('LEFT') || input.pressed('RIGHT');
+}
+
+// Sound effects (0) or music (1) on or off.
+function toggle(which) {
+  if (which === 0) sound.setSfx(!sound.sfxOn);
+  else sound.setMusic(!sound.musicOn);
+  sound.play('select');
+}
+
+function bestLine() {
+  if (best <= 0) return '';
+  const sky = phaseName(best);
+  return `<div class="small">Best ${best}${sky ? ` · ${sky}` : ''}</div>`;
+}
+
+function showTitle() {
+  const head = `<div class="title">${TITLE}</div>`;
+  if (menu === 'main') {
+    hud.menu(head, ['Play', 'Options'], sel, `<div class="small">${HINT}</div>${bestLine()}`, 'top');
+  } else {
+    hud.menu(head, [...optionItems(), 'Back'], sel, '<div class="small">A change · B back</div>', 'top');
+  }
+}
+
+function showPause() {
+  hud.menu('<div class="title">PAUSED</div>', ['Resume', ...optionItems(), 'Quit to title'], sel, '<div class="small">B or START resume</div>');
+}
+
 function toTitle() {
   state = 'title';
   stateT = 0;
+  menu = 'main';
+  sel = 0;
   hud.showStats(false);
   hud.callout('');
-  hud.message(
-    `<div class="title">${TITLE}</div>` +
-      `<div>Press A to start</div>` +
-      `<div class="small">${HINT}</div>` +
-      (best > 0 ? `<div class="small">Best ${best}</div>` : ''),
-    'top',
-  );
+  showTitle();
+  sound.duck(false);
   demoReset();
 }
 
@@ -186,14 +291,28 @@ function start() {
   hud.showStats(true);
   hud.score(0);
   hud.best(best > 0 ? `BEST ${best}` : '', false);
+  hud.markerText(`BEST ${best}`);
   hud.callout('');
   hud.message('');
+  sound.duck(false);
+  sound.play('start');
 }
 
 function pause() {
   state = 'paused';
+  sel = 0;
   hud.pause(true);
-  hud.message(`<div class="title">PAUSED</div><div>Press START to resume</div><div class="small">B quit to title</div>`);
+  sound.duck(true);
+  sound.play('pause');
+  showPause();
+}
+
+function resume() {
+  state = 'play';
+  hud.pause(false);
+  hud.message('');
+  sound.duck(false);
+  sound.play('select');
 }
 
 function drop() {
@@ -208,10 +327,17 @@ function drop() {
     topCombo = Math.max(topCombo, stack.combo);
   }
   landFx(kind, true);
+  landSound(kind);
   hud.score(score);
   if (best > 0 && score > best) hud.best('NEW BEST', true);
-  if (score % MILESTONE === 0 || (best > 0 && score === best + 1)) {
-    hud.callout(score % MILESTONE === 0 ? `${score} LAYERS!` : 'NEW BEST!');
+  if (score % PHASE_LAYERS === 0) {
+    // The sky moves on: golden hour, sunset, starry night, midnight...
+    hud.callout(phaseName(score).toUpperCase(), `${score} layers`);
+    sound.play('milestone', { delay: 0.1 });
+    fx.sparkle(tower.topX, tower.height, tower.topZ, tower.topW, tower.topD, 0xffe066, 30, 3.2);
+  } else if (best > 0 && score === best + 1) {
+    hud.callout('NEW BEST!');
+    sound.play('best', { delay: 0.08 });
     fx.sparkle(tower.topX, tower.height, tower.topZ, tower.topW, tower.topD, 0xffe066, 30, 3.2);
   }
   if (tower.full) lose();
@@ -225,6 +351,7 @@ function lose() {
   hud.flash();
   hud.callout('');
   tower.showAll(true);
+  sound.play('miss', { pan: stack.last.side * 0.3 });
   record = score > best;
   if (record) {
     best = score;
@@ -236,15 +363,19 @@ function showOver() {
   state = 'over';
   stateT = 0;
   hud.showStats(false);
+  const sky = phaseName(score);
   hud.message(
     `<div class="title">${record ? 'NEW BEST!' : 'GAME OVER'}</div>` +
       `<div class="big">${score}</div>` +
       `<div class="small">${score === 1 ? 'layer' : 'layers'} · Best ${best}</div>` +
-      `<div class="small">Perfect ${perfects} · Top combo ${topCombo}</div>` +
-      `<div>Press A to play again</div>` +
+      (sky ? `<div class="small sky">Sky: ${sky}</div>` : '') +
+      `<div class="small">Perfect ${perfects} · Best streak ${topCombo}</div>` +
+      `<div>A play again</div>` +
       `<div class="small">B title</div>`,
     'side',
   );
+  sound.duck(true);
+  sound.play(record ? 'record' : 'gameover');
 }
 
 // The demo stacks a tower of 14 to 25 layers with mostly perfect drops, then
@@ -346,13 +477,50 @@ function updateCamera(dt) {
     target.addScaledVector(UPWARD, (Math.random() - 0.5) * shake * 0.8 / zoom);
   }
   camera.position.copy(target).add(OFFSET);
+  camU = target.dot(RIGHT);
+}
+
+// The best-height line and its tag, while climbing towards the best run.
+function updateMarker() {
+  const show = (state === 'play' || state === 'paused') && best > score;
+  marker.visible = show;
+  if (!show) {
+    hud.marker(-1);
+    return;
+  }
+  // Behind the tower and lowered by as much as that raises it on screen, so
+  // it lines up with the top of a tower `best` layers tall.
+  marker.position
+    .set(tower.topX, best * LH - (MARKER_BACK * SIN_E) / COS_E, tower.topZ)
+    .addScaledVector(BACK, MARKER_BACK);
+  screenPos.copy(marker.position).project(camera);
+  const y = (1 - screenPos.y) * 0.5 * hh.height;
+  hud.marker(y > 30 && y < hh.height - 10 ? y : -1);
+}
+
+function updateWind() {
+  let volume = 0;
+  let rate = 1;
+  if (state === 'play') {
+    const k = Math.min(1, tower.n / 120);
+    volume = 0.08 + 0.3 * k;
+    rate = 0.85 + 0.3 * k;
+  } else if (state === 'title') {
+    volume = 0.08;
+    rate = 0.9;
+  } else if (state === 'falling' || state === 'over') {
+    volume = 0.14;
+    rate = 0.8;
+  }
+  wind.set(volume, rate);
 }
 
 toTitle();
+sound.startMusic(); // plays from the title on, once loaded and allowed
 
-// Compile every material now, while loading: the offcuts, rings, sparkles
-// and stars are not drawn until later, and would stall the game the first
-// time they show up.
+// Compile every material now, while loading: the offcuts, rings, sparkles,
+// stars, the shooting star and the best-height line are not drawn until
+// later, and would stall the game the first time they show up.
 renderer.compile(scene, camera);
 
 hh.run((dt) => {
@@ -361,29 +529,54 @@ hh.run((dt) => {
 
   if (state === 'title') {
     updateDemo(dt);
-    if (input.pressed('A') || input.pressed('UP') || input.pressed('START')) start();
+    if (menu === 'main') {
+      if (input.pressed('START') || (sel === 0 && input.pressed('A'))) start();
+      else if (menuMove(2)) showTitle();
+      else if (input.pressed('A')) {
+        menu = 'options';
+        sel = 0;
+        sound.play('select');
+        showTitle();
+      }
+    } else if (input.pressed('B') || (sel === 2 && input.pressed('A'))) {
+      menu = 'main';
+      sel = 1;
+      sound.play('back');
+      showTitle();
+    } else if (menuMove(3)) showTitle();
+    else if (sel < 2 && flipPressed()) {
+      toggle(sel);
+      showTitle();
+    }
   } else if (state === 'play') {
     if (input.pressed('START')) pause();
-    // A new slab starts clear of the tower, so a press in its first moment
-    // (a double tap, a bouncy button) would always miss: ignore it.
-    else if ((input.pressed('A') || input.pressed('UP')) && stack.age > DROP_GUARD) drop();
+    // The drop happens where the slab was last drawn, on the frame the press
+    // arrives. Only a press in a new slab's first moment, while it could
+    // only miss, is ignored (see DROP_GUARD).
+    else if ((input.pressed('A') || input.pressed('UP')) && !(stack.age < DROP_GUARD && stack.wouldMiss)) drop();
     else stack.update(dt);
   } else if (state === 'paused') {
-    if (input.pressed('START')) {
-      state = 'play';
-      hud.pause(false);
-      hud.message('');
-    } else if (input.pressed('B')) {
+    if (input.pressed('START') || input.pressed('B') || (sel === 0 && input.pressed('A'))) resume();
+    else if (menuMove(4)) showPause();
+    else if ((sel === 1 || sel === 2) && flipPressed()) {
+      toggle(sel - 1);
+      showPause();
+    } else if (sel === 3 && input.pressed('A')) {
+      sound.play('back');
       hud.pause(false);
       toTitle();
     }
   } else if (state === 'falling') {
-    if (stateT > OVER_DELAY) showOver();
+    if (stateT > OVER_DELAY || (stateT > SKIP_AFTER && (input.pressed('A') || input.pressed('UP')))) showOver();
   } else if (state === 'over') {
     // A short beat so a button mashed while losing does not restart at once.
     if (stateT > 0.4 && (input.pressed('A') || input.pressed('UP'))) start();
-    else if (stateT > 0.4 && input.pressed('B')) toTitle();
+    else if (stateT > 0.4 && input.pressed('B')) {
+      sound.play('back');
+      toTitle();
+    }
   }
+  updateWind();
 
   // Everything below animates; while paused it all stays frozen.
   if (!paused) {
@@ -395,8 +588,9 @@ hh.run((dt) => {
     }
     updateCamera(dt);
     sky.update(dt, skyLevel, camY, zoom);
-    clouds.update(dt, camY, zoom, sky.cloudTint);
+    clouds.update(dt, camY, camU, zoom, sky.cloudTint);
   }
+  updateMarker();
 
   renderer.render(scene, camera);
 });

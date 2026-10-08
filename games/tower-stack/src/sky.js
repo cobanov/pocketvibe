@@ -2,12 +2,24 @@
 // all hangs from the camera, so it stays put on screen while the tower rises;
 // only the stars drift a little for depth. The colours follow the height of
 // the tower: day, afternoon, dusk, night, deep night, dawn, and round again.
+// Under a starry sky a shooting star crosses now and then.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { smooth } from './shared.js';
 
-const PHASE_LAYERS = 28; // layers from one sky to the next
+export const PHASE_LAYERS = 25; // layers from one sky to the next
+
+// The sky each PHASE_LAYERS reaches, for the milestones: KEYS[1] is golden
+// hour, KEYS[2] sunset and so on; after dawn comes a new day.
+const PHASE_NAMES = ['A new day', 'Golden hour', 'Sunset', 'Starry night', 'Midnight', 'Dawn'];
+
+// The name of the last sky a tower of this many layers reached ('' below the
+// first milestone).
+export function phaseName(layers) {
+  const k = Math.floor(layers / PHASE_LAYERS);
+  return k > 0 ? PHASE_NAMES[k % PHASE_NAMES.length] : '';
+}
 
 // Sky top, middle and bottom, cloud tint, star brightness, sun and moon height
 // (-1 bottom of the screen, 1 top) and sun colour.
@@ -22,6 +34,8 @@ const KEYS = [
 const STARS_SMALL = 90;
 const STARS_BIG = 34;
 const STAR_PARALLAX = 0.12;
+const METEOR_TIME = 0.7; // a shooting star crosses in this long
+const METEOR_SPEED = 0.75; // view widths per second
 
 // Turns KEYS into THREE.Color objects once.
 const keyColors = KEYS.map((k) => ({
@@ -156,6 +170,26 @@ export function createSky(camera, viewW, viewH, fog) {
   sun.renderOrder = moon.renderOrder = -1;
   group.add(sun, moon);
 
+  // A shooting star: a thin streak whose tail fades out (vertex alpha), the
+  // head at its +x end. Same kind of material as the sun and the moon.
+  const streak = new THREE.PlaneGeometry(1, 1);
+  const streakColors = new Float32Array(4 * 4);
+  for (let i = 0; i < 4; i++) {
+    const head = streak.attributes.position.getX(i) > 0;
+    streakColors.set([1, 0.97, 0.88, head ? 1 : 0], i * 4);
+  }
+  streak.setAttribute('color', new THREE.BufferAttribute(streakColors, 4));
+  const meteor = new THREE.Mesh(streak, discMaterial());
+  meteor.scale.set(viewW * 0.16, 0.05, 1);
+  meteor.position.z = 0.8;
+  meteor.renderOrder = -2;
+  meteor.frustumCulled = false;
+  group.add(meteor);
+  let meteorT = METEOR_TIME; // time since the last one started
+  let meteorWait = 2; // until the next one
+  let meteorVX = 0;
+  let meteorVY = 0;
+
   const top = new THREE.Color();
   const mid = new THREE.Color();
   const bot = new THREE.Color();
@@ -209,6 +243,31 @@ export function createSky(camera, viewW, viewH, fog) {
         sun.visible = sunY > -1.5;
         moon.visible = moonY > -1.5;
         sun.material.color.copy(tmp.copy(a.sun).lerp(b.sun, f));
+      }
+
+      // Shooting stars only under a properly starry sky.
+      if (meteorT < METEOR_TIME) {
+        meteorT += dt;
+        meteor.position.x += meteorVX * dt;
+        meteor.position.y += meteorVY * dt;
+        const k = meteorT / METEOR_TIME;
+        meteor.material.opacity = starLevel * Math.min(1, k * 6) * (1 - k * k);
+        meteor.visible = meteorT < METEOR_TIME;
+      } else {
+        meteor.visible = false;
+        meteorWait -= dt;
+        if (meteorWait <= 0 && starLevel > 0.6) {
+          // From the upper part of the sky, slanting down to one side.
+          const side = Math.random() < 0.5 ? -1 : 1;
+          const a = 0.35 + Math.random() * 0.3;
+          meteorVX = side * Math.cos(a) * viewW * METEOR_SPEED;
+          meteorVY = -Math.sin(a) * viewW * METEOR_SPEED;
+          meteor.position.x = -side * viewW * (0.05 + Math.random() * 0.3);
+          meteor.position.y = viewH * (0.2 + Math.random() * 0.22);
+          meteor.rotation.z = Math.atan2(meteorVY, meteorVX);
+          meteorT = 0;
+          meteorWait = 3 + Math.random() * 6;
+        }
       }
 
       starsS.visible = starsB.visible = starLevel > 0.01;

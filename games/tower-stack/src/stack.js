@@ -10,11 +10,16 @@ export const CUT = 1;
 export const MISS = 2;
 
 const RANGE = 3.7; // the slab slides this far either side of the tower's top
-const PERFECT_TOL = 0.13; // a drop this close snaps exactly into place
+// A drop this close snaps exactly into place: PERFECT_TOL, or at speed
+// whatever the slab covers in PERFECT_TIME either side of the centre. A fixed
+// distance alone shrank to a 35 ms window (two frames) at full speed.
+const PERFECT_TOL = 0.13;
+const PERFECT_TIME = 0.04;
 const MIN_OVERLAP = 0.03; // anything thinner counts as a miss
 const GROW_FROM = 3; // from this many perfect drops in a row the slab grows
 const GROW = 0.18; // per perfect drop, up to the starting size
 const ENTER_TIME = 0.18; // the slab drops in from a little above
+const GLOW = new THREE.Color(0xffc23a); // the slab glows when a perfect drop will grow it
 
 export function createStack(scene, geometry, tower, debris) {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, fog: false });
@@ -32,9 +37,11 @@ export function createStack(scene, geometry, tower, debris) {
   let age = 0;
   let active = false;
   let combo = 0;
+  let glow = false;
 
-  // Result of the last drop, read by the game for effects.
-  const last = { kind: CUT, x: 0, y: 0, z: 0, w: 0, d: 0, grew: false, cut: 0, cutX: 0, cutZ: 0 };
+  // Result of the last drop, read by the game for effects. side is the side
+  // of the screen the slab was off to (-1 left, 1 right), for panning sounds.
+  const last = { kind: CUT, x: 0, y: 0, z: 0, w: 0, d: 0, grew: false, cut: 0, cutX: 0, cutZ: 0, side: 0 };
 
   function place() {
     const k = Math.min(1, age / ENTER_TIME);
@@ -59,11 +66,16 @@ export function createStack(scene, geometry, tower, debris) {
     get size() {
       return axis === AX_X ? w : d;
     },
+    // Dropped right now, the slab would miss the tower.
+    get wouldMiss() {
+      return (axis === AX_X ? w : d) - Math.abs(offset) < MIN_OVERLAP;
+    },
 
     reset() {
       combo = 0;
       active = false;
       slab.visible = false;
+      material.emissive.setRGB(0, 0, 0);
     },
 
     // A new slab above the top layer with the top's footprint. It slides on
@@ -79,6 +91,9 @@ export function createStack(scene, geometry, tower, debris) {
       active = true;
       slab.visible = true;
       material.color.copy(tower.colorOf(tower.n + 1, color));
+      // A soft glow says the next perfect drop grows the slab back.
+      glow = combo + 1 >= GROW_FROM && (w < SIZE || d < SIZE);
+      if (!glow) material.emissive.setRGB(0, 0, 0);
       place();
     },
 
@@ -94,6 +109,7 @@ export function createStack(scene, geometry, tower, debris) {
         offset = -2 * RANGE - offset;
         dir = 1;
       }
+      if (glow) material.emissive.copy(GLOW).multiplyScalar(0.2 + 0.12 * Math.sin(age * 7));
       place();
     },
 
@@ -113,8 +129,11 @@ export function createStack(scene, geometry, tower, debris) {
       last.y = y;
       last.grew = false;
       last.cut = 0;
+      // On screen, +x runs to the right and +z to the left.
+      last.side = axis === AX_X ? sign : -sign;
+      material.emissive.setRGB(0, 0, 0);
 
-      if (abs <= PERFECT_TOL) {
+      if (abs <= Math.max(PERFECT_TOL, speed * PERFECT_TIME)) {
         combo++;
         const gw = w;
         const gd = d;

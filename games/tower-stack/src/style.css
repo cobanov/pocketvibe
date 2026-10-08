@@ -203,6 +203,13 @@ body.handheld #legend {
   animation: callout 1.6s ease-out forwards;
 }
 
+#callout .sub {
+  margin-top: 2px;
+  font-size: 20px;
+  letter-spacing: 1px;
+  color: #fff;
+}
+
 @keyframes callout {
   0% {
     opacity: 0;
@@ -222,6 +229,23 @@ body.handheld #legend {
     opacity: 0;
     transform: translateY(-18px);
   }
+}
+
+/* The tag on the best-height line, at the right edge. main.js moves it
+   down to the line's height with a transform; it sits just above the line. */
+#marker {
+  position: absolute;
+  top: -27px;
+  right: 10px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffe066;
+  text-shadow: 0 2px 0 rgba(10, 14, 40, 0.7), 0 0 6px rgba(0, 0, 0, 0.45);
+}
+
+#marker[hidden] {
+  display: none;
 }
 
 #flash {
@@ -312,6 +336,32 @@ body.handheld #legend {
 .panel .small {
   font-size: 18px;
   color: #dfe6ff;
+}
+
+.panel .sky {
+  color: #ffe066;
+}
+
+/* Menus: the highlighted entry on a soft gold pill. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 2px 0 4px;
+}
+
+.menu .item {
+  min-width: 190px;
+  padding: 2px 18px;
+  border-radius: 12px;
+  color: #c9d2f2;
+}
+
+.menu .item.sel {
+  background: rgba(255, 224, 102, 0.2);
+  box-shadow: inset 0 0 0 2px rgba(255, 224, 102, 0.75);
+  color: #ffe066;
 }
 
 /* The perf overlay goes bottom right, out of the way of the score. */

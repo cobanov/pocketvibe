@@ -46,15 +46,36 @@ export function slabGeometry() {
   return g;
 }
 
+// The same slab with only the three faces the camera can ever see: the top
+// and the +x and +z sides (it looks down from the +x +z side at a fixed angle
+// and only moves). For the layers and the sliding slab, which never turn;
+// half the triangles of a tall tower. The tumbling offcuts keep all six.
+export function slabFrontGeometry() {
+  const g = slabGeometry();
+  const index = g.index.array;
+  const keep = [];
+  // BoxGeometry's faces come in the order +x, -x, +y, -y, +z, -z.
+  for (const group of g.groups) {
+    if (group.materialIndex % 2 === 0) for (let i = group.start; i < group.start + group.count; i++) keep.push(index[i]);
+  }
+  g.setIndex(keep);
+  g.clearGroups();
+  return g;
+}
+
 const tmpColor = new THREE.Color();
 
 // Gives a geometry one flat vertex colour (with an optional darker bottom), so
-// parts can be merged into a single mesh with one material.
-export function paint(geometry, hex, bottomHex = hex) {
+// parts can be merged into a single mesh with one material. The shade runs
+// over the geometry's height, or over box's if given.
+export function paint(geometry, hex, bottomHex = hex, box = null) {
   const pos = geometry.attributes.position;
   const colors = new Float32Array(pos.count * 3);
-  geometry.computeBoundingBox();
-  const { min, max } = geometry.boundingBox;
+  if (!box) {
+    geometry.computeBoundingBox();
+    box = geometry.boundingBox;
+  }
+  const { min, max } = box;
   const bottom = new THREE.Color(bottomHex);
   for (let i = 0; i < pos.count; i++) {
     const k = (pos.getY(i) - min.y) / Math.max(1e-6, max.y - min.y);
