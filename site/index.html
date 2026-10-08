@@ -7,7 +7,8 @@
     <meta name="description" content="A launcher and game store for ROCKNIX and Android handhelds, full of three.js games made with AI coding tools. Free and open source." />
     <meta property="og:title" content="PocketVibe" />
     <meta property="og:description" content="Vibe-coded games, in your pocket." />
-    <meta property="og:image" content="https://pocketvibe.cobanov.dev/img/og.png" />
+    <meta property="og:image" content="https://pocketvibe.cobanov.dev/img/og.png?v=2" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#0f1016" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/DejaVuSans-Bold.woff2" as="font" type="font/woff2" crossorigin />
@@ -19,7 +20,6 @@
       <a class="brand" href="/">PocketVibe</a>
       <nav>
         <a href="#games">Games</a>
-        <a href="#requirements">Requirements</a>
         <a href="#install">Install</a>
         <a href="/make/">Make a game</a>
         <a href="https://github.com/cobanov/pocketvibe">GitHub</a>
@@ -53,11 +53,10 @@
               </span>
             </a>
           </div>
-          <div class="actions">
-            <a class="button primary" href="/make/"><kbd>A</kbd>Make your own game</a>
-            <a class="button" href="#install"><kbd>B</kbd>How to install</a>
-          </div>
-          <p class="small">Free and open source.</p>
+          <p class="also">
+            <a class="button" href="/make/"><kbd>A</kbd>Make your own game</a>
+            <span>Free and open source.</span>
+          </p>
         </div>
 
         <figure class="stage" id="play">
@@ -115,123 +114,105 @@
         </figure>
       </section>
 
-      <section class="shelf" id="games">
-        <h2>Play the store's games here</h2>
-        <p>Every game in the store runs on this page. Pick one and it starts on the handheld.</p>
+      <section class="band" id="games">
+        <div class="band-head">
+          <h2>Play the store's games here</h2>
+          <p>Every game in the store runs on this page. Pick one and it starts on the handheld above.</p>
+        </div>
         <ul class="covers"></ul>
       </section>
 
-      <section class="column" id="requirements">
-        <h2>What you need</h2>
-        <div class="table needs">
-          <table>
-            <thead>
-              <tr>
-                <td></td>
-                <th scope="col" class="linux"><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#linux" /></svg>Linux</th>
-                <th scope="col" class="android"><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#android" /></svg>Android</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">System</th>
-                <td>ROCKNIX. Not muOS or other firmware</td>
-                <td>Android 10 or newer, with Android System WebView 94 or newer</td>
-              </tr>
-              <tr>
-                <th scope="row">Hardware</th>
-                <td>A 64-bit Arm chip such as the H700 or RK3566, 1 GB of RAM or more, and the Panfrost graphics driver (PocketVibe offers to switch from libmali)</td>
-                <td>A handheld with built-in buttons</td>
-              </tr>
-              <tr>
-                <th scope="row">Free space</th>
-                <td>About 1 GB on the SD card</td>
-                <td>About 50 MB</td>
-              </tr>
-              <tr>
-                <th scope="row">Internet</th>
-                <td>Wi-Fi, for the first start (150 MB, once) and the store</td>
-                <td>Wi-Fi, for the store</td>
-              </tr>
-              <tr>
-                <th scope="row">Tested on</th>
-                <td>Anbernic RG34XX SP, RG34XX and the two-screen RG DS</td>
-                <td>Anbernic RG Rotate</td>
-              </tr>
-            </tbody>
-          </table>
+      <section class="band" id="install">
+        <div class="band-head">
+          <h2>Put it on your handheld</h2>
+          <p>Free, with no account. On ROCKNIX it takes a couple of minutes, on Android one.</p>
         </div>
-        <p class="note">
-          Other ROCKNIX handhelds with the same chips, such as the RG35XX and RG40XX families, should
-          work too, but are not tested yet.
-        </p>
-      </section>
-
-      <section class="column" id="install">
-        <h2>Put it on your handheld</h2>
-        <div class="platforms">
-          <div class="platform-card linux">
-            <h3><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#linux" /></svg>On Linux (ROCKNIX)</h3>
+        <div class="platforms" id="requirements">
+          <article class="platform linux">
+            <header>
+              <svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#linux" /></svg>
+              <div>
+                <h3>Linux handhelds</h3>
+                <p>with ROCKNIX</p>
+              </div>
+            </header>
             <a class="get-button" href="/download/rocknix">
               <span>
-                <strong>PocketVibe.zip</strong>
+                <strong>Download PocketVibe.zip</strong>
                 <small data-release="rocknix">newest version</small>
               </span>
             </a>
             <ol>
               <li>Turn on Samba in ROCKNIX's network settings, open the handheld's <code>games-roms</code> share from your computer and unzip PocketVibe.zip into <code>ports</code>.</li>
-              <li>Restart the handheld, or update its game lists, then open Ports and PocketVibe.</li>
-              <li>The first start downloads the game engine, about 150 MB, in a minute and a half. Then PocketVibe opens with five games.</li>
+              <li>Restart the handheld, or update its game lists, and open Ports, then PocketVibe.</li>
+              <li>The first start sets up the game engine (150 MB, about a minute and a half), then opens with five games.</li>
             </ol>
-            <p>Leave a game: hold <kbd>Start</kbd> + <kbd>Select</kbd>.</p>
-          </div>
-          <div class="platform-card android">
-            <h3><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#android" /></svg>On Android</h3>
+            <dl>
+              <div><dt>Needs</dt><dd>ROCKNIX (not muOS or other firmware), a 64-bit Arm chip such as the H700 or RK3566, 1 GB of RAM, the Panfrost graphics driver, 1 GB free and Wi-Fi</dd></div>
+              <div><dt>Tested on</dt><dd>Anbernic RG34XX SP, RG34XX and RG DS. Other ROCKNIX handhelds with these chips should work too.</dd></div>
+            </dl>
+          </article>
+          <article class="platform android">
+            <header>
+              <svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#android" /></svg>
+              <div>
+                <h3>Android handhelds</h3>
+                <p>Android 10 or newer</p>
+              </div>
+            </header>
             <a class="get-button" href="/download/android">
               <span>
-                <strong>PocketVibe.apk</strong>
+                <strong>Download PocketVibe.apk</strong>
                 <small data-release="android">newest version</small>
               </span>
             </a>
             <ol>
-              <li>Open the download on the handheld. When Android asks, allow your browser or file manager to install apps.</li>
+              <li>Open the download on the handheld. When Android asks, let your browser or file manager install apps.</li>
               <li>Tap Install, then start PocketVibe from the app list.</li>
-              <li>It opens with five games, and installs new versions over itself from Settings.</li>
+              <li>It opens with five games, and updates itself from Settings.</li>
             </ol>
-            <p>Leave a game: hold <kbd>Start</kbd> + <kbd>Select</kbd>, or press Back.</p>
-          </div>
+            <dl>
+              <div><dt>Needs</dt><dd>Built-in buttons, Android System WebView 94 or newer, about 50 MB free and Wi-Fi</dd></div>
+              <div><dt>Tested on</dt><dd>Anbernic RG Rotate</dd></div>
+            </dl>
+          </article>
         </div>
-
-        <h3 class="section">Using it</h3>
-        <dl class="buttons">
-          <div><dt><kbd>L</kbd> <kbd>R</kbd></dt><dd>Library, Store and Settings</dd></div>
-          <div><dt><kbd>A</kbd></dt><dd>Play, or download in the Store</dd></div>
-          <div><dt><kbd>B</kbd></dt><dd>Back; on the tabs, quit</dd></div>
-          <div><dt><kbd>Y</kbd></dt><dd>Sort the games</dd></div>
-          <div><dt><kbd>X</kbd></dt><dd>Store: hide the games you have</dd></div>
-          <div><dt><kbd>Select</kbd></dt><dd>Cards or a list</dd></div>
-        </dl>
-        <p class="note">
-          The bar along the bottom of the launcher always shows what each button does. PocketVibe
-          checks for new versions of itself and offers them in Settings &gt; App update.
+        <p class="hintbar" aria-label="The buttons in PocketVibe">
+          <span><kbd>L</kbd><kbd>R</kbd>Tabs</span>
+          <span><kbd>A</kbd>Play</span>
+          <span><kbd>B</kbd>Back</span>
+          <span><kbd>Y</kbd>Sort</span>
+          <span><kbd>X</kbd>Hide owned</span>
+          <span><kbd>Select</kbd>Cards or list</span>
+          <span><kbd>Start</kbd>+<kbd>Select</kbd>Leave a game</span>
         </p>
       </section>
 
-      <section class="column" id="make">
-        <h2>Make your own game</h2>
-        <p>
-          Describe a game to your AI coding tool and play it on your handheld the same day. Give it
-          our brief first: the handheld's measured limits, the rules that keep a game at 60 fps,
-          and how to try it on a handheld and send it to the store.
-        </p>
-        <div class="code prompt">
-          <pre><code>Read https://pocketvibe.cobanov.dev/agents.md and follow it. Then make me a PocketVibe game: a snowboard race down a mountain, dodging trees.</code></pre>
-          <button class="copy" type="button">Copy</button>
+      <section class="band split" id="make">
+        <div class="band-head">
+          <h2>Make your own game</h2>
+          <p>
+            Describe a game to your AI coding tool and play it on your handheld the same day. Our
+            brief teaches it the handheld: the limits we measured, the rules that keep a game at
+            60 fps, and how to try it and publish it.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="/make/"><kbd>A</kbd>How to make a game</a>
+            <a class="button" href="/agents.md"><kbd>B</kbd>The brief for your AI</a>
+          </div>
         </div>
-        <div class="actions">
-          <a class="button primary" href="/make/"><kbd>A</kbd>How to make a game</a>
-          <a class="button" href="/agents.md"><kbd>B</kbd>The brief for your AI</a>
-        </div>
+        <pre class="terminal"><code><i># Start a game</i>
+npm create pocketvibe@latest my-game
+
+<i># Tell your AI tool</i>
+<b>Read https://pocketvibe.cobanov.dev/agents.md
+and follow it. Then make me a snowboard race.</b>
+
+<i># Play it on your handheld</i>
+npx pocketvibe serve
+
+<i># Send it to the store</i>
+npx pocketvibe publish</code></pre>
       </section>
     </main>
 
