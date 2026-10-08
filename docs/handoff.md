@@ -18,6 +18,25 @@ Bu dosyayı baştan sona oku, sonra "Kalan işler"den devam et. Önce `docs/plan
 - Denetim (iki alt ajan) ve düzeltmeler: yerel API artık `X-PocketVibe` başlığı, Origin ve Host denetimi istiyor; güncelleme açılmazsa `app.old`'a dönüş; daemon ölürse tarayıcıyı kapatan gözcü; kalıcı port kaydı (`ports.json`); dosyaların atomik yazılması; mağazada kimlik sahipliği, zip bombası, sürüm geri alma ve manifest doğrulaması; CLI'ın Windows'ta çalışması.
 - Cihazda tam test: her ekran, 11 oyunun hepsi, güncelleme, yedekleme ve geri yükleme, gözcü, geri dönüş, sıfırdan kurulum.
 
+## Güncel iş listesi (2026-10-08 öğleden sonra, en günceli bu)
+
+Bitenler: npm paketleri; dokuz yeni oyun mağazada; cihaz sınırları raporu, `docs/performance.md`, yeni bütçe; cihaz Tailscale'de; site işi commit'lendi, Android kurulum adımları ve `/download/android`; pil göstergesi; `screens` ve `android` dalları main'de; 0.6.0 ve 0.6.1 (yeni kurulum 5 oyunla gelir) yayında ve SP'de güncellemeyle test edildi; responsive altyapısı (template `handheld.js`, kabuk `"responsive": true` oyunlara ekran oranında çerçeve verir, `AGENTS.md` "Screen shapes").
+
+Sürenler:
+1. Oyun geçişi (responsive + performans): 20 oyun beş alt ajanda (`/private/tmp/.../scratchpad/game-pass-brief.md`). Dördü bitti (star-defender, rock-blaster, tank-brigade, maze-chase; 1.1.0, `"responsive": true`). Bitince: kontrol, commit, SP'de `?perflog` ile ölçüm, mağazaya yükleme, site.
+2. Runtime-v2: Debian forky, WPE 2.54 MiniBrowser, Mesa 26. SP'de ekranda 50 bin üçgen 60 fps (eski: 15). Yapım betiği `device/build-runtime.sh` (cihazda `/storage/pocketvibe/runtime-2` kuruluyor). Yazıldı: `app/pocketvibe/padkeys.py` (Debian'ın WPE 2.54'ünde gamepad yok; tuşları sanal klavyeye çevirir). Kalan: `runtime.py --bind`, `PocketVibe.sh`/`setup.sh`/`pocketvibed.py` (MiniBrowser, kayıtlar `/storage/pocketvibe/profile`, v1'den kopyalama, launcher'a dönüş cogctl yerine kabuk üzerinden, olmazsa tarayıcıyı yeniden başlatma), `screens.py` MiniBrowser penceresi, runtime-2 release, uygulama 0.7.0, SP ve RG DS testi. Açık sorun: WebKit sandbox'ı açıkken MiniBrowser çöküyor (şimdilik `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`).
+3. Ses efektleri ve menü müziği: alt ajan ayrı worktree'de, `audio` dalı (`scratchpad/audio-brief.md`). Ölçüm: cihazda OGG çözmek dosya başına ~1,5 sn, WAV 60 ms; efektler WAV, müzik OGG (arka planda ~5 sn). Bitince cihazda dinleme testi (kullanıcıyla) ve birleştirme.
+
+Bekleyenler:
+4. Template düzeltmeleri (oyun ajanının raporu): `handheld.js` bir kareden kısa basışları kaçırıyor (düzelt, sonra 20 oyuna kopyala); `template/src/style.css` hâlâ sabit 720x480 diyor; `tools/game-shots.mjs` öldürülünce Chrome ve Vite açık kalıyor.
+5. `create-pocketvibe` 0.1.1 (template değişti; kullanıcı onayıyla).
+6. Android: uygulama içi güncelleme kontrolü, kayıt yedekleme, 5 hazır oyun, yeni APK; RP3+ testi.
+7. RG DS: A/B ters (cihaz açık olmalı; `padkeys.py`'da RG DS için takas hazır, gerçek tuşlarla doğrulanmalı).
+8. Site: iPhone Safari testi (kullanıcı).
+9. Küçükler: oyunlar arası bellek birikmesi (runtime-v2'de tekrar bak), limits ses testi, güncellemeden sonra "Restarting..." metni.
+10. Eski denetim maddeleri: yönetici için bekleyen yüklemeyi inceleme, yükleme kotası, sayısal GitHub kimliği, OAuth device flow, site demo oyunları ayrı origin.
+11. Cihaz temizliği: `/storage/pv-runtime-m25`, `/storage/pv-runtime-m26` (~1,5 GB), `/storage/pv-*.sh`, `/tmp/pvbench` http sunucusu (8811), collector (8799), sanal pad (`/tmp/handheld-pad.py`).
+
 ## Yarım kalan: cihazın sınırları (2026-10-08 öğlen)
 
 Kullanıcı oyun optimizasyonu için yeni bir ajan başlatmadan önce cihazın gerçek sınırlarını istedi. Yapılanlar:
