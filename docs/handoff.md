@@ -1,4 +1,4 @@
-# PocketVibe: devir notu (2026-10-08 gece; handheld 0.6.9, Android 0.6.7)
+# PocketVibe: devir notu (2026-10-09; handheld 0.7.0, Android 0.6.7)
 
 Önce bunu, sonra `docs/plan.md` ve `docs/development.md`'yi oku; memory'de `pocketvibe-project.md`,
 `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` var. Eski devir notları git
@@ -6,7 +6,18 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Durum
 
-- **Handheld 0.6.9** (GitHub `v0.6.9`, "Latest"): 0.6.9, iki ekran kullanan bir oyunda ana ekran alttaysa
+- **Handheld 0.7.0** (GitHub `v0.7.0`, "Latest", 2026-10-09): oyunlar ROCKNIX'te ses çalabiliyor.
+  WebKit sesi gerçek bir tuşa basılmadan başlatmıyor; oyun, oyunun kendi portunda
+  `POST /__pocketvibe__/unlock-audio` istiyor, pocketvibed launcher'ın sanal F13 tuşuna basıyor.
+  Varsayılan beş oyun yenilendi ve mağazada: Turbo Circuit 1.3.0 (dört pist), Brick Breaker 1.2.0
+  (14 bölüm), Jet Rush 1.2.0, Tower Stack 1.2.0, Road Hopper 1.2.0. Hepsinde efekt, müzik, Sound/Music
+  seçenekli menüler var. Ses modülü `tools/sfx/sound.js` (oyunlarda `src/sound.js` kopyası), efektler
+  `tools/sfx/games/<id>.py`, müzik ACE-Step (hope-wsl) + `make_music_loop.py`; ayrıntı
+  `tools/sfx/README.md`. **Cihazda hiç denenmedi** (fps, hoparlörde ses dengesi, kilit açma).
+  Mağaza dersi: PR'ları art arda birleştirince `publish.yml`'in bekleyen çalıştırmaları iptal oluyor,
+  o oyunlar yayınlanmıyor; birer birer birleştir ya da `gh run rerun`.
+  Headless Chrome'u her zaman `--mute-audio` ile aç (gece hoparlörden ses çaldı).
+- **Handheld 0.6.9** (GitHub `v0.6.9`): 0.6.9, iki ekran kullanan bir oyunda ana ekran alttaysa
   (EmulationStation RG DS'in alt ekranında) oyunun üst ekranı kendi ilk ekranı olarak almasını sağlıyor;
   bir oyuncu bildirdi. 0.6.8'den beri: her oyun her cihazda kabukta (`play.html`)
   açılıyor; kabuk oyun ilk karelerini çizene kadar kapak, ad ve yükleme çubuğu gösteriyor.
