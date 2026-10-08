@@ -2,19 +2,23 @@
 // The PocketVibe command line tool.
 //
 //   pocketvibe serve [dir] [--port N]   play the game in dir on your own handheld
-//   pocketvibe publish [dir]            build the game in dir and upload it to the store
-//   pocketvibe status                   your games and your uploads
-//   pocketvibe pending                  (store admin) uploads waiting for review
-//   pocketvibe review <id> <version>    (store admin) play an upload on a handheld
-//   pocketvibe approve <id> <version>   (store admin) publish an upload
-//   pocketvibe reject <id> <version> [reason]
+//   pocketvibe publish [dir]            send the game in dir to the store: a pull request
+//                                       to github.com/cobanov/pocketvibe-store
+//   pocketvibe status                   your games and your pull requests
+//   pocketvibe review <number>          play a store pull request's games on a handheld
 //
-// You sign in with GitHub: the token comes from $GITHUB_TOKEN, or from the
-// GitHub CLI (`gh auth token`). The store only asks GitHub who you are.
+// The store is a GitHub repository, like F-Droid: each game is a file there
+// that points at the game's own public repository and a commit. Publishing
+// opens a pull request; the store builds the game from source, and merging
+// publishes it. It all goes through the GitHub CLI (`gh`), signed in once
+// with `gh auth login`.
 //
 // serve and review run a small store on this computer: added in the
-// handheld's PocketVibe (Settings > Stores), it lists the one game, which
-// then installs like any other.
+// handheld's PocketVibe (Settings > Stores), it lists the games, which then
+// install like any other.
+//
+// Older commands for the store's direct uploads, for its admin: pending,
+// review <id> <version>, approve and reject <id> <version> [reason].
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -22,10 +26,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, w
 import { createServer } from 'node:http';
 import { hostname, networkInterfaces, tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
-import { zipSync } from 'fflate';
+import { unzipSync, zipSync } from 'fflate';
 
 const STORE = (process.env.POCKETVIBE_STORE ?? 'https://pocketvibe-store.mertcobanov.workers.dev').replace(/\/$/, '');
 const SERVE_PORT = 8740;
+const STORE_REPO = 'cobanov/pocketvibe-store';
+const MAINTAINERS = ['cobanov'];
 
 // Thrown for problems the user can fix; printed without a stack trace.
 class Failure extends Error {}
@@ -41,6 +47,21 @@ function githubToken() {
   } catch {
     fail('Sign in with GitHub first: install the GitHub CLI and run `gh auth login`, or set GITHUB_TOKEN.');
   }
+}
+
+// The GitHub CLI, for the store's repository.
+function gh(args, { input } = {}) {
+  try {
+    return execFileSync('gh', args, { encoding: 'utf8', input, stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'] }).trim();
+  } catch (e) {
+    if (e.code === 'ENOENT') fail('This needs the GitHub CLI: install it from https://cli.github.com and run `gh auth login`.');
+    const message = String(e.stderr || e.message).trim().split('\n')[0];
+    throw new Failure(`GitHub: ${message}`);
+  }
+}
+
+function git(project, args) {
+  return execFileSync('git', ['-C', project, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 }
 
 async function request(path, { method = 'GET', body, type } = {}) {
@@ -113,22 +134,118 @@ function build(project, { quiet = false } = {}) {
   }
 }
 
+// Sends the game to the store: checks that it builds and has a cover, that
+// it is committed and pushed to a public GitHub repository, then opens a pull
+// request to the store's repository with the game's file pointing at that
+// commit. The same command updates a game: it moves the file to the new commit.
 async function publish(dir = '.') {
   const project = resolve(dir);
-  console.log(`Building ${readManifest(project).title}...`);
-  const { manifest, zip } = build(project);
-  console.log(`Uploading ${(zip.length / 1e6).toFixed(2)} MB to ${STORE}...`);
-  const result = await call('/api/publish', { method: 'POST', body: zip, type: 'application/zip' });
-  console.log(`${manifest.title} ${result.version}: ${result.message}`);
-  if (result.status !== 'published') console.log('`npx pocketvibe status` shows where it is.');
+  const manifest = readManifest(project);
+  console.log(`Checking that ${manifest.title} ${manifest.version} builds...`);
+  const { cover } = build(project, { quiet: true });
+  if (!cover) fail('Add a cover.png (480x270) next to pocketvibe.json: the store shows it.');
+
+  // The game's public repository, and the commit to publish.
+  let top;
+  try {
+    top = git(project, ['rev-parse', '--show-toplevel']);
+  } catch {
+    fail('The game must be in a public GitHub repository. In its folder: git init, commit it, then `gh repo create <name> --public --source . --push`.');
+  }
+  let remote = '';
+  try {
+    remote = git(project, ['remote', 'get-url', 'origin']);
+  } catch {
+    // No remote yet.
+  }
+  const match = remote.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/);
+  if (!match) fail("The game's repository has no GitHub remote. Create one: `gh repo create <name> --public --source . --push`.");
+  const [, repoOwner, repoName] = match;
+  if (git(project, ['status', '--porcelain', '--', '.'])) fail('Commit your changes first: the store builds the game from a commit.');
+  // The last commit that changed the game's folder: in a repository with more
+  // than one game, commits to the others do not count as changes to this one.
+  const commit = git(project, ['log', '-1', '--format=%H', '--', '.']);
+  try {
+    git(project, ['fetch', '-q', 'origin']);
+  } catch {
+    // Offline; the check below says what is missing.
+  }
+  if (!git(project, ['branch', '-r', '--contains', commit])) fail('Push your commits first (git push): the store builds the game from GitHub.');
+  if (gh(['repo', 'view', `${repoOwner}/${repoName}`, '--json', 'visibility', '--jq', '.visibility']) !== 'PUBLIC') {
+    fail(`github.com/${repoOwner}/${repoName} is private. Store games are open source: make it public (gh repo edit --visibility public --accept-visibility-change-consequences).`);
+  }
+
+  const me = gh(['api', 'user', '--jq', '.login']);
+  const path = relative(top, project).split(sep).join('/') || '.';
+  const file = `games/${manifest.id}.json`;
+  let existing = null;
+  try {
+    existing = JSON.parse(Buffer.from(gh(['api', `repos/${STORE_REPO}/contents/${file}`, '--jq', '.content']), 'base64').toString());
+  } catch {
+    // A new game.
+  }
+  if (existing && existing.owner !== me && !MAINTAINERS.includes(me)) fail(`${manifest.id} belongs to ${existing.owner} in the store; choose another id in pocketvibe.json.`);
+  if (existing?.source?.commit === commit && existing.source.repo === `https://github.com/${repoOwner}/${repoName}`) {
+    fail(`${manifest.title} is already in the store at this commit. Change the game, raise "version" in pocketvibe.json, commit and push, then publish again.`);
+  }
+  const entry = { id: manifest.id, owner: existing?.owner ?? me, source: { repo: `https://github.com/${repoOwner}/${repoName}`, commit, path } };
+
+  // A branch with the file: in the store's repository for its maintainers,
+  // in a fork of it for everyone else.
+  const own = MAINTAINERS.includes(me);
+  const target = own ? STORE_REPO : `${me}/pocketvibe-store`;
+  if (!own) {
+    gh(['repo', 'fork', STORE_REPO, '--clone=false']);
+    for (let i = 0; ; i++) {
+      try {
+        gh(['api', '-X', 'POST', `repos/${target}/merge-upstream`, '-f', 'branch=main']);
+        break;
+      } catch (e) {
+        if (i >= 10) throw e;
+        await new Promise((r) => setTimeout(r, 2000)); // a new fork takes a moment
+      }
+    }
+  }
+  const branch = `${manifest.id}-${manifest.version}`;
+  const base = gh(['api', `repos/${target}/git/ref/heads/main`, '--jq', '.object.sha']);
+  try {
+    gh(['api', `repos/${target}/git/refs`, '-f', `ref=refs/heads/${branch}`, '-f', `sha=${base}`]);
+  } catch {
+    gh(['api', '-X', 'PATCH', `repos/${target}/git/refs/heads/${branch}`, '-f', `sha=${base}`, '-F', 'force=true']);
+  }
+  const content = Buffer.from(JSON.stringify(entry, null, 2) + '\n').toString('base64');
+  let fileSha = null;
+  try {
+    fileSha = gh(['api', `repos/${target}/contents/${file}?ref=${branch}`, '--jq', '.sha']);
+  } catch {
+    // Not on the branch yet.
+  }
+  const title = `${manifest.title} ${manifest.version}`;
+  gh(['api', '-X', 'PUT', `repos/${target}/contents/${file}`, '-f', `message=${title}`, '-f', `content=${content}`, '-f', `branch=${branch}`, ...(fileSha ? ['-f', `sha=${fileSha}`] : [])]);
+
+  const head = own ? branch : `${me}:${branch}`;
+  const body = `${existing ? 'Updates' : 'Adds'} **${manifest.title}** ${manifest.version}${manifest.description ? `: ${manifest.description}` : ''}\n\n` +
+    `Source: ${entry.source.repo}/tree/${commit}${path === '.' ? '' : `/${path}`}\n\nOpened with \`npx pocketvibe publish\`.`;
+  let url;
+  try {
+    url = gh(['pr', 'create', '--repo', STORE_REPO, '--head', head, '--base', 'main', '--title', title, '--body', body]);
+  } catch {
+    // The pull request for this version is already open: the branch update above updated it.
+    url = gh(['pr', 'view', head, '--repo', STORE_REPO, '--json', 'url', '--jq', '.url']);
+  }
+  console.log(`\nPull request: ${url}`);
+  console.log('The store builds and checks your game there. Once it is reviewed and merged, it is in the store on every handheld.');
 }
 
 async function status() {
   const { login, games, releases } = await call('/api/me');
   console.log(`Signed in as ${login}.\n`);
-  console.log(games.length ? 'Your games:' : 'No published games yet.');
+  console.log(games.length ? 'Your games in the store:' : 'No games in the store yet.');
   for (const g of games) console.log(`  ${g.title} (${g.id}) v${g.version}, ${g.downloads} downloads`);
-  if (releases.length) console.log('\nYour uploads:');
+  const prs = JSON.parse(gh(['pr', 'list', '--repo', STORE_REPO, '--author', '@me', '--state', 'all', '--limit', '20', '--json', 'number,title,state,url']));
+  if (prs.length) console.log('\nYour pull requests to the store:');
+  for (const pr of prs) console.log(`  #${pr.number} ${pr.title}: ${pr.state.toLowerCase()} ${pr.url}`);
+  if (releases.length) console.log('\nYour direct uploads:');
   for (const r of releases) console.log(`  ${r.game_id} ${r.version}: ${r.status}${r.note ? ` (${r.note})` : ''}`);
 }
 
@@ -160,37 +277,39 @@ function addresses() {
     .map((a) => a.address);
 }
 
-// Serves a catalog with one game, its zip and its cover. game() gives the
-// current { entry, zip, cover }; entry is the game's catalog listing without
-// its addresses, which follow the address the handheld used.
-function serveStore(name, port, game) {
+// Serves a catalog of games with their zips and covers. games() gives the
+// current [{ entry, zip, cover }]; an entry is a game's catalog listing
+// without its addresses, which follow the address the handheld used.
+function serveStore(name, port, games) {
   const server = createServer((req, res) => {
     const path = req.url.split('?')[0];
-    const current = game();
+    const current = games();
     const send = (status, type, body) => {
       res.writeHead(status, { 'Content-Type': type, 'Content-Length': body.length, 'Cache-Control': 'no-store' });
       res.end(req.method === 'HEAD' ? undefined : body);
     };
+    const who = req.socket.remoteAddress?.replace('::ffff:', '');
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, 'text/plain', Buffer.from('not allowed'));
     if (path === '/' || path === '/catalog.json') {
       const base = `http://${req.headers.host}`;
-      const games = current
-        ? [{
-            ...current.entry,
-            download: `${base}/game.zip?v=${encodeURIComponent(current.entry.version)}`,
-            ...(current.cover && { cover: `${base}/cover?v=${encodeURIComponent(current.entry.version)}` }),
-          }]
-        : [];
-      console.log(`${new Date().toLocaleTimeString()} ${req.socket.remoteAddress?.replace('::ffff:', '')} looked at the store`);
-      return send(200, 'application/json', Buffer.from(JSON.stringify({ name, games })));
+      const list = current.map(({ entry, cover }) => ({
+        ...entry,
+        download: `${base}/game/${entry.id}.zip?v=${encodeURIComponent(entry.version)}`,
+        ...(cover && { cover: `${base}/cover/${entry.id}?v=${encodeURIComponent(entry.version)}` }),
+      }));
+      console.log(`${new Date().toLocaleTimeString()} ${who} looked at the store`);
+      return send(200, 'application/json', Buffer.from(JSON.stringify({ name, games: list })));
     }
-    if (path === '/game.zip' && current) {
-      console.log(`${new Date().toLocaleTimeString()} ${req.socket.remoteAddress?.replace('::ffff:', '')} downloads ${current.entry.title} ${current.entry.version}`);
-      return send(200, 'application/zip', Buffer.from(current.zip));
+    const zip = path.match(/^\/game\/([a-z0-9-]+)\.zip$/);
+    const coverPath = path.match(/^\/cover\/([a-z0-9-]+)$/);
+    const game = current.find((g) => g.entry.id === (zip?.[1] ?? coverPath?.[1]));
+    if (zip && game) {
+      console.log(`${new Date().toLocaleTimeString()} ${who} downloads ${game.entry.title} ${game.entry.version}`);
+      return send(200, 'application/zip', Buffer.from(game.zip));
     }
-    if (path === '/cover' && current?.cover) {
-      const png = current.cover[0] === 0x89 && current.cover[1] === 0x50;
-      return send(200, png ? 'image/png' : 'image/jpeg', Buffer.from(current.cover));
+    if (coverPath && game?.cover) {
+      const png = game.cover[0] === 0x89 && game.cover[1] === 0x50;
+      return send(200, png ? 'image/png' : 'image/jpeg', Buffer.from(game.cover));
     }
     return send(404, 'text/plain', Buffer.from('not found'));
   });
@@ -275,7 +394,7 @@ async function serve(args) {
   console.log(`Building ${readManifest(project).title}...`);
   rebuild();
   if (!current) process.exit(1);
-  await serveStore(`${readManifest(project).title} on ${hostname().replace(/\.local$/, '')}`, port, () => current);
+  await serveStore(`${readManifest(project).title} on ${hostname().replace(/\.local$/, '')}`, port, () => (current ? [current] : []));
   printAddresses(port);
   console.log('Change the game and it is built again; the Store then offers the new build as an update.\n');
 
@@ -294,6 +413,7 @@ async function serve(args) {
 // served to the handheld like `serve` does.
 async function review(args) {
   const { port, rest } = portOption(args);
+  if (rest.length === 1 && /^\d+$/.test(rest[0])) return reviewPullRequest(Number(rest[0]), port);
   const [id, version] = rest;
   if (!id || !version) fail('Usage: pocketvibe review <id> <version> [--port N]');
   const { pending: list } = await call('/api/admin/pending');
@@ -308,9 +428,37 @@ async function review(args) {
   const zip = await fetchFile(upload.zip_key);
   const cover = upload.cover_key ? await fetchFile(upload.cover_key) : null;
   const entry = catalogEntry(upload.manifest, zip, version, 'review');
-  await serveStore(`Review: ${upload.manifest.title}`, port, () => ({ entry, zip, cover }));
+  await serveStore(`Review: ${upload.manifest.title}`, port, () => [{ entry, zip, cover }]);
   printAddresses(port);
   console.log(`When you have played it: pocketvibe approve ${id} ${version}, or pocketvibe reject ${id} ${version} "why".\n`);
+}
+
+// Anyone can play a store pull request's games before it is merged: the zips
+// its check built from source, served to the handheld like `serve` does.
+async function reviewPullRequest(number, port) {
+  const pr = JSON.parse(gh(['pr', 'view', String(number), '--repo', STORE_REPO, '--json', 'title,author,headRefOid,url']));
+  const runs = JSON.parse(gh(['api', `repos/${STORE_REPO}/actions/runs?head_sha=${pr.headRefOid}&event=pull_request`, '--jq', '[.workflow_runs[] | {id, status, conclusion, name}]']));
+  const run = runs.find((r) => r.name === 'Check' && r.status === 'completed');
+  if (!run) fail(`The check of #${number} has not finished yet: ${pr.url}/checks`);
+  const dir = mkdtempSync(join(tmpdir(), 'pocketvibe-review-'));
+  try {
+    gh(['run', 'download', String(run.id), '--repo', STORE_REPO, '--name', 'games', '--dir', dir]);
+  } catch {
+    fail(`#${number}'s check built no game (${run.conclusion}). See ${pr.url}/checks`);
+  }
+  const games = readdirSync(dir).filter((n) => n.endsWith('.zip')).map((name) => {
+    const zip = new Uint8Array(readFileSync(join(dir, name)));
+    const files = unzipSync(zip, { filter: (f) => ['pocketvibe.json', 'cover.png', 'cover.jpg'].includes(f.name) });
+    const manifest = JSON.parse(new TextDecoder().decode(files['pocketvibe.json']));
+    return { entry: catalogEntry(manifest, zip, `${manifest.version}-pr${number}`, 'review'), zip, cover: files['cover.png'] ?? files['cover.jpg'] ?? null };
+  });
+  rmSync(dir, { recursive: true, force: true });
+  if (!games.length) fail(`#${number} built no game.`);
+  const note = run.conclusion === 'success' ? '' : ` (its check: ${run.conclusion})`;
+  console.log(`#${number} ${pr.title} by ${pr.author.login}: ${games.map((g) => g.entry.title).join(', ')}${note}`);
+  await serveStore(`Review: #${number} ${pr.title}`, port, () => games);
+  printAddresses(port);
+  console.log(`When you have played it, review it on ${pr.url}\n`);
 }
 
 const [command, ...args] = process.argv.slice(2);
@@ -328,10 +476,11 @@ if (!commands[command]) {
 
   npm create pocketvibe@latest my-game   start a new game
   pocketvibe serve [dir]                 play your game on your own handheld
-  pocketvibe publish [dir]               send your game to the store
-  pocketvibe status                      your games and uploads
+  pocketvibe publish [dir]               send your game to the store (a pull request)
+  pocketvibe status                      your games and pull requests
+  pocketvibe review <number>             play a store pull request on your handheld
 
-Store: ${STORE}`);
+Store: https://github.com/${STORE_REPO}`);
   process.exit(command ? 1 : 0);
 }
 try {

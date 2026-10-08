@@ -1,6 +1,6 @@
 {
   "name": "pocketvibe",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "PocketVibe command line tool: play your web game on your own handheld, then publish it to the PocketVibe store for ROCKNIX and Android handhelds.",
   "type": "module",
   "bin": {
