@@ -1102,66 +1102,161 @@ h2 {
   background: var(--panel-2);
 }
 
-/* The two downloads at the top of Install. */
-.downloads {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 14px;
-  margin-bottom: 36px;
+/* The platforms' marks, in their own colors. */
+.mark {
+  flex: none;
+  width: 1.6em;
+  height: 1.6em;
 }
 
-.download {
+.linux .mark {
+  color: #fcc624;
+}
+
+.android .mark {
+  color: #3ddc84;
+}
+
+/* Download buttons: the platform's mark, what it is, and the newest version. */
+.get {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+  max-width: 580px;
+  margin-bottom: 14px;
+}
+
+.get-button {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 22px;
-  border: 3px solid transparent;
-  border-radius: 10px;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 2px solid var(--panel-2);
+  border-radius: 14px;
   background: var(--panel);
+  color: var(--text);
   text-decoration: none;
 }
 
-.download:hover,
-.download:focus-visible {
+.get-button:hover,
+.get-button:focus-visible {
   border-color: var(--accent);
 }
 
-.download > kbd {
-  flex: none;
-  color: var(--accent);
-  font-size: 15px;
+.get-button .mark {
+  width: 30px;
+  height: 30px;
 }
 
-.download strong {
+.get-button strong {
   display: block;
-  font-size: 18px;
-  line-height: 1.35;
+  font-size: 16px;
+  white-space: nowrap;
+  line-height: 1.3;
 }
 
-.download small {
+.get-button small {
   display: block;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
-/* Using it: each button and what it does. */
+/* Install: a card for each platform, side by side. */
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.platform-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.platform-card h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.3;
+}
+
+.platform-card .get-button {
+  border-color: transparent;
+  background: var(--panel-2);
+}
+
+.platform-card .get-button:hover,
+.platform-card .get-button:focus-visible {
+  border-color: var(--accent);
+}
+
+.platform-card ol {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.platform-card li {
+  position: relative;
+  padding-left: 34px;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+  counter-increment: step;
+}
+
+/* The step's number as a button cap, like the launcher's hints. */
+.platform-card li::before {
+  content: counter(step);
+  position: absolute;
+  top: 2px;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 19px;
+  border: 2px solid var(--muted);
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.platform-card > p {
+  margin: auto 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Using it: each button and what it does, in two columns. */
 .buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  column-gap: 28px;
   margin: 0 0 18px;
-  padding: 6px 22px;
-  border-radius: 10px;
+  padding: 8px 22px;
+  border-radius: 14px;
   background: var(--panel);
 }
 
 .buttons div {
   display: grid;
-  grid-template-columns: 8.5em minmax(0, 1fr);
-  gap: 16px;
-  padding: 10px 0;
-  border-top: 1px solid var(--panel-2);
-}
-
-.buttons div:first-child {
-  border-top: 0;
+  grid-template-columns: 4.2em minmax(0, 1fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 9px 0;
 }
 
 .buttons dt {
@@ -1174,7 +1269,7 @@ h2 {
 .buttons dd {
   margin: 0;
   color: var(--body);
-  font-size: 16px;
+  font-size: 15px;
 }
 
 /* Tables of measured limits on the game-making page. */
@@ -1200,12 +1295,11 @@ h2 {
   vertical-align: top;
 }
 
-.table thead th {
+.table thead th,
+.table thead td {
   border-top: 0;
   color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 13px;
 }
 
 .table td:nth-child(2) {
@@ -1216,6 +1310,47 @@ h2 {
 
 .table td:last-child {
   color: var(--body);
+}
+
+/* What you need: the two platforms side by side. */
+.table.needs {
+  padding: 6px 22px 4px;
+}
+
+.table.needs th,
+.table.needs td {
+  padding: 12px 16px 12px 0;
+  color: var(--body);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.table.needs thead th {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.table.needs thead .mark {
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  vertical-align: -5px;
+}
+
+.table.needs tbody th {
+  width: 7.5em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.table.needs td:nth-child(2) {
+  color: var(--body);
+  font-weight: 400;
 }
 
 .column h3.section {
@@ -1250,83 +1385,6 @@ h2 {
 
 .page-intro .actions {
   margin-top: 8px;
-}
-
-/* What you need: a card for each kind of handheld, then the handhelds it was
-   tested on. */
-.needs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 14px;
-  margin-bottom: 36px;
-}
-
-.need {
-  padding: 18px 22px;
-  border-radius: 10px;
-  background: var(--panel);
-}
-
-.need h3 {
-  margin: 0 0 12px;
-  font-size: 18px;
-  line-height: 1.35;
-}
-
-.need dl {
-  margin: 0;
-}
-
-.need dl div {
-  padding: 9px 0;
-  border-top: 1px solid var(--panel-2);
-}
-
-.need dl div:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.need dt {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.need dd {
-  margin: 2px 0 0;
-  color: var(--body);
-  font-size: 16px;
-  line-height: 1.45;
-}
-
-.devices {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-  gap: 10px;
-  margin: 0 0 18px;
-  padding: 0;
-  list-style: none;
-}
-
-.devices li {
-  padding: 12px 16px;
-  border-radius: 10px;
-  background: var(--panel);
-}
-
-.devices strong {
-  display: block;
-  font-size: 16px;
-  line-height: 1.35;
-}
-
-.devices span {
-  display: block;
-  color: var(--muted);
-  font-size: 14px;
 }
 
 .note {
@@ -1423,9 +1481,52 @@ h2 {
     right: 10px;
   }
 
-  .buttons div {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
+  .table.needs {
+    padding: 4px 16px;
+  }
+
+  .table.needs table,
+  .table.needs tbody,
+  .table.needs tr {
+    display: block;
+  }
+
+  /* On a phone each row is a block: what, then Linux, then Android. */
+  .table.needs thead {
+    display: none;
+  }
+
+  .table.needs tr {
+    padding: 12px 0;
+    border-top: 1px solid var(--panel-2);
+  }
+
+  .table.needs tr:first-child {
+    border-top: 0;
+  }
+
+  .table.needs th,
+  .table.needs td {
+    display: block;
+    padding: 2px 0;
+    border: 0;
+  }
+
+  .table.needs tbody th {
+    width: auto;
+  }
+
+  .table.needs td::before {
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  .table.needs td:nth-child(2)::before {
+    content: 'Linux: ';
+  }
+
+  .table.needs td:nth-child(3)::before {
+    content: 'Android: ';
   }
 
   .bar nav a:not(:last-child) {

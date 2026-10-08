@@ -14,7 +14,7 @@ fetch('/releases.json')
   .then((releases) => {
     for (const el of document.querySelectorAll('[data-release]')) {
       const release = releases?.[el.dataset.release];
-      if (release) el.textContent = `${release.version}, ${(release.size / 1e6).toFixed(1)} MB`;
+      if (release) el.textContent = `version ${release.version}, ${(release.size / 1e6).toFixed(1)} MB`;
     }
   })
   .catch(() => {

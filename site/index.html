@@ -35,14 +35,29 @@
             three.js games made with AI coding tools. Pick one and play it with the handheld's
             buttons.
           </p>
-          <div class="actions">
-            <a class="button primary" href="/download/rocknix"><kbd>A</kbd>Download for ROCKNIX</a>
-            <a class="button" href="/download/android"><kbd>B</kbd>Download for Android</a>
+          <div class="get">
+            <a class="get-button linux" href="/download/rocknix">
+              <svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#linux" /></svg>
+              <span>
+                <strong>Download for Linux</strong>
+                <small>ROCKNIX handhelds</small>
+                <small data-release="rocknix">newest version</small>
+              </span>
+            </a>
+            <a class="get-button android" href="/download/android">
+              <svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#android" /></svg>
+              <span>
+                <strong>Download for Android</strong>
+                <small>Android 10 or newer</small>
+                <small data-release="android">newest version</small>
+              </span>
+            </a>
           </div>
-          <p class="small">
-            Free and open source. <a href="#install">How to install it</a> ·
-            <a href="/make/">Make your own game</a>
-          </p>
+          <div class="actions">
+            <a class="button primary" href="/make/"><kbd>A</kbd>Make your own game</a>
+            <a class="button" href="#install"><kbd>B</kbd>How to install</a>
+          </div>
+          <p class="small">Free and open source.</p>
         </div>
 
         <figure class="stage" id="play">
@@ -108,36 +123,44 @@
 
       <section class="column" id="requirements">
         <h2>What you need</h2>
-        <p>PocketVibe runs on ROCKNIX and Android handhelds with buttons.</p>
-        <div class="needs">
-          <div class="need">
-            <h3>ROCKNIX handhelds</h3>
-            <dl>
-              <div><dt>System</dt><dd>ROCKNIX. PocketVibe does not run on muOS or other firmware.</dd></div>
-              <div><dt>Chip</dt><dd>64-bit Arm, such as the Allwinner H700 or the Rockchip RK3566</dd></div>
-              <div><dt>Memory</dt><dd>1 GB of RAM or more</dd></div>
-              <div><dt>Graphics</dt><dd>The Panfrost driver. On libmali, PocketVibe offers to switch.</dd></div>
-              <div><dt>Storage</dt><dd>About 1 GB free on the SD card</dd></div>
-              <div><dt>Network</dt><dd>Wi-Fi, for the first start (150 MB, once) and the store</dd></div>
-            </dl>
-          </div>
-          <div class="need">
-            <h3>Android handhelds</h3>
-            <dl>
-              <div><dt>System</dt><dd>Android 10 or newer</dd></div>
-              <div><dt>Web engine</dt><dd>Android System WebView 94 or newer, updated from the Play Store</dd></div>
-              <div><dt>Controls</dt><dd>Built-in buttons: a d-pad, A, B, X, Y, L, R, Start and Select</dd></div>
-              <div><dt>Network</dt><dd>Wi-Fi, for the store</dd></div>
-            </dl>
-          </div>
+        <div class="table needs">
+          <table>
+            <thead>
+              <tr>
+                <td></td>
+                <th scope="col" class="linux"><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#linux" /></svg>Linux</th>
+                <th scope="col" class="android"><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#android" /></svg>Android</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">System</th>
+                <td>ROCKNIX. Not muOS or other firmware</td>
+                <td>Android 10 or newer, with Android System WebView 94 or newer</td>
+              </tr>
+              <tr>
+                <th scope="row">Hardware</th>
+                <td>A 64-bit Arm chip such as the H700 or RK3566, 1 GB of RAM or more, and the Panfrost graphics driver (PocketVibe offers to switch from libmali)</td>
+                <td>A handheld with built-in buttons</td>
+              </tr>
+              <tr>
+                <th scope="row">Free space</th>
+                <td>About 1 GB on the SD card</td>
+                <td>About 50 MB</td>
+              </tr>
+              <tr>
+                <th scope="row">Internet</th>
+                <td>Wi-Fi, for the first start (150 MB, once) and the store</td>
+                <td>Wi-Fi, for the store</td>
+              </tr>
+              <tr>
+                <th scope="row">Tested on</th>
+                <td>Anbernic RG34XX SP, RG34XX and the two-screen RG DS</td>
+                <td>Anbernic RG Rotate</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <h3 class="platform">Tested on</h3>
-        <ul class="devices">
-          <li><strong>Anbernic RG34XX SP</strong><span>ROCKNIX, H700</span></li>
-          <li><strong>Anbernic RG34XX</strong><span>ROCKNIX, H700</span></li>
-          <li><strong>Anbernic RG DS</strong><span>ROCKNIX, RK3566, two screens</span></li>
-          <li><strong>Anbernic RG Rotate</strong><span>Android</span></li>
-        </ul>
         <p class="note">
           Other ROCKNIX handhelds with the same chips, such as the RG35XX and RG40XX families, should
           work too, but are not tested yet.
@@ -146,97 +169,51 @@
 
       <section class="column" id="install">
         <h2>Put it on your handheld</h2>
-        <div class="downloads">
-          <a class="download" href="/download/rocknix">
-            <kbd>A</kbd>
-            <span>
-              <strong>PocketVibe for ROCKNIX</strong>
-              <small>PocketVibe.zip · <span data-release="rocknix">newest version</span></small>
-            </span>
-          </a>
-          <a class="download" href="/download/android">
-            <kbd>B</kbd>
-            <span>
-              <strong>PocketVibe for Android</strong>
-              <small>PocketVibe.apk · <span data-release="android">newest version</span></small>
-            </span>
-          </a>
+        <div class="platforms">
+          <div class="platform-card linux">
+            <h3><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#linux" /></svg>On Linux (ROCKNIX)</h3>
+            <a class="get-button" href="/download/rocknix">
+              <span>
+                <strong>PocketVibe.zip</strong>
+                <small data-release="rocknix">newest version</small>
+              </span>
+            </a>
+            <ol>
+              <li>Turn on Samba in ROCKNIX's network settings, open the handheld's <code>games-roms</code> share from your computer and unzip PocketVibe.zip into <code>ports</code>.</li>
+              <li>Restart the handheld, or update its game lists, then open Ports and PocketVibe.</li>
+              <li>The first start downloads the game engine, about 150 MB, in a minute and a half. Then PocketVibe opens with five games.</li>
+            </ol>
+            <p>Leave a game: hold <kbd>Start</kbd> + <kbd>Select</kbd>.</p>
+          </div>
+          <div class="platform-card android">
+            <h3><svg class="mark" aria-hidden="true"><use href="/img/platforms.svg#android" /></svg>On Android</h3>
+            <a class="get-button" href="/download/android">
+              <span>
+                <strong>PocketVibe.apk</strong>
+                <small data-release="android">newest version</small>
+              </span>
+            </a>
+            <ol>
+              <li>Open the download on the handheld. When Android asks, allow your browser or file manager to install apps.</li>
+              <li>Tap Install, then start PocketVibe from the app list.</li>
+              <li>It opens with five games, and installs new versions over itself from Settings.</li>
+            </ol>
+            <p>Leave a game: hold <kbd>Start</kbd> + <kbd>Select</kbd>, or press Back.</p>
+          </div>
         </div>
-        <h3 class="platform">On ROCKNIX</h3>
-        <ol class="steps">
-          <li>
-            <kbd>1</kbd>
-            <div>
-              <h3><a href="/download/rocknix">Download PocketVibe.zip</a></h3>
-              <p>5 MB. The handheld needs ROCKNIX, Wi-Fi and about 1 GB free on its SD card (<a href="#requirements">what you need</a>).</p>
-            </div>
-          </li>
-          <li>
-            <kbd>2</kbd>
-            <div>
-              <h3>Unzip it into <code>roms/ports</code></h3>
-              <p>
-                Over the network: turn on Samba in ROCKNIX's network settings, then open the
-                handheld's <code>games-roms</code> share from your computer. A second SD card for
-                games can also be filled straight from your computer.
-              </p>
-            </div>
-          </li>
-          <li>
-            <kbd>3</kbd>
-            <div>
-              <h3>Restart, then open Ports and PocketVibe</h3>
-              <p>
-                The first start downloads and installs the game engine, about 150 MB, in about a
-                minute and a half over Wi-Fi. Then PocketVibe opens with five games, in seconds
-                from then on, and keeps itself up to date.
-              </p>
-            </div>
-          </li>
-        </ol>
-        <p class="note">In a game, hold <kbd>Start</kbd> and <kbd>Select</kbd> to go back to PocketVibe.</p>
-        <h3 class="platform">On Android</h3>
-        <ol class="steps">
-          <li>
-            <kbd>1</kbd>
-            <div>
-              <h3><a href="/download/android">Download PocketVibe.apk</a></h3>
-              <p>On the handheld. It needs Android 10 or newer.</p>
-            </div>
-          </li>
-          <li>
-            <kbd>2</kbd>
-            <div>
-              <h3>Open it and tap Install</h3>
-              <p>When Android asks, allow your browser or file manager to install apps.</p>
-            </div>
-          </li>
-          <li>
-            <kbd>3</kbd>
-            <div>
-              <h3>Start PocketVibe from the app list</h3>
-              <p>
-                Made for handhelds with buttons, such as the Anbernic RG Rotate. A new version
-                installs over the old one, and PocketVibe updates itself from Settings.
-              </p>
-            </div>
-          </li>
-        </ol>
-        <p class="note">In a game, hold <kbd>Start</kbd> and <kbd>Select</kbd>, or press Back, to go back to PocketVibe.</p>
 
-        <h3 class="platform">Using it</h3>
+        <h3 class="section">Using it</h3>
         <dl class="buttons">
-          <div><dt><kbd>L</kbd> <kbd>R</kbd></dt><dd>Switch between Library, Store and Settings</dd></div>
-          <div><dt><kbd>A</kbd></dt><dd>Play a game, or open a game's page in the Store, where A downloads it</dd></div>
-          <div><dt><kbd>B</kbd></dt><dd>Go back; on the tabs, quit PocketVibe</dd></div>
-          <div><dt><kbd>Y</kbd></dt><dd>Sort: recently played, newest, most downloaded, A to Z or by category</dd></div>
-          <div><dt><kbd>X</kbd></dt><dd>In the Store, hide the games you already have</dd></div>
+          <div><dt><kbd>L</kbd> <kbd>R</kbd></dt><dd>Library, Store and Settings</dd></div>
+          <div><dt><kbd>A</kbd></dt><dd>Play, or download in the Store</dd></div>
+          <div><dt><kbd>B</kbd></dt><dd>Back; on the tabs, quit</dd></div>
+          <div><dt><kbd>Y</kbd></dt><dd>Sort the games</dd></div>
+          <div><dt><kbd>X</kbd></dt><dd>Store: hide the games you have</dd></div>
           <div><dt><kbd>Select</kbd></dt><dd>Cards or a list</dd></div>
-          <div><dt><kbd>Start</kbd> + <kbd>Select</kbd></dt><dd>Held in a game: back to PocketVibe. Held for three seconds: quit</dd></div>
         </dl>
         <p class="note">
-          The bar along the bottom always shows what each button does. PocketVibe checks for a new
-          version of itself every few hours and offers it in Settings &gt; App update.
+          The bar along the bottom of the launcher always shows what each button does. PocketVibe
+          checks for new versions of itself and offers them in Settings &gt; App update.
         </p>
       </section>
 
