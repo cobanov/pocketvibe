@@ -93,6 +93,9 @@ function chooseScreen() {
 
 function createInput() {
   const keys = new Set(); // buttons held on the keyboard
+  // Keys pressed since the last frame, even if already let go: a tap shorter
+  // than a frame still counts as one frame of holding the button.
+  const tapped = new Set();
   let held = new Set(); // buttons held this frame, from all sources
   let prev = new Set(); // buttons held last frame
   const dpad = { x: 0, y: 0 };
@@ -101,6 +104,7 @@ function createInput() {
     const button = KEYMAP[e.code];
     if (button) {
       keys.add(button);
+      if (!e.repeat) tapped.add(button);
       e.preventDefault();
     }
   });
@@ -121,6 +125,8 @@ function createInput() {
       held = swap;
       held.clear();
       for (const button of keys) held.add(button);
+      for (const button of tapped) held.add(button);
+      tapped.clear();
 
       for (const pad of navigator.getGamepads?.() ?? []) {
         if (!pad) continue;

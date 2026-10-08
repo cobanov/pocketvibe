@@ -56,7 +56,7 @@ The game is designed for a 720×480 screen (3:2, the RG34XX SP), but PocketVibe 
 
 ## Graphics budget
 
-Measured on the handheld (`bench/results/2026-10-08-limits.md` in the PocketVibe repository; explained for people in https://github.com/cobanov/pocketvibe/blob/main/docs/performance.md). The game has 16.7 ms per frame for 60 fps. The perf overlay (top right, toggle with `P` in the browser) shows fps, draw calls and triangles, and turns red when the game is over budget or below 55 fps. Stay under it at all times:
+Measured on the handheld (`bench/results/2026-10-08-limits.md` in the PocketVibe repository; explained for people in https://github.com/cobanov/pocketvibe/blob/main/docs/performance.md). The game has 16.7 ms per frame for 60 fps. The perf overlay (top right, toggle with `P` in the browser) shows fps, draw calls and triangles, and turns red when the game is over budget or below 55 fps. It counts every triangle drawn, also those outside the view and in hidden (zero-scale) instances, so the real count on screen can be lower. Stay under it at all times:
 
 - **Triangles on screen: 10,000 or fewer.** This is the hardest limit: about 1 ms per 1,000 visible triangles (15k: 48 fps, 20k: 39 fps, 30k: 28 fps). Triangles outside the view cost almost nothing, so use `scene.fog` with a short camera `far`, and low-poly models (a few hundred triangles for a character, tens for props).
 - **Draw calls: 100 or fewer.** Each costs 30 to 70 µs of CPU.
@@ -83,7 +83,7 @@ How to stay under it:
 
 The first use of anything new costs a long frame, so do it all while the game loads, never during play:
 
-- Shaders compile when a material is first drawn: 40 ms for Basic, 90 ms for Lambert, up to 300 ms with shadows. While loading, put one of every kind of object the game will show (enemies, bullets, effects, pickups) in the scene, call `renderer.compile(scene, camera)` once, then hide or pool them.
+- Shaders compile when a material is first drawn: 40 ms for Basic, 90 ms for Lambert, up to 300 ms with shadows. While loading, put one of every kind of object the game will show (enemies, bullets, effects, pickups) in the scene, visible and in front of the camera, call `renderer.compile(scene, camera)` and render one frame (compiling does not upload geometry; drawing does), then hide or pool them.
 - Textures upload when first used: about 30 ms for a 512×512 PNG, 100 ms for 1024×1024. Call `renderer.initTexture(texture)` for each texture while loading.
 - Create geometries while loading too; a 50,000-triangle geometry takes 130 ms to upload.
 
