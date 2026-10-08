@@ -62,7 +62,10 @@ export function cylinder(r, h, x, y, z, hex, topHex, sides = 8) {
 
 // A soft round blob (white in the middle, clear at the edge) drawn on a
 // small canvas: used for fake shadows and the glow under finished crates.
+// Drawn once and shared.
+let blob = null;
 export function blobTexture() {
+  if (blob) return blob;
   const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -74,7 +77,8 @@ export function blobTexture() {
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
-  return new THREE.CanvasTexture(canvas);
+  blob = new THREE.CanvasTexture(canvas);
+  return blob;
 }
 
 export function clamp(v, lo, hi) {

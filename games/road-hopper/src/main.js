@@ -11,10 +11,11 @@ import { createFx } from './fx.js';
 import { createHud } from './hud.js';
 
 const CAM_OFFSET = new THREE.Vector3(1.6, 12, 6.4);
+const CAM_FOV = 40; // vertical, on the 3:2 screen the game is designed for
 const LEAD = 2.2; // the camera looks this many rows ahead of the chicken
 const CREEP = 0.3; // rows per second the camera moves forward on its own
 const CREEP_MAX = 0.6;
-const BEHIND_LIMIT = 2.2; // fall this far behind the camera (the screen's bottom edge) and the hawk comes
+const BEHIND_LIMIT = 2.2; // fall this far behind the camera (the 3:2 screen's bottom edge) and the hawk comes
 const IDLE_LIMIT = 9; // so it does after this many seconds without a hop
 const SAVE_KEY = 'road-hopper';
 const DIRECTIONS = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
@@ -25,8 +26,26 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(SKY, 17, 25);
 
-const camera = new THREE.PerspectiveCamera(40, hh.width / hh.height, 0.5, 27);
+const camera = new THREE.PerspectiveCamera(CAM_FOV, hh.aspect, 0.5, 27);
+fitView();
 const lookAt = new THREE.Vector3();
+
+// Wider screens show more at the sides. On taller ones the extra height all
+// goes below the designed view, onto rows the chicken has already crossed,
+// so the rows ahead that can be seen are the same on every screen shape.
+function fitView() {
+  hh.fitCamera(camera);
+  const scale = hh.viewScale();
+  if (scale <= 1) return;
+  // A frustum tall enough to reach that far down, of which the screen shows
+  // the bottom part: its top edge is the designed one.
+  const t = Math.tan(THREE.MathUtils.degToRad(CAM_FOV / 2));
+  camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(t * (2 * scale - 1)));
+  const k = (2 * scale - 1) / scale;
+  const fullWidth = hh.width * k;
+  const fullHeight = hh.height * k;
+  camera.setViewOffset(fullWidth, fullHeight, (fullWidth - hh.width) / 2, fullHeight - hh.height, hh.width, hh.height);
+}
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x7d9a70, 1.5));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -39,7 +58,9 @@ const shadowMaterial = new THREE.MeshBasicMaterial({
   opacity: 0.24,
   depthWrite: false,
 });
-const world = createWorld(scene, shadowMaterial);
+// Taller screens see more rows behind the camera (see fitView), so the world
+// keeps more of them there.
+const world = createWorld(scene, shadowMaterial, Math.ceil(6 * hh.viewScale()));
 const player = createPlayer(scene, world, shadowMaterial);
 const fx = createFx(scene, shadowMaterial);
 const hud = createHud(hh.hud);
@@ -207,6 +228,11 @@ function play(dt) {
 }
 
 toTitle();
+
+// Compile every material now, while loading: trains, coins, lamps and the
+// hawk are not on screen at the start, so without this their shaders would
+// compile in the middle of a run.
+renderer.compile(scene, camera);
 
 hh.run((dt) => {
   stateT += dt;

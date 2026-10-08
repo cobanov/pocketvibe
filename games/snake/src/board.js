@@ -73,7 +73,20 @@ function flower(x, y, z) {
   return [box(0.1, 0.45, 0.1, x, y + 0.22, z, 0x3a8f3a), box(0.4, 0.16, 0.4, x, y + 0.5, z, hex)];
 }
 
-export function createBoard(scene) {
+// One random prop at (x, z) on the grass; trees only when tall is set.
+function prop(parts, x, y, z, tall) {
+  const r = rand();
+  const s = 0.7 + rand() * 0.6;
+  let list;
+  if (tall && r < 0.4) list = tree(x, y, z, s);
+  else if (r < 0.65) list = bush(x, y, z, s);
+  else if (r < 0.8) list = rock(x, y, z, s);
+  else list = flower(x, y, z);
+  for (let k = 0; k < list.length; k++) parts.push(list[k]);
+}
+
+// view: what the screen shows beyond the 720x480 view, { taller, wider }.
+export function createBoard(scene, view) {
   const parts = [];
 
   // Checker floor, one quad per cell.
@@ -136,6 +149,22 @@ export function createBoard(scene) {
     const s = 0.7 + rand() * 0.6;
     const list = r < 0.4 ? tree(x, gy, z, s) : r < 0.65 ? bush(x, gy, z, s) : r < 0.8 ? rock(x, gy, z, s) : flower(x, gy, z);
     for (let k = 0; k < list.length; k++) parts.push(list[k]);
+  }
+
+  // Taller and wider screens show grass the 720x480 view does not: more of
+  // the same there, all of it out of that view, so it looks the same as ever.
+  if (view.taller) {
+    // In front of the board (low props close to it, trees further out) and
+    // far behind it.
+    for (let i = 0; i < 26; i++) {
+      const z = 11.5 + rand() * 3.5;
+      prop(parts, -16 + rand() * 32, gy, z, z > 12.8);
+    }
+    for (let i = 0; i < 16; i++) prop(parts, -26 + rand() * 52, gy, -25 + rand() * 4.5, true);
+  }
+  if (view.wider) {
+    // The far corners behind the board.
+    for (let i = 0; i < 8; i++) prop(parts, (i % 2 === 0 ? -1 : 1) * (22.5 + rand() * 3), gy, -19 + rand() * 9, true);
   }
 
   // Polyhedra come without an index and the rest with one; mergeGeometries

@@ -6,11 +6,11 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { PAD_COLOR, RING_COLOR, VIEW_AHEAD, VIEW_BACK, box, glowTexture, paint, quad } from './shared.js';
+import { CAM_Z, PAD_COLOR, RING_COLOR, VIEW_AHEAD, VIEW_BACK, box, glowTexture, paint, quad } from './shared.js';
 
 const FLOOR_DEPTH = 22; // the grid runs back this far
 const FLOOR_FRONT = 1.3; // and comes this far towards the camera
-const FLOOR_SPAN = 27; // columns drawn on each side: the far floor is wide
+const FLOOR_SPAN = 27; // columns drawn on each side on a 3:2 screen: the far floor is wide
 const MAX_BLOCKS = 110;
 const MAX_PILLARS = 60;
 const MAX_SPIKES = 70;
@@ -146,7 +146,10 @@ function instanced(scene, geometry, material, max) {
   return mesh;
 }
 
-export function createWorld(scene) {
+// halfTan: tan of half the camera's horizontal view. Wide screens see more
+// of the far floor at the sides, so it gets more columns there.
+export function createWorld(scene, halfTan) {
+  const span = Math.max(FLOOR_SPAN, Math.ceil((CAM_Z + FLOOR_DEPTH) * halfTan) + 2);
   const floorMat = new THREE.MeshBasicMaterial({ vertexColors: true });
   const blockMat = new THREE.MeshBasicMaterial({ vertexColors: true });
   const spikeMat = new THREE.MeshBasicMaterial({ vertexColors: true });
@@ -159,7 +162,7 @@ export function createWorld(scene) {
     depthWrite: false,
   });
 
-  const floor = instanced(scene, floorGeometry(), floorMat, FLOOR_SPAN * 2 + 2);
+  const floor = instanced(scene, floorGeometry(), floorMat, span * 2 + 2);
   const blocks = instanced(scene, blockGeometry(), blockMat, MAX_BLOCKS);
   const pillars = instanced(scene, pillarGeometry(), blockMat, MAX_PILLARS);
   const caps = instanced(scene, capGeometry(), blockMat, MAX_PILLARS);
@@ -228,9 +231,9 @@ export function createWorld(scene) {
       blockMat.color.copy(main).multiplyScalar(0.9 + 0.25 * pulse);
 
       // Floor: one tile per column, none over a gap.
-      const f0 = Math.floor(camX) - FLOOR_SPAN;
+      const f0 = Math.floor(camX) - span;
       let n = 0;
-      for (let c = f0; c <= f0 + FLOOR_SPAN * 2; c++) {
+      for (let c = f0; c <= f0 + span * 2; c++) {
         if (c >= 0 && c < L.cols && L.gap[c] === 1) continue;
         put(floor, n++, c + 0.5, 0, 0, 1, 0);
       }

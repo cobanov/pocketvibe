@@ -43,11 +43,14 @@ const { renderer, input } = hh;
 // scene has no lights; depth comes from fog and baked vertex colours.
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(LEVELS[0].palette.bg, 18, 44);
-const camera = new THREE.PerspectiveCamera(FOV, hh.width / hh.height, 0.5, 70);
+const camera = new THREE.PerspectiveCamera(FOV, hh.aspect, 0.5, 70);
+hh.fitCamera(camera); // wide screens see more of the track, tall ones more above and below
 const lookAt = new THREE.Vector3();
+// Tan of half the horizontal view, for the scenery that must reach the sides.
+const halfTan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * hh.aspect;
 
-const world = createWorld(scene);
-const backdrop = createBackdrop(scene);
+const world = createWorld(scene, halfTan);
+const backdrop = createBackdrop(scene, halfTan);
 const cube = createCube(scene);
 const fx = createFx(scene);
 const hud = createHud(hh.hud);
@@ -341,6 +344,12 @@ function updateComplete(dt) {
 
 setLevel(levelIndex);
 toTitle();
+// Upload the textures and build every shader now (all kinds of objects are in
+// the scene, even if hidden or empty), so nothing stalls mid-run.
+scene.traverse((object) => {
+  if (object.material?.map) renderer.initTexture(object.material.map);
+});
+renderer.compile(scene, camera);
 
 hh.run((dt) => {
   stateTime += dt;

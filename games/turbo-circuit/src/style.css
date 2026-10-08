@@ -16,8 +16,9 @@ body {
   gap: 16px;
 }
 
-/* #frame takes the scaled size in the page layout; #screen is always 720x480
-   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+/* #frame takes the scaled size in the page layout; #screen is always the
+   game's screen size (set by handheld.js) inside it and gets scaled with a
+   transform, so HUD pixel values stay valid. */
 #frame {
   flex: none;
   box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
@@ -26,8 +27,8 @@ body {
 
 #screen {
   position: relative;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
   overflow: hidden;
   background: #000;
   transform-origin: top left;
@@ -35,8 +36,6 @@ body {
 
 #screen canvas {
   display: block;
-  width: 720px;
-  height: 480px;
 }
 
 #hud {

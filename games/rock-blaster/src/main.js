@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { createHandheld } from './handheld.js';
 import { BG, HALF_H, HALF_W, rand } from './shared.js';
-import { createSpace } from './space.js';
+import { createFrame, createSpace } from './space.js';
 import { createFx } from './fx.js';
 import { SIZES, createRocks } from './rocks.js';
 import { createShots } from './shots.js';
@@ -28,9 +28,12 @@ const scene = new THREE.Scene();
 // reach into the fog, which dims the farther ones.
 scene.fog = new THREE.Fog(BG, 30, 62);
 
-// Orthographic top-down view that maps the field exactly onto the screen.
+// Orthographic top-down view that maps the field exactly onto the 3:2
+// screen. Other shapes keep the field whole at the same scale and show a
+// frame around it (see createFrame).
 const camera = new THREE.OrthographicCamera(-HALF_W, HALF_W, HALF_H, -HALF_H, 1, 55);
 camera.position.set(0, 0, 30);
+hh.fitCamera(camera);
 
 // The hemisphere's sky side faces the camera, so faces turned to the viewer read brightest.
 const hemi = new THREE.HemisphereLight(0xd8e4ff, 0x3a2a5c, 1.5);
@@ -41,6 +44,7 @@ sun.position.set(-6, 8, 10);
 scene.add(sun);
 
 const space = createSpace(scene);
+createFrame(scene, camera.right - camera.left, camera.top - camera.bottom);
 const fx = createFx(scene);
 const rocks = createRocks(scene, fx);
 const shots = createShots(scene);
@@ -297,6 +301,26 @@ function playTimers(dt) {
   }
 }
 
+// Loading: put one of every kind of object on screen (rocks of every size,
+// the ship with its flame and shield, the saucer, both kinds of bullets,
+// sparks, rings and the flash), compile every material and upload every
+// geometry now, so nothing stalls the first time it appears in play.
+// toTitle() clears them again.
+function warmUp() {
+  rocks.spawnAttract();
+  ship.reset();
+  ship.update(0, 0, true);
+  saucer.spawn(1);
+  shots.firePlayer(0, 2, 1, 0, 1);
+  shots.fireEnemy(0, -2, 1, 0, 1);
+  shots.update(0);
+  fx.flash(0xffffff, 0.1, 0.1);
+  fx.update(0);
+  renderer.compile(scene, camera);
+  renderer.render(scene, camera);
+}
+
+warmUp();
 toTitle();
 
 hh.run((realDt) => {

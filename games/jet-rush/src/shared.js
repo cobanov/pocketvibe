@@ -4,6 +4,7 @@
 // camera. The hero stays at x = HERO_X and the world scrolls towards -x.
 
 import * as THREE from 'three';
+import { SCREEN } from './handheld.js';
 
 export const BG = 0x1a2340; // clear and fog color: the dim lab behind the windows
 
@@ -12,13 +13,15 @@ export const MID_Y = CEIL_Y / 2;
 
 export const HERO_X = 0;
 
-// Camera: straight side view, a little ahead of the hero.
+// Camera: straight side view, a little ahead of the hero. FOV is the view
+// on the 3:2 screen the game is designed for; wider screens see more at the
+// sides (main.js passes how much more to the modules that spawn things).
 export const CAM_X = HERO_X + 5;
 export const CAM_Z = 11;
 export const FOV = 48;
 export const VIEW_HALF_H = CAM_Z * Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-export const VIEW_HALF_W = VIEW_HALF_H * 1.5; // 720 / 480
-export const RIGHT_EDGE = CAM_X + VIEW_HALF_W; // visible right edge at z = 0
+export const VIEW_HALF_W = VIEW_HALF_H * (SCREEN.width / SCREEN.height); // at z = 0 on the 3:2 screen
+export const RIGHT_EDGE = CAM_X + VIEW_HALF_W; // visible right edge at z = 0 on the 3:2 screen
 
 export const SPAWN_X = RIGHT_EDGE + 1.5; // new patterns start here, off screen
 export const DESPAWN_X = -8; // behind the left edge

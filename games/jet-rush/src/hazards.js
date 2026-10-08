@@ -220,7 +220,6 @@ const FLY = 3;
 // The warning icon floats a little in front of everything, just inside the
 // right edge of the screen at that depth.
 const ICON_Z = 0.6;
-const ICON_X = CAM_X + (VIEW_HALF_W * (CAM_Z - ICON_Z)) / CAM_Z - 0.75;
 
 function missileGeometry() {
   // Points left (-x), the way it flies.
@@ -255,7 +254,12 @@ function warningTexture() {
   });
 }
 
-export function createMissiles(scene, particles) {
+// sideRoom: how much further than on the 3:2 screen the view reaches to the
+// right. Icons sit at the real edge and missiles start that much further
+// out, leaving that much earlier, so they arrive when they would on 3:2.
+export function createMissiles(scene, particles, sideRoom = 0) {
+  const iconX = CAM_X + ((VIEW_HALF_W + sideRoom) * (CAM_Z - ICON_Z)) / CAM_Z - 0.75;
+  const startX = RIGHT_EDGE + 1.2 + sideRoom;
   const bodies = new THREE.InstancedMesh(
     missileGeometry(),
     new THREE.MeshLambertMaterial({ vertexColors: true }),
@@ -294,7 +298,7 @@ export function createMissiles(scene, particles) {
         const rate = m.state === TRACK ? 7 : 16;
         if ((m.t * rate) % 1 > 0.55) continue; // blink
         const pop = m.state === LOCK ? 1.25 : 1 + Math.min(1, m.t * 6) * 0.1;
-        dummy.position.set(ICON_X, m.y, ICON_Z);
+        dummy.position.set(iconX, m.y, ICON_Z);
         dummy.rotation.set(0, 0, 0);
         dummy.scale.setScalar(pop);
         dummy.updateMatrix();
@@ -356,10 +360,11 @@ export function createMissiles(scene, particles) {
             m.t = 0;
           }
         } else if (m.state === LOCK) {
-          if (m.t > LOCK_TIME) {
+          const lead = sideRoom / (FLY_SPEED + move / Math.max(dt, 0.001));
+          if (m.t > LOCK_TIME - lead) {
             m.state = FLY;
             m.t = 0;
-            m.x = RIGHT_EDGE + 1.2;
+            m.x = startX;
           }
         } else {
           m.x -= FLY_SPEED * dt + move;

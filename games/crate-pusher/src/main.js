@@ -31,15 +31,22 @@ const MENU_DELAY = 0.32; // held D-pad on the level grid
 const MENU_REPEAT = 0.09;
 const CLEAR_DELAY = 1.1; // the party runs a moment before the panel
 const STROLL_TIME = 0.2; // the worker's steps when he wanders on the title screen
-const PLAY_RECT = [18, 60, 684, 386]; // the board fits here while playing: x, y, w, h
-const TITLE_RECT = [30, 8, 660, 200]; // and here above the title menu
+const MENU_H = 272; // the title menu's height from the bottom of the screen, in px
 
 const hh = createHandheld({ clearColor: BG });
 const { renderer, input } = hh;
 
+// The board fits here while playing (x, y, w, h in px): under the bar and
+// above the hint. On the title screen it fits above the menu.
+const PLAY_RECT = [18, 60, hh.width - 36, hh.height - 94];
+const TITLE_RECT = [30, 8, hh.width - 60, hh.height - MENU_H - 8];
+
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(BG, 20, 40);
-const camera = new THREE.PerspectiveCamera(36, hh.width / hh.height, 0.5, 60);
+const camera = new THREE.PerspectiveCamera(36, hh.aspect, 0.5, 60);
+// view.js frames every board inside a rectangle of the screen itself, so the
+// camera keeps its designed fov on every shape (minAspect: the screen's own).
+hh.fitCamera(camera, { minAspect: hh.aspect });
 
 scene.add(new THREE.HemisphereLight(0xfff4e0, 0x4a5580, 1.45));
 const sun = new THREE.DirectionalLight(0xffffff, 1.55);
@@ -422,8 +429,20 @@ function updateClear() {
   }
 }
 
+// Compile every material and upload every texture now, with one of each
+// kind of object in the scene (empty particle and glow pools included), so
+// nothing stalls the first time it shows during play.
+function warmUp() {
+  scene.traverse((o) => {
+    if (o.material?.map) renderer.initTexture(o.material.map);
+  });
+  view.update(0, 0, 0, 0);
+  renderer.compile(scene, camera);
+}
+
 toTitle();
 view.fit(puzzle.W, puzzle.H, TITLE_RECT[0], TITLE_RECT[1], TITLE_RECT[2], TITLE_RECT[3], true);
+warmUp();
 
 hh.run((dt) => {
   if (state !== 'paused') {

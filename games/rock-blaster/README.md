@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Open the address it prints. The game shows in a 720×480 frame, the size of the handheld's screen.
+Open the address it prints. The game shows in a 720×480 frame, the size of the handheld's screen; the links under it try the other screen shapes (4:3, 16:9 and 1:1).
 
 ## Controls in the browser
 

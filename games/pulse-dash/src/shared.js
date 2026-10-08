@@ -55,8 +55,11 @@ export function quad(w, h, x, y, z, hex, up) {
   return paint(g, hex);
 }
 
-// A soft round glow drawn once on a canvas, for additive halos.
+// A soft round glow drawn once on a canvas, for additive halos. Every halo
+// shares the one texture.
+let glow = null;
 export function glowTexture() {
+  if (glow) return glow;
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
@@ -67,9 +70,9 @@ export function glowTexture() {
   gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 64, 64);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+  glow = new THREE.CanvasTexture(canvas);
+  glow.colorSpace = THREE.SRGBColorSpace;
+  return glow;
 }
 
 // The kick's pulse at song time t: 1 on each beat, fading over the beat.

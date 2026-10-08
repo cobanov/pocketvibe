@@ -13,7 +13,7 @@ export const HORIZON = 0xd4efff;
 export const BIRD_X = -4;
 export const CEILING_Y = 14.2; // the bird cannot fly above this (top of the screen)
 export const SPAWN_X = 13.4; // new pipes appear here, just off the right edge
-export const DESPAWN_X = -13.8; // and are recycled once past the left edge
+export const DESPAWN_X = -15; // and are recycled once they and their shadows are past the left edge
 
 const tmpColor = new THREE.Color();
 

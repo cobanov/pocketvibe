@@ -2,7 +2,7 @@
 // A (or UP) flaps, START pauses.
 
 import * as THREE from 'three';
-import { createHandheld } from './handheld.js';
+import { SCREEN, createHandheld } from './handheld.js';
 import { BIRD_X, HORIZON } from './shared.js';
 import { createWorld } from './world.js';
 import { createPipes } from './pipes.js';
@@ -29,19 +29,30 @@ scene.fog = new THREE.Fog(HORIZON, 30, 110);
 
 // A side view with a slight upward tilt, so the horizon sits low and the
 // pipes stand out against the sky.
-const camera = new THREE.PerspectiveCamera(40, hh.width / hh.height, 1, 110);
+const FOV = 40;
+const camera = new THREE.PerspectiveCamera(FOV, hh.aspect, 1, 110);
+hh.fitCamera(camera); // the 40 degree view stays whole; wide screens see more at the sides
 const CAM_Y = 4.2;
 const CAM_Z = 22;
 const LOOK_Y = 6.6;
 const lookAt = new THREE.Vector3();
+
+// How much wider than on the 3:2 screen the view is, as a factor and in world
+// units at the pipes (measured a little behind them, where their shadows lie).
+// On wide screens pipes appear and vanish that much further out and the
+// scenery layers are that much wider, so nothing pops in or out in view. The
+// pipes keep their spacing and gaps, so the game plays the same.
+const halfWidth = (fov, aspect) => Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect;
+const WIDEN = halfWidth(camera.fov, hh.aspect) / halfWidth(FOV, SCREEN.width / SCREEN.height);
+const SIDE_ROOM = (WIDEN - 1) * halfWidth(FOV, SCREEN.width / SCREEN.height) * (CAM_Z + 2);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0xc2b08a, 1.4));
 const sun = new THREE.DirectionalLight(0xfff2dc, 1.7);
 sun.position.set(-6, 12, 9);
 scene.add(sun);
 
-const world = createWorld(scene);
-const pipes = createPipes(scene);
+const world = createWorld(scene, WIDEN);
+const pipes = createPipes(scene, SIDE_ROOM);
 const bird = createBird(scene);
 const particles = createParticles(scene);
 const hud = createHud(hh.hud);

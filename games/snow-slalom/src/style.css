@@ -16,8 +16,9 @@ body {
   gap: 16px;
 }
 
-/* #frame takes the scaled size in the page layout; #screen is always 720x480
-   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+/* #frame takes the scaled size in the page layout; #screen is the game's
+   screen (its size comes from handheld.js) inside it and gets scaled with a
+   transform, so HUD pixel values stay valid. */
 #frame {
   flex: none;
   box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
@@ -26,8 +27,8 @@ body {
 
 #screen {
   position: relative;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
   overflow: hidden;
   background: #000;
   transform-origin: top left;
@@ -35,8 +36,8 @@ body {
 
 #screen canvas {
   display: block;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
 }
 
 #hud {
@@ -339,12 +340,14 @@ body.handheld #legend {
   }
 }
 
-/* A big word over the slope: COMBO ×5, MISSED!, CRASH! */
+/* A big word over the slope: COMBO ×5, MISSED!, CRASH! Placed from the
+   middle of the screen, as the 3D view grows evenly above and below it on
+   taller screens; this keeps it just over the horizon on every shape. */
 #callout {
   position: absolute;
   left: 0;
   right: 0;
-  top: 128px;
+  top: calc(50% - 112px);
   text-align: center;
   font-size: 46px;
   font-weight: 900;

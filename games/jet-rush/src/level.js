@@ -29,7 +29,11 @@ function rand(a, b) {
   return a + Math.random() * (b - a);
 }
 
-export function createLevel(zappers, coins, missiles) {
+// sideRoom: how much further than on the 3:2 screen the view reaches to the
+// right. Patterns start that much further out, so they never pop in on a wide
+// screen; they keep their spacing, so the run plays the same.
+export function createLevel(zappers, coins, missiles, sideRoom = 0) {
+  const spawnX = SPAWN_X + sideRoom;
   const weights = new Float32Array(KINDS);
   // Missile triggers ride along with the world like everything else.
   const markerX = new Float32Array(MAX_MARKERS);
@@ -220,7 +224,7 @@ export function createLevel(zappers, coins, missiles) {
     update(move, d, speed, heroY) {
       untilNext -= move;
       while (untilNext <= 0) {
-        const width = spawn(SPAWN_X + untilNext, d, speed);
+        const width = spawn(spawnX + untilNext, d, speed);
         untilNext += width + speed * (0.9 - 0.45 * d) + 1.4;
       }
       for (let i = 0; i < MAX_MARKERS; i++) {

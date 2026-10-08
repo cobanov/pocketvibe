@@ -7,8 +7,7 @@ import * as THREE from 'three';
 import { COLS, GRASS, HALF, LILY_Y, LOG_Y, RAIL, RIVER, ROAD, WATER_Y, clamp, randInt } from './shared.js';
 import * as models from './models.js';
 
-export const ROWS = 20; // row slots in the pool: all the screen shows, and a little more
-export const BEHIND = 6; // rows kept behind the camera row
+const AHEAD = 14; // rows kept from the camera row on: all the screen shows ahead, and a little more
 
 const MAX_MOVERS = 6; // cars, trucks, logs or lily pads per row
 const WRAP = 13; // movers loop over x in [-WRAP, WRAP)
@@ -133,7 +132,10 @@ function instanced(geometry, material, count, colors) {
   return mesh;
 }
 
-export function createWorld(scene, shadowMaterial) {
+// behind: rows kept behind the camera row, enough for the bottom of the
+// screen (taller screens see further back).
+export function createWorld(scene, shadowMaterial, behind = 6) {
+  const ROWS = behind + AHEAD; // row slots in the pool
   const rows = [];
   for (let i = 0; i < ROWS; i++) rows.push(makeRow());
 
@@ -554,15 +556,15 @@ export function createWorld(scene, shadowMaterial) {
       lastType = GRASS;
       lastLily = false;
       reach = ALL;
-      first = -BEHIND;
+      first = -behind;
       for (let r = first; r < first + ROWS; r++) generate(r);
       rebuildStatics();
       draw();
     },
 
-    // Recycles rows that fell more than BEHIND rows behind `cameraRow`.
+    // Recycles rows that fell more than `behind` rows behind `cameraRow`.
     advance(cameraRow) {
-      const want = Math.floor(cameraRow) - BEHIND;
+      const want = Math.floor(cameraRow) - behind;
       if (first >= want) return;
       while (first < want) {
         generate(first + ROWS);

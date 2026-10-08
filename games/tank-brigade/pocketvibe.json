@@ -2,7 +2,7 @@
   "id": "tank-brigade",
   "title": "Tank Brigade",
   "author": "cobanov",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Guard your energy core in a top-down tank battle: blast through brick walls, grab power-ups from flashing tanks and hold out against twenty enemy tanks on each of ten stages.",
   "genre": "Shooter",
   "controls": {
@@ -10,5 +10,6 @@
     "A": "Fire (hold for auto fire); start / play again",
     "B": "Back to title (paused or game over)",
     "START": "Pause / resume"
-  }
+  },
+  "responsive": true
 }

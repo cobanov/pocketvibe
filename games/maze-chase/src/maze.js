@@ -171,7 +171,11 @@ function buildLayout(layout) {
   parts.push(slab(x1, z0 - 0.04, x1 + 0.06, z1 + 0.04, -0.1, 0, rim, rim, rim));
   parts.push(slab(x0 - 0.04, z1, x1 + 0.04, z1 + 0.05, -PLATFORM_H, -PLATFORM_H + 0.06, dim, dim, dim));
 
-  const walls = mergeGeometries(parts);
+  // Thousands of triangles: non-indexed, which WebKit draws without a
+  // per-frame cost for the index.
+  const merged = mergeGeometries(parts);
+  const walls = merged.toNonIndexed();
+  merged.dispose();
   for (const g of parts) g.dispose();
 
   // Floor: a grid of vertices colored by how close they are to a wall, so
@@ -199,7 +203,9 @@ function buildLayout(layout) {
   }
   floor.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   floor.translate(0, -0.01, 0);
-  return { walls, floor };
+  const flat = floor.toNonIndexed(); // thousands of triangles too
+  floor.dispose();
+  return { walls, floor: flat };
 }
 
 // ---- Dots and cores -------------------------------------------------------

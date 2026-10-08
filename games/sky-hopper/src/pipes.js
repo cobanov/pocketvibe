@@ -34,7 +34,11 @@ function pipeGeometry() {
   ]);
 }
 
-export function createPipes(scene) {
+// sideRoom: how much further than on the 3:2 screen the view reaches to each
+// side; pipes appear and are recycled that much further out.
+export function createPipes(scene, sideRoom = 0) {
+  const spawnX = SPAWN_X + sideRoom;
+  const despawnX = DESPAWN_X - sideRoom;
   const mesh = new THREE.InstancedMesh(pipeGeometry(), lowPoly(), MAX_PAIRS * 2);
   mesh.frustumCulled = false; // instances move, so the cached bounds would be wrong
   mesh.count = 0;
@@ -133,12 +137,12 @@ export function createPipes(scene) {
       for (let i = 0; i < MAX_PAIRS; i++) {
         if (!active[i]) continue;
         x[i] -= move;
-        if (x[i] < DESPAWN_X) active[i] = 0;
+        if (x[i] < despawnX) active[i] = 0;
       }
       untilNext -= move;
       if (untilNext <= 0) {
         // Spawned late by -untilNext units, so it has already moved that far.
-        spawn(SPAWN_X + untilNext, d);
+        spawn(spawnX + untilNext, d);
         untilNext += SPACING_EASY + (SPACING_HARD - SPACING_EASY) * d;
       }
       draw();

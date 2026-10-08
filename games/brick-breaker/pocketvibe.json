@@ -2,7 +2,7 @@
   "id": "brick-breaker",
   "title": "Brick Breaker",
   "author": "cobanov",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Bounce the ball, smash every brick and catch the falling power-ups before they hit the floor.",
   "genre": "Arcade",
   "controls": {
@@ -10,5 +10,6 @@
     "A": "Launch the ball; start / play again",
     "B": "Back to title (paused or game over)",
     "START": "Pause / resume"
-  }
+  },
+  "responsive": true
 }

@@ -21,7 +21,8 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(SKY, 28, 62);
 
-const camera = new THREE.PerspectiveCamera(62, hh.width / hh.height, 0.1, 72);
+const camera = new THREE.PerspectiveCamera(62, hh.aspect, 0.1, 72);
+hh.fitCamera(camera);
 const lookAt = new THREE.Vector3();
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x4a6b3a, 1.4));
@@ -97,6 +98,14 @@ function crash() {
 }
 
 toTitle();
+
+// Compile every material and upload every texture now, while loading. The
+// obstacles and coins are empty on the title screen, so without this their
+// shaders would compile when the first run starts.
+scene.traverse((object) => {
+  if (object.material?.map) renderer.initTexture(object.material.map);
+});
+renderer.compile(scene, camera);
 
 hh.run((dt) => {
   let move = 0;

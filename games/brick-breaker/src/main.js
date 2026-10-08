@@ -37,13 +37,17 @@ const SAVE_KEY = 'brick-breaker';
 const CAM_Y = 23;
 const CAM_Z = 9.6;
 const LOOK_Z = 0.7;
+// The part of the view that must stay on screen (width / height): the table
+// and the score columns beside it. Taller screens zoom in on it.
+const VIEW_ASPECT = 1.3;
 
 const hh = createHandheld({ clearColor: BG });
 const { renderer, input } = hh;
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(BG, 34, 60);
-const camera = new THREE.PerspectiveCamera(44, hh.width / hh.height, 1, 64);
+const camera = new THREE.PerspectiveCamera(44, hh.aspect, 1, 64);
+hh.fitCamera(camera, { minAspect: VIEW_ASPECT });
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x5a4a9a, 1.3));
 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -316,6 +320,14 @@ function updateDemo(dt) {
 }
 
 toTitle();
+
+// Upload every texture and compile every material now, while loading: the
+// power-up pills are not drawn until the first one drops, and that would
+// otherwise stall the game in the middle of play.
+scene.traverse((object) => {
+  if (object.material?.map) renderer.initTexture(object.material.map);
+});
+renderer.compile(scene, camera);
 
 hh.run((dt) => {
   if (state !== 'paused') stateTime += dt;

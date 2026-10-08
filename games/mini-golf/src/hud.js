@@ -24,7 +24,8 @@ export function resultName(strokes, par, pickedUp) {
   return `${relative(d)} OVER`;
 }
 
-export function createHud(root) {
+// width and height are the screen's size in px, for keeping popups on it.
+export function createHud(root, width, height) {
   root.innerHTML = `
     <div id="flash"></div>
     <div class="hud-top">
@@ -140,8 +141,8 @@ export function createHud(root) {
       const el = popups[nextPopup];
       nextPopup = (nextPopup + 1) % POPUPS;
       el.textContent = text;
-      el.style.left = `${Math.round(Math.min(640, Math.max(80, x)))}px`;
-      el.style.top = `${Math.round(Math.min(420, Math.max(90, y)))}px`;
+      el.style.left = `${Math.round(Math.min(width - 80, Math.max(80, x)))}px`;
+      el.style.top = `${Math.round(Math.min(height - 60, Math.max(90, y)))}px`;
       el.className = `popup ${cls}`;
       replay(el, 'show');
     },

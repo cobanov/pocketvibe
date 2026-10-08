@@ -16,8 +16,10 @@ body {
   gap: 16px;
 }
 
-/* #frame takes the scaled size in the page layout; #screen is always 720x480
-   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+/* #frame takes the scaled size in the page layout; #screen is always the
+   game's screen size inside it (set by handheld.js: 720x480 on the RG34XX SP,
+   larger on other shapes) and gets scaled with a transform, so HUD pixel
+   values stay valid. */
 #frame {
   flex: none;
   box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
@@ -26,8 +28,8 @@ body {
 
 #screen {
   position: relative;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
   overflow: hidden;
   background: #000;
   transform-origin: top left;
@@ -35,8 +37,8 @@ body {
 
 #screen canvas {
   display: block;
-  width: 720px;
-  height: 480px;
+  width: 100%;
+  height: 100%;
 }
 
 #hud {
@@ -164,9 +166,10 @@ body.handheld #legend {
   to { transform: scale(1); }
 }
 
+/* 122px above the middle: the same spot on the field on every screen shape. */
 #toast {
   position: absolute;
-  top: 118px;
+  top: calc(50% - 122px);
   left: 0;
   right: 0;
   text-align: center;

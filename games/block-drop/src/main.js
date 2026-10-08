@@ -14,6 +14,9 @@ import { createHud } from './hud.js';
 const DIST = 40; // camera distance from the well
 const LOOK_Y = 0.55;
 const PITCH = 0.045; // the camera looks slightly down on the blocks
+// Width / height of the well and its side panels in the designed view, so
+// narrower screens zoom out until all of it shows.
+const BOARD_ASPECT = 1.3;
 const SAVE_KEY = 'block-drop';
 const CLEAR_NAMES = ['', 'SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD!'];
 const HINT = '◀ ▶ move · ▼ ▲ drop · A B rotate · L R hold';
@@ -24,7 +27,8 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0x8a5ab0, 48, 92);
 
-const camera = new THREE.PerspectiveCamera(32, hh.width / hh.height, 1, 100);
+const camera = new THREE.PerspectiveCamera(32, hh.aspect, 1, 100);
+hh.fitCamera(camera, { minAspect: BOARD_ASPECT });
 
 // Only the drifting background blocks are lit; the well has baked shading.
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6a6a9a, 2.2));
@@ -159,9 +163,21 @@ function react() {
   }
 }
 
+// Compile every material and upload every texture now, with one of each
+// kind of object in the scene (empty instance pools included), so nothing
+// stalls the first time it shows during play.
+function warmUp() {
+  scene.traverse((o) => {
+    if (o.material?.map) renderer.initTexture(o.material.map);
+  });
+  placeCamera(0, PITCH, 0, 0);
+  renderer.compile(scene, camera);
+}
+
 layoutHud();
 backdrop.theme(1, true);
 toTitle();
+warmUp();
 
 hh.run((dt) => {
   time += dt;

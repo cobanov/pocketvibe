@@ -2,9 +2,10 @@
   "id": "cloud-climber",
   "title": "Cloud Climber",
   "author": "cobanov",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Bounce from cloud to cloud up an endless sky, from pastel morning to a starry night, dodging storm clouds and grumpy flying pests.",
   "genre": "Platformer",
+  "responsive": true,
   "controls": {
     "D-pad": "Steer left / right",
     "A": "Start / play again",

@@ -123,10 +123,14 @@ function plungerGeometry() {
   return mergeGeometries([shaded(head, 0xff8a2b, 0.55, 0.3), shaded(rod, 0x8a8aa8, 0.6, 0)]);
 }
 
-export function createView(scene) {
+// hh is the device layer: the camera is fitted to its screen shape. Taller
+// screens than 3:2 show more above and below the table, so the score columns
+// beside it keep their room; wider ones show more at the sides.
+export function createView(scene, hh) {
   scene.fog = new THREE.Fog(BG, 36, 70);
 
-  const camera = new THREE.PerspectiveCamera(30, 720 / 480, 1, 70);
+  const camera = new THREE.PerspectiveCamera(30, hh.aspect, 1, 70);
+  hh.fitCamera(camera);
   camera.up.set(0, 0, 1);
   const camBase = new THREE.Vector3(0.8, -12.0, 31.0);
   const camLook = new THREE.Vector3(0.8, 8.1, 0);

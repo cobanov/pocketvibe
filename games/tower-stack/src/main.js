@@ -25,9 +25,10 @@ const DEMO_SKIES = [40, 0, 86]; // sky offsets (in layers) for the demo runs
 const SAVE_KEY = 'tower-stack';
 
 // Orthographic camera at a fixed angle: isometric-looking, rising with the
-// tower. VIEW_H is the visible height in world units at zoom 1.
+// tower. VIEW_H is the visible height in world units at zoom 1 on the 3:2
+// screen; wider screens show more at the sides, taller ones more above and
+// below.
 const VIEW_H = 10;
-const VIEW_W = (VIEW_H * 720) / 480;
 const ELEV = THREE.MathUtils.degToRad(31);
 const COS_E = Math.cos(ELEV);
 const SIN_E = Math.sin(ELEV);
@@ -35,7 +36,6 @@ const DIST = 40;
 const PLAY_LOOK = 0.75; // the camera looks this far above the top: the top sits a little below the centre
 const TITLE_LOOK = 2.7; // lower on screen under the title panel
 const TITLE_ZOOM = 0.8; // and a little further out, so more of the tower shows
-const OVER_SHIFT = VIEW_W * 0.2; // tower to the left of the game-over panel
 
 const hh = createHandheld({ clearColor: 0x7fc0f2 });
 const { renderer, input } = hh;
@@ -43,7 +43,14 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 // Fog only hazes the clouds far behind the tower; the slabs keep their colours.
 scene.fog = new THREE.Fog(0x7fc0f2, 44, 80);
-const camera = new THREE.OrthographicCamera(-VIEW_W / 2, VIEW_W / 2, VIEW_H / 2, -VIEW_H / 2, 1, 110);
+const camera = new THREE.OrthographicCamera(-1, 1, VIEW_H / 2, -VIEW_H / 2, 1, 110);
+hh.fitCamera(camera); // sets the sides for this screen's shape
+// The view's size in world units at zoom 1 on this screen, and how much
+// taller it is than designed (1 on 3:2 and wider screens).
+const SHOWN_W = camera.right - camera.left;
+const SHOWN_H = camera.top - camera.bottom;
+const TALL = SHOWN_H / VIEW_H;
+const OVER_SHIFT = SHOWN_W * 0.2 * TALL; // tower to the left of the game-over panel
 const OFFSET = new THREE.Vector3(DIST * COS_E * Math.SQRT1_2, DIST * SIN_E, DIST * COS_E * Math.SQRT1_2);
 const RIGHT = new THREE.Vector3(1, 0, -1).normalize(); // screen right, on the ground
 const UPWARD = new THREE.Vector3(); // screen up, in the world
@@ -62,8 +69,8 @@ const tower = createTower(scene, slab);
 const debris = createDebris(scene, slab);
 const stack = createStack(scene, slab, tower, debris);
 const fx = createFx(scene);
-const sky = createSky(camera, VIEW_W, VIEW_H, scene.fog);
-const clouds = createClouds(scene, COS_E, SIN_E, VIEW_W, VIEW_H);
+const sky = createSky(camera, SHOWN_W, SHOWN_H, scene.fog);
+const clouds = createClouds(scene, COS_E, SIN_E, SHOWN_W, SHOWN_H);
 const hud = createHud(hh.hud);
 
 let state = 'title'; // title | play | paused | falling | over
@@ -302,14 +309,16 @@ function frame() {
   const h = tower.height;
   const room = state === 'title' ? 0.6 : 0.8;
   const extent = (h + 4) * COS_E + SIZE * Math.SQRT2 * SIN_E;
-  // Always a little pull back, even for a short tower.
-  goalZoom = Math.min(state === 'title' ? 0.7 : 0.85, (VIEW_H * room) / extent);
+  // Always a little pull back, even for a short tower. Screens taller than
+  // 3:2 zoom in by as much as they are taller, so the tower fills them the
+  // same way and its foot stays in the cloud bank.
+  goalZoom = Math.min(state === 'title' ? 0.7 : 0.85, (VIEW_H * room) / extent) * TALL;
   goalX = 0;
   goalZ = 0;
   goalY = (h - 4) / 2 + 0.9;
   // Under the title panel the tower sits lower; beside the game-over panel
   // it moves left.
-  if (state === 'title') goalY += (VIEW_H * 0.16) / goalZoom / COS_E;
+  if (state === 'title') goalY += (SHOWN_H * 0.16) / goalZoom / COS_E;
   goalShift = state === 'title' ? 0 : OVER_SHIFT;
   if (state === 'title' && h < 6) goalY = h + TITLE_LOOK;
 }
@@ -340,6 +349,11 @@ function updateCamera(dt) {
 }
 
 toTitle();
+
+// Compile every material now, while loading: the offcuts, rings, sparkles
+// and stars are not drawn until later, and would stall the game the first
+// time they show up.
+renderer.compile(scene, camera);
 
 hh.run((dt) => {
   const paused = state === 'paused';

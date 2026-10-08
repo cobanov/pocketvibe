@@ -22,7 +22,8 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(SKY, 60, 140);
 
-const camera = new THREE.PerspectiveCamera(64, hh.width / hh.height, 0.3, 160);
+const camera = new THREE.PerspectiveCamera(64, hh.aspect, 0.3, 160);
+hh.fitCamera(camera);
 const lookAt = new THREE.Vector3();
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x5a7a4a, 1.5));
@@ -60,6 +61,7 @@ let camYaw = 0;
 let camDist = 7;
 let camHeight = 3;
 let fov = 64;
+let fittedFov = 64; // the designed fov the camera was last fitted to
 
 const HINT = 'A gas · B brake · ◀ ▶ steer';
 
@@ -202,6 +204,13 @@ function titleCamera() {
 
 toTitle();
 
+// Compile every material and upload every texture now, while loading, so
+// nothing stalls the first time it comes into view during the race.
+scene.traverse((object) => {
+  if (object.material?.map) renderer.initTexture(object.material.map);
+});
+renderer.compile(scene, camera);
+
 hh.run((dt) => {
   time += dt;
   stateTime += dt;
@@ -270,9 +279,9 @@ hh.run((dt) => {
 
   if (state !== 'paused') {
     fov += (targetFov - fov) * Math.min(1, dt * 4);
-    if (Math.abs(camera.fov - fov) > 0.05) {
-      camera.fov = fov;
-      camera.updateProjectionMatrix();
+    if (Math.abs(fittedFov - fov) > 0.05) {
+      fittedFov = fov;
+      hh.fitCamera(camera, { fov });
     }
     shake = Math.max(0, shake - dt);
     const jitter = shake * 0.9;

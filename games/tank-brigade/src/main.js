@@ -50,7 +50,11 @@ const { renderer, input } = hh;
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(BG, 34, 52);
-const camera = new THREE.PerspectiveCamera(30, hh.width / hh.height, 1, 56);
+const camera = new THREE.PerspectiveCamera(30, hh.aspect, 1, 56);
+// The whole field and the side panels' room stay in view on every screen
+// shape: wider screens show more of the camp at the sides, taller ones more
+// above and below.
+hh.fitCamera(camera);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x5a5a48, 1.25));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -556,6 +560,38 @@ function updateBattle(dt, spawning) {
   }
 }
 
+// Loading: put one of every kind of object on screen (every tank kind with
+// the shield, a spawn twinkle, shells, an explosion, a power-up and the
+// wrecked core), compile every material and upload every geometry now, so
+// nothing stalls the first time it appears in play. toTitle() clears them.
+function warmUp() {
+  camera.position.set(0, CAM_Y, CAM_Z);
+  camera.lookAt(0, 0, LOOK_Z);
+  loadStage(0);
+  for (let k = 0; k < KINDS.length; k++) {
+    const t = tanks.spawn(k, k, tileCenter(2 + k * 2), tileCenter(6), UP, false);
+    t.spawnT = 0;
+    t.live = true;
+    t.pop = 1;
+  }
+  player.shield = 1;
+  tanks.fire(player, GUN_SPEED[0], false, 1);
+  tanks.fire(tanks.list[1], GUN_SPEED[0], false, 1);
+  bullets.update(0, tanks.list, events);
+  fx.explode(0, 0, 1, 0xffffff);
+  fx.update(0.01);
+  items.spawn(STAR, 0, tileCenter(4));
+  field.destroyCore();
+  tanks.draw(0, false);
+  renderer.compile(scene, camera);
+  renderer.render(scene, camera);
+  // The spawn twinkle, drawn in place of the basic tank.
+  tanks.list[1].spawnT = 0.5;
+  tanks.draw(0, false);
+  renderer.render(scene, camera);
+}
+
+warmUp();
 toTitle();
 
 hh.run((dt) => {

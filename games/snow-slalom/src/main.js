@@ -34,7 +34,8 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(SKY, 38, 96);
 
-const camera = new THREE.PerspectiveCamera(FOV, hh.width / hh.height, 0.5, 220);
+const camera = new THREE.PerspectiveCamera(FOV, hh.aspect, 0.5, 220);
+hh.fitCamera(camera);
 const lookAt = new THREE.Vector3();
 const screenPos = new THREE.Vector3();
 const ski = { x: 0, z: 0 };
@@ -71,6 +72,7 @@ let shake = 0;
 let camX = 0;
 let camZ = CAM_BACK;
 let fov = FOV;
+let fittedFov = FOV; // the designed fov the camera was last fitted to
 let sprayAcc = 0;
 let demoTuck = false;
 let best = hh.load(SAVE_KEY, null)?.best || 0;
@@ -324,14 +326,22 @@ function updateCamera(dt, live) {
   camera.position.set(camX + (Math.random() - 0.5) * j, slopeY(camZ) + CAM_UP + (Math.random() - 0.5) * j, camZ);
   lookAt.set(camX * 0.4 + skier.x * 0.6, slopeY(skier.z - LOOK_AHEAD) + 0.3, skier.z - LOOK_AHEAD);
   camera.lookAt(lookAt);
-  if (Math.abs(camera.fov - fov) > 0.01) {
-    camera.fov = fov;
-    camera.updateProjectionMatrix();
+  if (Math.abs(fittedFov - fov) > 0.01) {
+    fittedFov = fov;
+    hh.fitCamera(camera, { fov });
   }
   world.placeBackdrop(camera);
 }
 
 toTitle();
+
+// Compile every material and upload every texture now, while loading:
+// kickers, fences and moguls only show up far into a run, so without this
+// their first appearance could stall the game.
+scene.traverse((object) => {
+  if (object.material?.map) renderer.initTexture(object.material.map);
+});
+renderer.compile(scene, camera);
 
 hh.run((dt) => {
   stateT += dt;

@@ -4,7 +4,7 @@
 // vanishes after a few seconds.
 
 import * as THREE from 'three';
-import { createHandheld } from './handheld.js';
+import { SCREEN, createHandheld } from './handheld.js';
 import { DIR_X, DIR_Z, DOWN, LEFT, RIGHT, SKY, UP, cellX, cellZ } from './shared.js';
 import { createBoard } from './board.js';
 import { createSnake } from './snake.js';
@@ -31,16 +31,19 @@ scene.fog = new THREE.Fog(SKY, 40, 62);
 // Angled top-down view that fits the whole board under the HUD row.
 const CAM_Y = 28.8;
 const CAM_Z = 14.3;
-const camera = new THREE.PerspectiveCamera(36, hh.width / hh.height, 1, 64);
+const camera = new THREE.PerspectiveCamera(36, hh.aspect, 1, 64);
 camera.position.set(0, CAM_Y, CAM_Z);
 camera.lookAt(0, 0, 0.2);
+// The whole designed view stays in view: taller screens show more grass
+// above and below the board, wider ones more at the sides.
+hh.fitCamera(camera);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7a5a, 1.35));
 const sun = new THREE.DirectionalLight(0xffffff, 1.5);
 sun.position.set(6, 14, 8);
 scene.add(sun);
 
-createBoard(scene);
+createBoard(scene, { taller: hh.viewScale() > 1, wider: hh.aspect > SCREEN.width / SCREEN.height });
 const snake = createSnake(scene);
 const food = createFood(scene, snake);
 const fx = createFx(scene);
@@ -187,6 +190,11 @@ function readTurns() {
   if (input.pressed('LEFT')) snake.turn(LEFT);
   if (input.pressed('RIGHT')) snake.turn(RIGHT);
 }
+
+// Compile every material now, with one of each kind of object in the scene
+// (the hidden star and ring and the empty particle pool included), so nothing
+// stalls the first time it shows during play.
+renderer.compile(scene, camera);
 
 toTitle();
 

@@ -62,7 +62,10 @@ const { renderer, input } = hh;
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(SKY, 24, 50);
-const camera = new THREE.PerspectiveCamera(50, hh.width / hh.height, 0.1, 75);
+const camera = new THREE.PerspectiveCamera(50, hh.aspect, 0.1, 75);
+// Wider screens show more at the sides, taller ones more above and below;
+// the overview of a hole fits on every shape.
+hh.fitCamera(camera);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6a8a50, 1.35));
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -76,7 +79,7 @@ const bumpers = createBumpers(scene);
 const fx = createFx(scene);
 const view = createBallView(scene);
 const aim = createAim(scene);
-const hud = createHud(hh.hud);
+const hud = createHud(hh.hud, hh.width, hh.height);
 const ball = createBall();
 
 const camPos = new THREE.Vector3();
@@ -713,6 +716,18 @@ function updateHint() {
 }
 
 toTitle();
+
+// Draw every hole once while loading, so all their meshes are uploaded and
+// every material is compiled now instead of when a hole first shows up. The
+// second render, with only the title hole, is the one that reaches the
+// screen.
+camera.position.copy(camPos);
+camera.lookAt(camLook);
+for (let i = 0; i < holes.length; i++) holes[i].group.visible = true;
+renderer.compile(scene, camera);
+renderer.render(scene, camera);
+for (let i = 0; i < holes.length; i++) holes[i].group.visible = holes[i] === hole;
+renderer.render(scene, camera);
 
 hh.run((dt) => {
   let live = true; // false while paused: nothing moves

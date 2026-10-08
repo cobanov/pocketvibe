@@ -5,7 +5,8 @@ import * as THREE from 'three';
 export const BG = 0x0c0f2e; // deep space blue behind everything
 
 // The play field in world units: 1 unit = 20 screen pixels, so 36 x 24 units
-// fill the 720x480 screen exactly. The camera looks down the -z axis and
+// fill the 3:2 screen exactly. Other screen shapes show a dark frame around
+// the same field (see space.js). The camera looks down the -z axis and
 // everything plays on the z = 0 plane.
 export const HALF_W = 18;
 export const HALF_H = 12;

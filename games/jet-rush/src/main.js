@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { createHandheld } from './handheld.js';
-import { BG, CAM_X, CAM_Z, FOV, HERO_X, MID_Y } from './shared.js';
+import { BG, CAM_X, CAM_Z, FOV, HERO_X, MID_Y, VIEW_HALF_W } from './shared.js';
 import { createWorld } from './world.js';
 import { createParticles } from './particles.js';
 import { createHero } from './hero.js';
@@ -26,8 +26,12 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(BG, 15, 34);
 
-const camera = new THREE.PerspectiveCamera(FOV, hh.width / hh.height, 0.5, 36);
+const camera = new THREE.PerspectiveCamera(FOV, hh.aspect, 0.5, 36);
+hh.fitCamera(camera); // the corridor stays whole; wide screens see more ahead and behind
 const lookAt = new THREE.Vector3();
+// How much further than on the 3:2 screen the view reaches to each side at
+// z = 0: hazards start and missiles launch that much further out.
+const SIDE_ROOM = Math.max(0, CAM_Z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * hh.aspect - VIEW_HALF_W);
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x6d7fa3, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -38,9 +42,9 @@ const world = createWorld(scene);
 const particles = createParticles(scene);
 const hero = createHero(scene, particles);
 const zappers = createZappers(scene, particles);
-const missiles = createMissiles(scene, particles);
+const missiles = createMissiles(scene, particles, SIDE_ROOM);
 const coinField = createCoins(scene, particles, zappers);
-const level = createLevel(zappers, coinField, missiles);
+const level = createLevel(zappers, coinField, missiles, SIDE_ROOM);
 const hud = createHud(hh.hud);
 
 let state = 'title'; // title | play | paused | dying | over
@@ -146,6 +150,12 @@ function gameOver() {
 }
 
 toTitle();
+// Upload every texture and build every shader now (all kinds of objects are
+// in the scene, even if hidden or empty), so nothing stalls mid-run.
+scene.traverse((object) => {
+  if (object.material?.map) renderer.initTexture(object.material.map);
+});
+renderer.compile(scene, camera);
 
 hh.run((dt) => {
   time += dt;

@@ -16,8 +16,9 @@ body {
   gap: 16px;
 }
 
-/* #frame takes the scaled size in the page layout; #screen is always 720x480
-   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+/* #frame takes the scaled size in the page layout; #screen is the game's
+   screen size inside it (set by handheld.js) and gets scaled with a transform,
+   so HUD pixel values stay valid. */
 #frame {
   flex: none;
   box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
@@ -26,8 +27,8 @@ body {
 
 #screen {
   position: relative;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
   overflow: hidden;
   background: #000;
   transform-origin: top left;
@@ -35,8 +36,8 @@ body {
 
 #screen canvas {
   display: block;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
 }
 
 #hud {
@@ -166,12 +167,13 @@ body.handheld #legend {
   text-shadow: 0 3px 0 #000, 0 0 8px #000;
 }
 
+/* Placed from the middle of the screen, where the table is on every shape. */
 #banner {
-  top: 170px;
+  top: calc(50% - 70px);
 }
 
 #callout {
-  top: 300px;
+  top: calc(50% + 60px);
   font-size: 28px;
 }
 
@@ -241,7 +243,7 @@ body.handheld #legend {
   position: absolute;
   left: 0;
   right: 0;
-  top: 330px;
+  top: calc(50% + 90px);
   text-align: center;
   font-size: 22px;
   font-weight: 700;

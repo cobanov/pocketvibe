@@ -2,7 +2,7 @@
   "id": "road-hopper",
   "title": "Road Hopper",
   "author": "cobanov",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Hop a voxel chicken across endless roads, rivers and railways without getting squashed, soaked or snatched by the hawk.",
   "genre": "Arcade",
   "controls": {
@@ -10,5 +10,6 @@
     "A": "Start / play again",
     "B": "Back to title (paused or game over)",
     "START": "Pause / resume"
-  }
+  },
+  "responsive": true
 }

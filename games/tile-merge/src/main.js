@@ -36,7 +36,10 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(BG, 17, 36);
 
-const camera = new THREE.PerspectiveCamera(32, hh.width / hh.height, 1, 38);
+const camera = new THREE.PerspectiveCamera(32, hh.aspect, 1, 38);
+// The whole designed view stays in view, so the board never runs under the
+// score and undo boxes beside it; taller screens show more table.
+hh.fitCamera(camera);
 
 // Only the table and its things are lit; the board and tiles have baked shading.
 scene.add(new THREE.HemisphereLight(0xfff4e6, 0x9a6a4a, 1.6));
@@ -313,7 +316,24 @@ function placeCamera(dt) {
   camera.lookAt(leanX * 0.14, 0, TITLE_LOOK_Z + (LOOK_Z - TITLE_LOOK_Z) * v + leanZ * 0.12);
 }
 
+// Compile every material and upload every texture now, with one of each
+// kind of object in the scene (empty pools and the hidden ring included), so
+// nothing stalls the first time it shows during play.
+function warmUp() {
+  scene.traverse((o) => {
+    const m = o.material;
+    if (!m) return;
+    if (m.map) renderer.initTexture(m.map);
+    for (const key in m.uniforms) {
+      if (m.uniforms[key].value?.isTexture) renderer.initTexture(m.uniforms[key].value);
+    }
+  });
+  placeCamera(0);
+  renderer.compile(scene, camera);
+}
+
 toTitle();
+warmUp();
 
 hh.run((dt) => {
   if (state !== 'paused') stateTime += dt;
@@ -357,6 +377,8 @@ hh.run((dt) => {
     } else if (panelShown && input.pressed('A')) {
       state = 'play';
       hud.message('');
+      // The winning move can fill the board with nothing left to merge.
+      if (!game.canMove()) gameOver();
     } else if (panelShown && input.pressed('B')) {
       toTitle();
     }

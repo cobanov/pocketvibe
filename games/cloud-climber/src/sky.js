@@ -15,7 +15,6 @@ const STAR_Z = -76;
 const DISC_Z = -70;
 const STARS = 110;
 const CLOUDS = 7;
-const ASPECT = 1.5;
 
 // Sky colors (top, middle, bottom of the screen) for day, dusk and night.
 const DAY = [0x86cdf6, 0xbfe6fb, 0xffe1ee];
@@ -138,15 +137,16 @@ function frameGeometry() {
 }
 
 // A screen-filling plane with one row of vertices per band of the gradient.
-function skyPlane() {
+function skyPlane(aspect) {
   const h = viewHalf(SKY_Z) * 2 + 4;
-  const g = new THREE.PlaneGeometry(h * ASPECT + 8, h, 1, 12);
+  const g = new THREE.PlaneGeometry(h * aspect + 8, h, 1, 12);
   paint(g, 0xffffff);
   return g;
 }
 
 // A layer of pieces at depths z0..z1 that wrap back above the view.
-function createLayer(scene, geometry, material, count, z0, z1, place) {
+// place(item, halfW) gets the half width of the view at the item's depth.
+function createLayer(scene, geometry, material, count, z0, z1, aspect, place) {
   const mesh = new THREE.InstancedMesh(geometry, material, count);
   mesh.frustumCulled = false; // instances move, so the cached bounds would be wrong
   scene.add(mesh);
@@ -164,7 +164,7 @@ function createLayer(scene, geometry, material, count, z0, z1, place) {
       const half = viewHalf(it.z);
       const mid = camY - viewDrop(it.z);
       it.y = above ? mid + half + rand(1, half) : mid + rand(-half, half);
-      place(it, half * ASPECT);
+      place(it, half * aspect);
     },
     // Moves pieces that fell under the view back up above it.
     recycle(camY, margin) {
@@ -176,13 +176,20 @@ function createLayer(scene, geometry, material, count, z0, z1, place) {
   };
 }
 
-export function createSky(scene, renderer) {
+// aspect: the screen's width / height. The view keeps its height on every
+// screen (see main.js), so wider screens show more margin at the sides.
+export function createSky(scene, renderer, aspect) {
+  // Where the margins begin, as a share of the half width of the view: the
+  // sun, the moon and the big clouds stay out past it, or near the edges on
+  // screens with narrow margins.
+  const margin = (HALF_W + 0.5) / (viewHalf(0) * aspect);
+
   const hemi = new THREE.HemisphereLight(0xffffff, 0xb6a8d0, 1.35);
   const sun = new THREE.DirectionalLight(0xffffff, 1.5);
   sun.position.set(-4, 10, 8);
   scene.add(hemi, sun);
 
-  const sky = new THREE.Mesh(skyPlane(), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+  const sky = new THREE.Mesh(skyPlane(aspect), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
   scene.add(sky);
   const skyColors = sky.geometry.attributes.color;
   const skyPos = sky.geometry.attributes.position;
@@ -205,7 +212,7 @@ export function createSky(scene, renderer) {
   const starHalf = viewHalf(STAR_Z);
   const dummy = new THREE.Object3D();
   for (let i = 0; i < STARS; i++) {
-    dummy.position.set(rand(-starHalf * ASPECT, starHalf * ASPECT), rand(-starHalf * 0.6, starHalf), 0);
+    dummy.position.set(rand(-starHalf * aspect, starHalf * aspect), rand(-starHalf * 0.6, starHalf), 0);
     dummy.scale.setScalar(Math.random() < 0.12 ? rand(0.6, 0.85) : rand(0.25, 0.45));
     dummy.updateMatrix();
     stars.setMatrixAt(i, dummy.matrix);
@@ -241,9 +248,10 @@ export function createSky(scene, renderer) {
   scene.add(frame);
 
   // Big soft clouds drifting far behind the column.
-  const clouds = createLayer(scene, skyCloudGeometry(), lowPoly(0x56627c), CLOUDS, -52, -30, (it, halfW) => {
+  const cloudFrom = Math.max(0.68, margin);
+  const clouds = createLayer(scene, skyCloudGeometry(), lowPoly(0x56627c), CLOUDS, -52, -30, aspect, (it, halfW) => {
     // Out in the margins, so they never pass for clouds to climb.
-    it.x = (Math.random() < 0.5 ? -1 : 1) * rand(halfW * 0.68, halfW * 1.05);
+    it.x = (Math.random() < 0.5 ? -1 : 1) * rand(halfW * cloudFrom, halfW * (cloudFrom + 0.37));
     it.s = rand(2.4, 4);
     it.sy = it.s * rand(0.6, 0.8);
     it.turn = rand(-0.4, 0.4);
@@ -251,7 +259,7 @@ export function createSky(scene, renderer) {
   });
 
   // Hot-air balloons, mostly out in the margins.
-  const balloons = createLayer(scene, balloonGeometry(), lowPoly(0x262626), 5, -30, -12, (it, halfW) => {
+  const balloons = createLayer(scene, balloonGeometry(), lowPoly(0x262626), 5, -30, -12, aspect, (it, halfW) => {
     const side = Math.random() < 0.5 ? -1 : 1;
     it.x = Math.random() < 0.7 ? side * rand(halfW * 0.6, halfW * 0.92) : rand(-halfW * 0.5, halfW * 0.5);
     it.s = rand(0.9, 1.3);
@@ -270,6 +278,7 @@ export function createSky(scene, renderer) {
     6,
     -16,
     -8,
+    aspect,
     (it, halfW) => {
       it.vx = (Math.random() < 0.5 ? -1 : 1) * rand(1.6, 2.6);
       it.x = -Math.sign(it.vx) * halfW * rand(0.9, 1.4);
@@ -371,11 +380,12 @@ export function createSky(scene, renderer) {
       const discMid = camY - viewDrop(DISC_Z);
       // The sun sinks through dusk; the moon rises with the night.
       const sunY = discMid + discHalf * (0.55 - duskAmt * 1.05 - nightAmt * 0.8);
-      sunDisc.position.set(discHalf * ASPECT * 0.72, sunY, DISC_Z);
+      const discX = discHalf * aspect * Math.max(0.72, margin);
+      sunDisc.position.set(discX, sunY, DISC_Z);
       sunHalo.position.set(sunDisc.position.x, sunY, DISC_Z - 0.5);
       sunDisc.visible = sunHalo.visible = nightAmt < 0.99;
       const moonY = discMid + discHalf * (-1.3 + nightAmt * 1.85);
-      moonDisc.position.set(-discHalf * ASPECT * 0.72, moonY, DISC_Z);
+      moonDisc.position.set(-discX, moonY, DISC_Z);
       moonHalo.position.set(moonDisc.position.x, moonY, DISC_Z - 0.5);
       moonDisc.visible = moonHalo.visible = nightAmt > 0.01;
 
@@ -389,7 +399,7 @@ export function createSky(scene, renderer) {
         const b = birds.items[i];
         b.x += b.vx * dt;
         b.y += Math.sin(b.t * 1.3) * 0.2 * dt;
-        if (Math.abs(b.x) > viewHalf(b.z) * ASPECT * 1.5) birds.respawn(i, camY, false);
+        if (Math.abs(b.x) > viewHalf(b.z) * aspect * 1.5) birds.respawn(i, camY, false);
       }
       clouds.recycle(camY, 4);
       balloons.recycle(camY, 3);

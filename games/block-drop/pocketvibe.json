@@ -2,7 +2,7 @@
   "id": "block-drop",
   "title": "Block Drop",
   "author": "cobanov",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Falling-block puzzle with chunky 3D pieces. Clear lines, chain combos and keep the stack low.",
   "genre": "Puzzle",
   "controls": {
@@ -13,5 +13,6 @@
     "B": "Rotate counter-clockwise; back to title (paused or game over)",
     "L / R": "Hold the piece",
     "START": "Pause / resume"
-  }
+  },
+  "responsive": true
 }

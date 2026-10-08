@@ -2,14 +2,15 @@
   "id": "neon-pinball",
   "title": "Neon Pinball",
   "author": "cobanov",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "A glowing pinball table made for the handheld: L and R are the flippers.",
-  "genre": "Pinball",
+  "genre": "Arcade",
   "controls": {
     "L / LEFT": "Left flipper",
     "R / A": "Right flipper (A also starts / plays again)",
     "DOWN": "Hold to pull the plunger, release to launch",
     "START": "Pause / resume",
     "B": "Back to title (paused or game over)"
-  }
+  },
+  "responsive": true
 }

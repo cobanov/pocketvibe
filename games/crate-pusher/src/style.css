@@ -421,19 +421,21 @@ body.handheld #legend {
   text-shadow: 0 3px 0 #000, 0 0 8px #000;
 }
 
+/* The banner sits a little above the middle of the board. */
 #banner {
-  top: 150px;
+  top: calc(50% - 90px);
 }
 
+/* Callouts sit just above the hint at the bottom. */
 #callout {
-  top: 380px;
+  bottom: 71px;
   font-size: 24px;
   color: #fff;
 }
 
-/* On the title screen callouts sit above the menu. */
+/* On the title screen callouts sit just above the menu. */
 #menu:not([hidden]) ~ #callout {
-  top: 178px;
+  bottom: 273px;
 }
 
 #callout .warn {

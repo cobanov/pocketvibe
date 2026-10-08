@@ -28,7 +28,10 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(SPACE, 34, 88);
 
-const camera = new THREE.PerspectiveCamera(44, hh.width / hh.height, 0.5, 92);
+const camera = new THREE.PerspectiveCamera(44, hh.aspect, 0.5, 92);
+// The whole field stays in view on every screen shape: wider screens show
+// more space at the sides, taller ones more above and below.
+hh.fitCamera(camera);
 const CAM_Y = 23.5;
 const CAM_Z = 13.5;
 const LOOK_Z = -0.2;
@@ -274,6 +277,26 @@ function updateDemo(dt) {
   }
 }
 
+// Loading: put one of every kind of object on screen (saucer, bullet, bomb,
+// debris), compile every material and upload every texture and geometry
+// now, so nothing stalls the first time it appears in play. toTitle()
+// clears them again.
+function warmUp() {
+  saucer.active = true;
+  saucer.update(0, false, 0, 0);
+  shots.fire(0, 0);
+  shots.drop(0, -4, 0);
+  shots.draw();
+  fx.burst(0, 1, 0, 0xffffff, 1, 0, 0.2);
+  fx.update(0);
+  camera.position.set(0, CAM_Y, CAM_Z);
+  camera.lookAt(lookAt.set(0, 0, LOOK_Z));
+  for (const texture of background.textures) renderer.initTexture(texture);
+  renderer.compile(scene, camera);
+  renderer.render(scene, camera);
+}
+
+warmUp();
 toTitle();
 
 hh.run((dt) => {

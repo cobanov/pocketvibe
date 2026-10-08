@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { createHandheld } from './handheld.js';
-import { BODY_H, CAM_EYE, CAM_Z, CRUMBLE, FOV, JUMP_V, ONESHOT, SPRING_V } from './shared.js';
+import { BODY_H, CAM_EYE, CAM_Z, COL_W, CRUMBLE, FOV, JUMP_V, ONESHOT, SPRING_V, viewHalf } from './shared.js';
 import { SPRING_H } from './models.js';
 import { createSky } from './sky.js';
 import { createPlatforms } from './platforms.js';
@@ -37,10 +37,15 @@ const { renderer, input } = hh;
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xbfe6fb, 24, 80);
 
-// The camera only ever moves straight up, so it is aimed once here.
-const camera = new THREE.PerspectiveCamera(FOV, hh.width / hh.height, 1, 100);
+// The camera only ever moves straight up, so it is aimed once here. The
+// play area is the column and the band of sky a 3:2 screen shows; it fills
+// every screen shape: wider screens show more margin at the sides, and the
+// square one shows the column with narrow margins rather than more sky above
+// and below, so the climb plays the same everywhere.
+const camera = new THREE.PerspectiveCamera(FOV, hh.aspect, 1, 100);
 camera.position.set(0, CAM_EYE, CAM_Z);
 camera.lookAt(0, 0, 0);
+hh.fitCamera(camera, { minAspect: (COL_W + 1) / (viewHalf(0) * 2) });
 camera.updateMatrixWorld();
 
 // The y of the screen's bottom and top edges on the column plane (z = 0),
@@ -58,7 +63,7 @@ const CAM_START = -(VIEW_BOTTOM + VIEW_H * START_AT);
 const DEMO_ANCHOR_Y = VIEW_BOTTOM + VIEW_H * DEMO_ANCHOR;
 const DEMO_CAM_START = -(VIEW_BOTTOM + VIEW_H * DEMO_START_AT);
 
-const sky = createSky(scene, renderer);
+const sky = createSky(scene, renderer, hh.aspect);
 const platforms = createPlatforms(scene);
 const pickups = createPickups(scene);
 const enemies = createEnemies(scene);

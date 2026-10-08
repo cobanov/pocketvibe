@@ -2,7 +2,7 @@
 // InstancedMesh with additive blending, so fading a color to black fades it out.
 
 import * as THREE from 'three';
-import { TAU } from './shared.js';
+import { HALF_H, HALF_W, TAU } from './shared.js';
 
 const MAX_PARTS = 360;
 const MAX_RINGS = 10;
@@ -42,9 +42,10 @@ export function createFx(scene) {
   partMesh.count = 0;
   ringMesh.count = 0;
 
-  // A full-screen additive plane for color flashes, hidden when idle.
+  // A full-screen additive plane for color flashes, hidden when idle. It is
+  // larger than the field, so it covers the screen with camera shake too.
   const flashMaterial = new THREE.MeshBasicMaterial({ ...additive, color: 0x000000 });
-  const flashMesh = new THREE.Mesh(new THREE.PlaneGeometry(44, 32), flashMaterial);
+  const flashMesh = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2 + 8, HALF_H * 2 + 8), flashMaterial);
   flashMesh.position.z = 10;
   flashMesh.visible = false;
   scene.add(flashMesh);

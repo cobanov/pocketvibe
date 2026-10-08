@@ -6,17 +6,18 @@
 import * as THREE from 'three';
 import { HORIZON, SKY_MID, SKY_TOP, box, lowPoly, merge, part } from './shared.js';
 
-const LEDGE_FROM = -18; // the ledge mesh spans x = -18 .. 26
-const LEDGE_LEN = 44;
+const LEDGE_FROM = -20; // the ledge mesh spans x = -20 .. 28, wide enough for 16:9 screens
+const LEDGE_LEN = 48;
 const LEDGE_PERIOD = 8; // its pattern repeats every 8 units, so it can wrap
 const LEDGE_BACK = -6;
 const LEDGE_FRONT = 1.7; // close enough that the lip and the dirt show at the bottom
 
 // Big vertical plane far behind everything, colored by height: hazy at the
-// horizon (the camera's eye level), deep blue at the top.
+// horizon (the camera's eye level), deep blue at the top. Tall enough for the
+// square screen, which shows the most sky.
 function skyGeometry() {
-  const g = new THREE.PlaneGeometry(150, 110, 1, 22);
-  g.translate(0, 18, 0);
+  const g = new THREE.PlaneGeometry(150, 120, 1, 24);
+  g.translate(0, 23, 0);
   const pos = g.attributes.position;
   const colors = new Float32Array(pos.count * 3);
   const horizon = new THREE.Color(HORIZON);
@@ -167,7 +168,10 @@ function rand(a, b) {
   return a + Math.random() * (b - a);
 }
 
-export function createWorld(scene) {
+// widen: how much wider the view is than on the 3:2 screen (1 or more). Each
+// layer of scenery is that much wider, with as many more pieces, so wide
+// screens show the same density of scenery and nothing wraps in view.
+export function createWorld(scene, widen = 1) {
   const sky = new THREE.Mesh(skyGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
   sky.position.z = -78; // inside the camera's far distance even at the top corners
   scene.add(sky);
@@ -178,7 +182,7 @@ export function createWorld(scene) {
   cloudMaterial.emissive.setHex(0x5d6a80);
   const cloud = cloudGeometry();
 
-  const peaks = createLayer(scene, peakGeometry(), material, 7, 136, 0.08, (p) => {
+  const peaks = createLayer(scene, peakGeometry(), material, Math.round(7 * widen), 136 * widen, 0.08, (p) => {
     const r = rand(9, 14);
     p.y = -10;
     p.z = rand(-66, -58);
@@ -189,7 +193,7 @@ export function createWorld(scene) {
   });
 
   // The sea of clouds around the horizon.
-  const bank = createLayer(scene, cloud, cloudMaterial, 12, 124, 0.2, (p) => {
+  const bank = createLayer(scene, cloud, cloudMaterial, Math.round(12 * widen), 124 * widen, 0.2, (p) => {
     p.y = rand(-5, -2.5);
     p.z = rand(-48, -40);
     p.sx = rand(5, 8);
@@ -198,7 +202,7 @@ export function createWorld(scene) {
     p.turn = rand(-0.3, 0.3);
   });
 
-  const islands = createLayer(scene, islandGeometry(), material, 5, 66, 0.9, (p) => {
+  const islands = createLayer(scene, islandGeometry(), material, Math.round(5 * widen), 66 * widen, 0.9, (p) => {
     const s = rand(0.8, 1.4);
     p.y = rand(-1.5, 4.5);
     p.z = rand(-26, -18);
@@ -208,7 +212,7 @@ export function createWorld(scene) {
     p.turn = rand(0, Math.PI);
   });
 
-  const clouds = createLayer(scene, cloud, cloudMaterial, 7, 78, 0.45, (p) => {
+  const clouds = createLayer(scene, cloud, cloudMaterial, Math.round(7 * widen), 78 * widen, 0.45, (p) => {
     const s = rand(1.8, 3);
     p.y = rand(10, 17);
     p.z = rand(-30, -16);

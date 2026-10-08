@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { SAUCER_Z, part, rand } from './shared.js';
 
 const SPEED = 5.5;
-const START_X = 22; // off screen on both sides
+const START_X = 26; // off screen on both sides, also on the wide 16:9 screen
 const Y = 0.9;
 export const SAUCER_HALF_W = 1.1;
 export const SAUCER_HALF_D = 0.6;

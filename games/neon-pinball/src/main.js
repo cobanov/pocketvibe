@@ -28,7 +28,7 @@ const { renderer, input } = hh;
 
 const scene = new THREE.Scene();
 const physics = createPhysics(onEvent);
-const view = createView(scene);
+const view = createView(scene, hh);
 const hud = createHud(hh.hud);
 
 let state = 'title'; // title | play | paused | over
@@ -345,6 +345,13 @@ function updateLamps() {
 }
 
 toTitle();
+
+// Upload every texture and compile every material now, while loading, so
+// nothing stalls the first time it shows up in play.
+scene.traverse((object) => {
+  if (object.material?.map) renderer.initTexture(object.material.map);
+});
+renderer.compile(scene, view.camera);
 
 hh.run((dt) => {
   if (state === 'title') {

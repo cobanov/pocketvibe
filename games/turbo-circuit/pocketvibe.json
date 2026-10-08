@@ -2,7 +2,7 @@
   "id": "turbo-circuit",
   "title": "Turbo Circuit",
   "author": "cobanov",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "An arcade lap racer: three laps against three AI rivals on a low-poly circuit with boost pads, curbs and flying cones.",
   "genre": "Racing",
   "controls": {
@@ -10,5 +10,6 @@
     "B": "Brake, then reverse",
     "D-pad": "Steer",
     "START": "Pause (B in pause quits to title)"
-  }
+  },
+  "responsive": true
 }

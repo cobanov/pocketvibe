@@ -136,6 +136,9 @@ export function createBackground(scene) {
   let spin = 0;
 
   return {
+    // Textures to upload while the game loads.
+    textures: [gridMap],
+
     // Brightens the rails for a moment (called on every formation step).
     pulse(amount) {
       pulse = Math.max(pulse, amount);

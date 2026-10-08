@@ -5,11 +5,15 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAM_X, CEIL_Y, box, canvasTexture, cyl } from './shared.js';
+import { CAM_X, CAM_Z, CEIL_Y, box, canvasTexture, cyl } from './shared.js';
 
 const WALL_Z = -3.5;
 const FAR_Z = -11;
-const FRONT_Z = 4.5; // floor and ceiling run from the wall to here
+const FRONT_Z = 4.5; // floor and ceiling textures run from the wall to here
+// The floor and ceiling planes go on past the camera, so taller screens,
+// which see more of them, never see their front edge. Past FRONT_Z their
+// textures repeat their edge row: plain tiles and panels.
+const NEAR_Z = CAM_Z + 1;
 const SPAN_W = 40; // width of the scrolling planes, centred on the camera
 
 const WALL_TILE = 8; // world units per texture repeat
@@ -233,17 +237,21 @@ export function createWorld(scene) {
   far.position.set(CAM_X, 5, FAR_Z);
   scene.add(far);
 
-  const depth = FRONT_Z - WALL_Z;
+  const depth = NEAR_Z - WALL_Z;
+  const stretch = depth / (FRONT_Z - WALL_Z); // texture lengths across the planes
   const floorMap = repeating(floorTexture(), SPAN_W / FLOOR_TILE);
+  floorMap.repeat.y = stretch; // the floor's v runs from the front (0) to the wall (1)
+  floorMap.offset.y = 1 - stretch;
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(SPAN_W, depth), plain(floorMap));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(CAM_X, 0, (WALL_Z + FRONT_Z) / 2);
+  floor.position.set(CAM_X, 0, (WALL_Z + NEAR_Z) / 2);
   scene.add(floor);
 
   const ceilingMap = repeating(ceilingTexture(), SPAN_W / FLOOR_TILE);
+  ceilingMap.repeat.y = stretch; // the ceiling's v runs from the wall (0) to the front (1)
   const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(SPAN_W, depth), plain(ceilingMap));
   ceiling.rotation.x = Math.PI / 2;
-  ceiling.position.set(CAM_X, CEIL_Y, (WALL_Z + FRONT_Z) / 2);
+  ceiling.position.set(CAM_X, CEIL_Y, (WALL_Z + NEAR_Z) / 2);
   scene.add(ceiling);
 
   const best = new THREE.Mesh(

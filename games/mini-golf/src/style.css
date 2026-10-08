@@ -16,8 +16,9 @@ body {
   gap: 16px;
 }
 
-/* #frame takes the scaled size in the page layout; #screen is always 720x480
-   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+/* #frame takes the scaled size in the page layout; #screen is the game's
+   screen size inside it (set by handheld.js) and gets scaled with a transform,
+   so HUD pixel values stay valid. */
 #frame {
   flex: none;
   box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
@@ -26,8 +27,8 @@ body {
 
 #screen {
   position: relative;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
   overflow: hidden;
   background: #000;
   transform-origin: top left;
@@ -35,8 +36,8 @@ body {
 
 #screen canvas {
   display: block;
-  width: 720px;
-  height: 480px;
+  width: var(--screen-width);
+  height: var(--screen-height);
 }
 
 #hud {
@@ -160,11 +161,12 @@ body.handheld #legend {
   }
 }
 
-/* The power meter: a gradient revealed from the bottom. */
+/* The power meter: a gradient revealed from the bottom, centered on the
+   left edge. */
 #power {
   position: absolute;
   left: 22px;
-  top: 128px;
+  top: calc(50% - 112px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -235,12 +237,12 @@ body.handheld #legend {
   text-shadow: 0 2px 0 #12361a, 0 0 5px #000;
 }
 
-/* Banners: "HOLE 3", "BIRDIE!" */
+/* Banners: "HOLE 3", "BIRDIE!", placed from the middle of the screen. */
 #banner {
   position: absolute;
   left: 0;
   right: 0;
-  top: 120px;
+  top: calc(50% - 120px);
   display: flex;
   justify-content: center;
   text-align: center;

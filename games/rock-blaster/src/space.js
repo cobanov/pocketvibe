@@ -2,7 +2,8 @@
 // three draw calls, nothing in here moves per vertex.
 
 import * as THREE from 'three';
-import { BG, HALF_H, HALF_W } from './shared.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { BG, HALF_H, HALF_W, part } from './shared.js';
 
 // Each star layer is a tile slightly larger than the screen, built 2x2 times
 // into one geometry, so sliding the mesh by up to one tile never shows a gap.
@@ -104,4 +105,47 @@ export function createSpace(scene) {
       place(near, 0.16);
     },
   };
+}
+
+const FRAME = 0x05061a; // the dark space around the field
+const EDGE = 0x2c3f86; // the line along the field's edges
+const EDGE_W = 0.12;
+const FRAME_Z = 20; // in front of everything, also explosions and flashes
+
+// A rectangle from (x0, y0) to (x1, y1), painted.
+function rect(x0, y0, x1, y1, hex) {
+  const g = new THREE.PlaneGeometry(x1 - x0, y1 - y0);
+  return part(g, hex, (x0 + x1) / 2, (y0 + y1) / 2, 0);
+}
+
+// Screens of another shape than 3:2 show more than the field: wider ones at
+// the sides, taller ones above and below. Rocks and bullets wrap at the
+// field's edges, so the extra space is covered by a dark frame with a thin
+// line along the field; the field itself is the same on every screen.
+// viewW and viewH are the camera's view in world units. One mesh, and none
+// at all on a 3:2 screen.
+export function createFrame(scene, viewW, viewH) {
+  const sideX = viewW / 2 - HALF_W > 0.01; // margins left and right
+  const sideY = viewH / 2 - HALF_H > 0.01; // margins above and below
+  if (!sideX && !sideY) return null;
+  // The frame reaches past the screen's edges, so camera shake shows no gap.
+  const w = viewW / 2 + 4;
+  const h = viewH / 2 + 4;
+  const e = EDGE_W;
+  const pieces = [];
+  if (sideX) {
+    pieces.push(rect(-w, -h, -HALF_W - e, h, FRAME), rect(HALF_W + e, -h, w, h, FRAME));
+    pieces.push(rect(-HALF_W - e, -HALF_H - e, -HALF_W, HALF_H + e, EDGE));
+    pieces.push(rect(HALF_W, -HALF_H - e, HALF_W + e, HALF_H + e, EDGE));
+  }
+  if (sideY) {
+    const x = sideX ? HALF_W + e : w;
+    pieces.push(rect(-x, -h, x, -HALF_H - e, FRAME), rect(-x, HALF_H + e, x, h, FRAME));
+    pieces.push(rect(-HALF_W - e, -HALF_H - e, HALF_W + e, -HALF_H, EDGE));
+    pieces.push(rect(-HALF_W - e, HALF_H, HALF_W + e, HALF_H + e, EDGE));
+  }
+  const mesh = new THREE.Mesh(mergeGeometries(pieces), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+  mesh.position.z = FRAME_Z;
+  scene.add(mesh);
+  return mesh;
 }

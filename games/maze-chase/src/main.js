@@ -50,10 +50,13 @@ const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(BG, 50, 72);
 
 // Tilted overhead view that keeps the whole maze on screen under the HUD row.
+// Wider screens show more of the grid at the sides, taller ones more above
+// and below; the maze stays whole and the same size on every shape.
 const CAM_Y = 40.3;
 const CAM_Z = 18.1;
 const LOOK_Z = -0.7;
-const camera = new THREE.PerspectiveCamera(30, hh.width / hh.height, 10, 75);
+const camera = new THREE.PerspectiveCamera(30, hh.aspect, 10, 75);
+hh.fitCamera(camera);
 camera.position.set(0, CAM_Y, CAM_Z);
 camera.lookAt(0, 0, LOOK_Z);
 
@@ -483,6 +486,28 @@ camera.updateMatrixWorld();
 const readyPos = project(0, 0.5, worldZ(START_Y - 2));
 hh.hud.querySelector('#ready').style.top = `${Math.round(readyPos.y - 18)}px`;
 
+// Loading: put one of every kind of object on screen (the gem, a wisp,
+// particles and the ring) and draw every maze layout once, so every
+// material is compiled and every geometry uploaded before play; a new maze
+// or the first gem never stalls a frame. toTitle() resets them.
+function warmUp() {
+  bonus.spawn(1);
+  bonus.draw();
+  drones.reset(1);
+  drones.eat(1);
+  drones.draw(0, false);
+  fx.burst(0, 0.5, 0, 0xffffff, 4, 3);
+  fx.wave(0, 0, 0xffffff, 1);
+  fx.update(0.01);
+  for (let i = 0; i < MAZES.length; i++) {
+    maze.load(i);
+    if (i === 0) renderer.compile(scene, camera);
+    renderer.render(scene, camera);
+  }
+  bonus.clear();
+}
+
+warmUp();
 toTitle();
 
 hh.run((dt) => {

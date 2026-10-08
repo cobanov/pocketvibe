@@ -5,12 +5,11 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { box } from './shared.js';
+import { CAM_Z, box } from './shared.js';
 
 const FRAMES = 14;
 const FRAME_SPACING = 9; // world units between frames
 const FRAME_DRIFT = 0.3; // frames slide past at this share of the track's speed
-const BARS = 44;
 const BAR_SPACING = 1.6;
 const BAR_DRIFT = 0.12;
 const BAR_Z = -46;
@@ -58,7 +57,10 @@ function horizonGeometry() {
   return g;
 }
 
-export function createBackdrop(scene) {
+// halfTan: tan of half the camera's horizontal view. The row of equalizer
+// bars is as wide as the view at its depth, with one spare bar at each end.
+export function createBackdrop(scene, halfTan) {
+  const BARS = 2 * Math.ceil(((CAM_Z - BAR_Z) * halfTan) / BAR_SPACING) + 4;
   const frameMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
   const frames = new THREE.InstancedMesh(frameGeometry(), frameMat, FRAMES);
   const barMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
