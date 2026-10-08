@@ -89,6 +89,14 @@ const STRINGS = {
   restoreConfirm: { en: 'Restore {name}? Current saves are replaced.', tr: '{name} geri yüklensin mi? Şu anki kayıtların yerine geçer.' },
   restored: { en: 'Saves restored.', tr: 'Kayıtlar geri yüklendi.' },
   restoreFailed: { en: 'Restore failed: {error}', tr: 'Geri yükleme başarısız: {error}' },
+  gameCrashed: {
+    en: 'The game stopped working, so PocketVibe started again.',
+    tr: 'Oyun çöktü, PocketVibe yeniden başlatıldı.',
+  },
+  crashed: {
+    en: 'PocketVibe ran into a problem and started again.',
+    tr: 'PocketVibe bir sorunla karşılaştı ve yeniden başlatıldı.',
+  },
   backupsWhere: { en: 'Backups are kept in /storage/pocketvibe/backups', tr: 'Yedekler /storage/pocketvibe/backups klasöründe' },
   developer: { en: 'Developer', tr: 'Geliştirici' },
   showFps: { en: 'Show FPS in games', tr: 'Oyunlarda FPS göster' },

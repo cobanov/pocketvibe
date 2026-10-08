@@ -1395,6 +1395,7 @@ async function unlockAudio() {
   if (notice === 'restored') toast(t('restored'), 'save_done');
   else if (notice?.startsWith('updated:')) toast(t('updatedTo', { version: notice.slice(8) }));
   else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }), 'error');
+  else if (notice?.startsWith('crashed')) toast(t(notice === 'crashed:game' ? 'gameCrashed' : 'crashed'), 'error');
   else if (state.info?.gpu === 'libmali' && !load('gpuAsked', false)) {
     // Asked once; Settings keeps the row to switch later.
     try {

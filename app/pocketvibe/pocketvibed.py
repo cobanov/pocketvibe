@@ -65,6 +65,7 @@ LAUNCHER_URL = f'http://127.0.0.1:{PORT}/'
 GAME_ID = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
 RUNTIME = HOME / 'runtime'  # the Debian root with WPE WebKit; runtime.py runs things in it
 QUIT_FLAG = Path('/tmp/pocketvibe-quit')  # tells PocketVibe.sh not to restart the browser
+BROWSER_LOG = Path('/tmp/pocketvibe-cog.log')  # PocketVibe.sh sends the browser's output here
 RESTART_FLAG = Path('/tmp/pocketvibe-restart')  # tells PocketVibe.sh to start again (after an update)
 BUSY_FLAG = Path('/tmp/pocketvibe-busy')  # PocketVibe.sh waits for it to go before reopening the browser
 WEB_DATA = RUNTIME / 'root' / '.local' / 'share' / 'wpe'  # WebKit's data; storage/ holds every game's saves
@@ -779,6 +780,35 @@ def quit_app():
     threading.Thread(target=launcher_server.shutdown, daemon=True).start()
 
 
+def watch_browser():
+    """Restart the browser when its page process crashes. Cog would show a
+    white error page with no way out; PocketVibe.sh opens a new browser on the
+    launcher instead, with a fresh page process, and the launcher says what
+    happened."""
+    global in_game, notice
+    position = None
+    while True:
+        time.sleep(1)
+        try:
+            size = BROWSER_LOG.stat().st_size
+            if position is None or size < position:
+                # What was there at the start is old; a smaller file was emptied.
+                position = size if position is None else 0
+                continue
+            if size == position:
+                continue
+            with BROWSER_LOG.open('rb') as f:
+                f.seek(position)
+                added = f.read(size - position)
+            position = size
+        except OSError:
+            continue
+        if b'> Crash!: ' in added:
+            notice = 'crashed:game' if in_game else 'crashed'
+            in_game = False
+            close_browser()
+
+
 def go_home():
     """Leave the running game and show the launcher."""
     global in_game
@@ -1085,6 +1115,7 @@ def main():
     fix_pad_mapping()
     install_bundled()
     threading.Thread(target=watch_buttons, daemon=True).start()
+    threading.Thread(target=watch_browser, daemon=True).start()
     audio_key.open()
     launcher_server = ThreadingHTTPServer(('127.0.0.1', PORT), LauncherHandler)
     (HOME / 'update-pending').unlink(missing_ok=True)  # this version starts
