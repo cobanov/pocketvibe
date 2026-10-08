@@ -6,6 +6,7 @@
 //   POST /api/publish               upload a game zip (GitHub token)
 //   GET  /api/me                    your games and uploads (GitHub token)
 //   GET  /api/admin/pending         uploads waiting for review (admin)
+//   GET  /api/admin/files/<key>     an upload's zip or cover, to try it before review (admin)
 //   POST /api/admin/review          approve or reject an upload (admin)
 //
 // Developers sign in with a GitHub token; the store asks GitHub who it
@@ -328,9 +329,23 @@ async function me(request: Request, env: Env) {
 async function pending(request: Request, env: Env) {
   await requireAdmin(request, env);
   const { results } = await env.DB.prepare(
-    "SELECT game_id, version, uploader, manifest, size, created_at FROM releases WHERE status = 'pending' ORDER BY created_at LIMIT 50",
+    "SELECT game_id, version, uploader, manifest, size, sha256, zip_key, cover_key, created_at FROM releases WHERE status = 'pending' ORDER BY created_at LIMIT 50",
   ).all();
   return json({ pending: results.map((r) => ({ ...r, manifest: JSON.parse(r.manifest as string) })) });
+}
+
+// An upload's zip or cover, published or not, so the admin can play it on a
+// handheld before approving it (`pocketvibe review`). Not counted as a download.
+async function adminFile(request: Request, env: Env, key: string) {
+  await requireAdmin(request, env);
+  const match = key.match(/^games\/[a-z0-9-]+\/\d+\.\d+\.\d+\.(zip|png|jpg)$/);
+  if (!match) throw new HttpError(404, 'not found');
+  const object = await env.FILES.get(key);
+  if (!object) throw new HttpError(404, 'not found');
+  const type = match[1] === 'zip' ? 'application/zip' : match[1] === 'png' ? 'image/png' : 'image/jpeg';
+  return new Response(object.body, {
+    headers: { 'Content-Type': type, 'Content-Length': String(object.size), 'Cache-Control': 'private, no-store' },
+  });
 }
 
 async function review(request: Request, env: Env) {
@@ -404,6 +419,7 @@ export default {
       if (request.method === 'POST' && pathname === '/api/publish') return await publish(request, env);
       if (request.method === 'GET' && pathname === '/api/me') return await me(request, env);
       if (request.method === 'GET' && pathname === '/api/admin/pending') return await pending(request, env);
+      if (request.method === 'GET' && pathname.startsWith('/api/admin/files/')) return await adminFile(request, env, pathname.slice(17));
       if (request.method === 'POST' && pathname === '/api/admin/review') return await review(request, env);
       throw new HttpError(404, 'not found');
     } catch (e) {
