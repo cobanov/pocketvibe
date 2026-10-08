@@ -21,29 +21,25 @@ geçmişinde (`git log -- docs/handoff.md`).
 - **Mağaza:** Coin Rush kaldırıldı (D1 `games` satırı silindi, sürümü "removed from the store"
   notuyla `rejected`, R2 dosyaları silindi). Yeni `GET /api/admin/files/<key>`: yönetici bekleyen
   yüklemenin zip ve kapağını alabiliyor.
-- **CLI:** `pocketvibe` 0.2.0 (`serve`: oyunu bilgisayarda küçük bir mağaza olarak sunar,
-  handheld'de Ayarlar > Stores > Add a store; oyun `<id>-dev`, "(dev)" adıyla ayrı kayıtlarla
-  kurulur, her değişiklik güncelleme olur. `review <id> <sürüm>`: bekleyen yüklemeyi aynı yolla
-  yöneticinin cihazına getirir) ve `create-pocketvibe` 0.1.1 commit'li ama **npm'de yayında
-  değil**. Mac mini'de npm oturumu yok (`npm whoami` 401). `serve` Mac'te yerel `pocketvibed` ile
-  uçtan uca denendi (katalog, kurulum, kapak, güncelleme); gerçek cihazda denenmedi.
+- **CLI ve starter (npm'de yayında):** `pocketvibe` 0.2.0 (`serve`: oyunu bilgisayarda küçük bir
+  mağaza olarak sunar, handheld'de Ayarlar > Stores > Add a store; oyun `<id>-dev`, "(dev)" adıyla
+  ayrı kayıtlarla kurulur, her değişiklik güncelleme olur. `review <id> <sürüm>`: bekleyen yüklemeyi
+  aynı yolla yöneticinin cihazına getirir) ve `create-pocketvibe` 0.1.1 (yeni kurallar, rehber).
+  npm'den sıfırdan denendi. Mac mini'de npm oturumu açık (`cobanov`); yayın iki adımlı doğrulama
+  için web onayı istiyor: komutu `expect` ile sanal terminalde çalıştır, çıkan
+  `npmjs.com/auth/cli/...` bağlantısını kullanıcıya aç (`open <url>`).
 
 ## Sıradaki işler
 
-1. **npm yayını:** kullanıcı bir tarayıcıya ulaşınca `npm login --auth-type=web` (bağlantıyı
-   onaylar), sonra `packages/pocketvibe` ve `packages/create-pocketvibe` içinde
-   `npm publish --access public` (2FA bağlantı isteyebilir:
-   `script -q /dev/null npm publish --access public --browser=false`). O zamana kadar sitedeki
-   `npx pocketvibe serve` çalışmaz.
-2. `serve`'i gerçek bir handheld'de denemek (Ayarlar > Stores > Add a store, Mac mini'nin
+1. `serve`'i gerçek bir handheld'de denemek (Ayarlar > Stores > Add a store, Mac mini'nin
    Tailscale adresi `http://100.70.248.21:8740`).
-3. İnceleme ölçütlerini (`/make/#review`, `agents.md` 7. bölüm) kullanıcı onaylamadı; ben yazdım.
-4. Çökmenin asıl sebebi (WPEWebProcess SIGTRAP, coredump yok) bilinmiyor; launcher her
+2. İnceleme ölçütlerini (`/make/#review`, `agents.md` 7. bölüm) kullanıcı onaylamadı; ben yazdım.
+3. Çökmenin asıl sebebi (WPEWebProcess SIGTRAP, coredump yok) bilinmiyor; launcher her
    yüklemede müziği yeniden çözüyor (~38 MB).
-5. SP'deki eski kayıtlar ve oyun listesi `/storage/pv-backup-20261008`'de; kullanıcı isterse geri
+4. SP'deki eski kayıtlar ve oyun listesi `/storage/pv-backup-20261008`'de; kullanıcı isterse geri
    yüklenecek.
-6. Starter projenin örnek oyunu hâlâ Coin Rush (yalnızca mağaza ve siteden kaldırıldı).
-7. Kurulum pürüzleri (belgelere yazıldı): yeni ROCKNIX'te Samba kapalı geliyor; tek kartta `roms`
+5. Starter projenin örnek oyunu hâlâ Coin Rush (yalnızca mağaza ve siteden kaldırıldı).
+6. Kurulum pürüzleri (belgelere yazıldı): yeni ROCKNIX'te Samba kapalı geliyor; tek kartta `roms`
    ext4, Mac ve Windows açamıyor.
 
 ## Cihazlar
@@ -81,3 +77,10 @@ geçmişinde (`git log -- docs/handoff.md`).
 - Commit sonuna `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Değişiklik yapan her işten sonra `~/bin/daily-done "[pocketvibe] Tek cümle."`.
 - Yön değiştirmeyi önerme; kullanıcının vizyonuna sadık kal.
+
+## Tanıtım (2026-10-08)
+
+Tweet (TR ve EN), Reddit (r/handheldsTR, r/SBCGaming, r/vibecoding) atıldı. r/SBCGaming ve
+r/handheldsTR gönderiyi kaldırdı (SBCGaming: AI içeriği kuralı, AI beyanı şart); kullanıcı
+moderatörlere yazdı. Tanıtım videosu MacBook'ta `~/workspace/pocketvibe/` (sessiz kopya
+`pocketvibe_promo_sessiz.mp4`).
