@@ -1,6 +1,7 @@
 // Gets the launcher demo ready before a build:
 //   public/demo/   the handheld app's launcher, copied from app/pocketvibe/launcher
 //   public/play/   every game in the store, unpacked so the demo can play it
+//   public/_redirects   /download/android to the newest Android release's APK
 // The demo's /api answers come from public/sw.js.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
@@ -65,3 +66,22 @@ const shelf = games
   .map(({ id, title, genre, description, entry, controls }) => ({ id, title, genre, description, entry, controls }));
 writeFileSync(join(play, 'catalog.json'), JSON.stringify(shelf));
 console.log(`demo ${version}, ${playable.length} playable games`);
+
+// The Android app's releases are tagged android-v<version>, and GitHub's
+// "latest" release is the ROCKNIX app, so the APK's address comes from the
+// list of releases. If GitHub cannot be reached, the last _redirects stays.
+const redirects = join(SITE, 'public', '_redirects');
+try {
+  const res = await fetch('https://api.github.com/repos/cobanov/pocketvibe/releases?per_page=30', {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  if (!res.ok) throw new Error(`GitHub: ${res.status}`);
+  const apk = (await res.json())
+    .filter((r) => r.tag_name.startsWith('android-v') && !r.draft && !r.prerelease)
+    .flatMap((r) => r.assets.filter((a) => a.name.endsWith('.apk')))[0];
+  if (!apk) throw new Error('no Android release with an APK');
+  writeFileSync(redirects, `/download/android ${apk.browser_download_url} 302\n`);
+  console.log(`android ${apk.name}`);
+} catch (e) {
+  console.log(`android download not updated (${e.message})${existsSync(redirects) ? '' : ', and there is none yet'}`);
+}
