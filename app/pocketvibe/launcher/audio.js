@@ -165,7 +165,7 @@ async function loadMusic() {
     // Render it below.
   }
   const music = await renderMusic();
-  fetch(MUSIC_CACHE, { method: 'PUT', body: toWav(music) }).catch(() => {});
+  fetch(MUSIC_CACHE, { method: 'PUT', headers: { 'X-PocketVibe': '1' }, body: toWav(music) }).catch(() => {});
   return music;
 }
 

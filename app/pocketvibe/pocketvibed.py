@@ -47,6 +47,7 @@ UPDATE_CHECK_EVERY = 6 * 3600  # seconds between checks, so GitHub is not asked 
 DEFAULT_STORE = os.environ.get('POCKETVIBE_STORE', CONFIG['store_url'])
 SETTINGS_FILE = HOME / 'settings.json'
 PLAYS_FILE = HOME / 'plays.json'  # when each game was last played, for "Recently played"
+PORTS_FILE = HOME / 'ports.json'  # the port each game is served on, kept for good
 DEFAULT_SETTINGS = {
     'language': 'en',
     'music': True,
@@ -78,6 +79,7 @@ QUIT_HOLD = 3.0  # seconds to quit the app, in case the launcher itself hangs
 jobs = {}  # game id -> {'state', 'progress', 'error'}
 game_servers = {}  # game id -> (server, port)
 lock = threading.Lock()
+files_lock = threading.Lock()  # settings.json, plays.json and ports.json are read, changed and written under it
 launcher_server = None
 in_game = False
 notice = None  # a message for the launcher to show the next time it loads
@@ -89,15 +91,35 @@ def open_url(url, timeout=10):
     return urllib.request.urlopen(request, timeout=timeout)
 
 
-def load_settings():
+def read_json(path, fallback):
     try:
-        saved = json.loads(SETTINGS_FILE.read_text())
+        return json.loads(path.read_text())
     except (OSError, ValueError):
+        return fallback
+
+
+def write_json(path, data):
+    """Write a file whole or not at all: a full card or a power cut never
+    leaves it empty."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f'.{path.name}.tmp')
+    temp.write_text(json.dumps(data, indent=2))
+    os.replace(temp, path)
+
+
+def load_settings():
+    saved = read_json(SETTINGS_FILE, {})
+    if not isinstance(saved, dict):
         saved = {}
     return {**DEFAULT_SETTINGS, **{k: v for k, v in saved.items() if k in DEFAULT_SETTINGS}}
 
 
 def save_settings(changes):
+    with files_lock:
+        return _save_settings(changes if isinstance(changes, dict) else {})
+
+
+def _save_settings(changes):
     settings = load_settings()
     for key, value in changes.items():
         default = DEFAULT_SETTINGS.get(key)
@@ -112,8 +134,7 @@ def save_settings(changes):
         elif key == 'stores' and isinstance(value, list):
             urls = [u.strip() for u in value if isinstance(u, str) and re.match(r'https?://\S+$', u.strip())]
             settings[key] = list(dict.fromkeys(urls))[:10]
-    HOME.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(settings, indent=2))
+    write_json(SETTINGS_FILE, settings)
     return settings
 
 
@@ -130,6 +151,8 @@ def read_manifest(game_dir):
             break
         except (OSError, ValueError):
             continue
+    if not isinstance(meta, dict):
+        meta = {}
     meta.setdefault('id', game_dir.name)
     meta.setdefault('title', game_dir.name.replace('-', ' ').title())
     meta.setdefault('entry', 'index.html')
@@ -137,17 +160,20 @@ def read_manifest(game_dir):
 
 
 def load_plays():
-    try:
-        return json.loads(PLAYS_FILE.read_text())
-    except (OSError, ValueError):
-        return {}
+    plays = read_json(PLAYS_FILE, {})
+    return plays if isinstance(plays, dict) else {}
 
 
 def record_play(gid):
-    plays = load_plays()
-    entry = plays.get(gid, {'count': 0})
-    plays[gid] = {'count': entry.get('count', 0) + 1, 'last': time.time()}
-    PLAYS_FILE.write_text(json.dumps(plays))
+    """Best effort: a full card must not stop a game from starting."""
+    try:
+        with files_lock:
+            plays = load_plays()
+            entry = plays.get(gid, {'count': 0})
+            plays[gid] = {'count': entry.get('count', 0) + 1, 'last': time.time()}
+            write_json(PLAYS_FILE, plays)
+    except OSError:
+        pass
 
 
 def library():
@@ -158,11 +184,40 @@ def library():
     for game_dir in sorted(GAMES.iterdir()):
         if game_dir.is_dir() and not game_dir.name.startswith('.'):
             meta = read_manifest(game_dir)
+            for key in ('id', 'title', 'entry'):
+                meta[key] = str(meta[key])
             played = plays.get(meta['id'], {})
+            if not isinstance(played, dict):
+                played = {}
             meta['lastPlayed'] = played.get('last', 0)
             meta['plays'] = played.get('count', 0)
             games.append(meta)
     return sorted(games, key=lambda g: g['title'].lower())
+
+
+MAX_CATALOG = 4 << 20  # bytes; a store's catalog is a few KB
+TEXT_FIELDS = ('title', 'author', 'version', 'description', 'genre', 'entry', 'download', 'cover', 'sha256', 'updated')
+
+
+def catalog_entries(data):
+    """The usable games of one store's catalog. Anything malformed is left
+    out, so one broken store cannot break the others."""
+    if not isinstance(data, dict) or not isinstance(data.get('games'), list):
+        return []
+    entries = []
+    for game in data['games']:
+        if not isinstance(game, dict) or not isinstance(game.get('id'), str) or not valid_id(game['id']):
+            continue
+        if not isinstance(game.get('title'), str) or not isinstance(game.get('download'), str):
+            continue
+        entry = {k: v for k, v in game.items() if k not in TEXT_FIELDS or isinstance(v, str)}
+        if not isinstance(entry.get('controls', {}), dict):
+            del entry['controls']
+        for key in ('size', 'downloads'):
+            if not isinstance(entry.get(key, 0), int) or isinstance(entry.get(key), bool):
+                del entry[key]
+        entries.append(entry)
+    return entries
 
 
 def fetch_catalog(url):
@@ -170,29 +225,42 @@ def fetch_catalog(url):
     cached = CACHE / f'catalog-{hashlib.sha1(url.encode()).hexdigest()[:12]}.json'
     try:
         with open_url(url) as r:
-            data = json.loads(r.read())
+            body = r.read(MAX_CATALOG + 1)
+        if len(body) > MAX_CATALOG:
+            raise ValueError('catalog too large')
+        data = json.loads(body)
+        if not isinstance(data, dict):
+            raise ValueError('not a catalog')
         CACHE.mkdir(parents=True, exist_ok=True)
-        cached.write_text(json.dumps(data))
+        write_json(cached, data)
         return data, True
     except (OSError, ValueError):
-        if cached.exists():
-            return json.loads(cached.read_text()), False
-        return {'games': []}, False
+        data = read_json(cached, {'games': []})
+        return (data if isinstance(data, dict) else {'games': []}), False
 
 
-def merged_catalog():
-    """Games from every store in the settings; on a clash the first store wins."""
+catalog_cache = (0.0, [], [])  # (when, games, stores) from the last merged_catalog
+
+
+def merged_catalog(max_age=0):
+    """Games from every store in the settings; on a clash the first store wins.
+    With max_age, a copy fetched less than that many seconds ago will do."""
+    global catalog_cache
+    if max_age and time.monotonic() - catalog_cache[0] < max_age:
+        return catalog_cache[1], catalog_cache[2]
     urls = load_settings()['stores']
     with ThreadPoolExecutor(max_workers=4) as pool:
         results = list(pool.map(fetch_catalog, urls))
     games, stores = {}, []
     for url, (data, online) in zip(urls, results):
-        name = data.get('name') or urllib.parse.urlparse(url).hostname or url
-        entries = [g for g in data.get('games', []) if valid_id(g.get('id'))]
+        name = data.get('name') if isinstance(data.get('name'), str) else None
+        name = name or urllib.parse.urlparse(url).hostname or url
+        entries = catalog_entries(data)
         stores.append({'url': url, 'name': name, 'online': online, 'count': len(entries)})
         for entry in entries:
             games.setdefault(entry['id'], {**entry, 'store': name})
-    return list(games.values()), stores
+    catalog_cache = (time.monotonic(), list(games.values()), stores)
+    return catalog_cache[1], catalog_cache[2]
 
 
 def store():
@@ -210,7 +278,7 @@ def store():
 
 
 def find_catalog_entry(gid):
-    catalog, _ = merged_catalog()
+    catalog, _ = merged_catalog(max_age=60)
     return next((g for g in catalog if g['id'] == gid), None)
 
 
@@ -337,10 +405,15 @@ def backup_saves():
     BACKUPS.mkdir(parents=True, exist_ok=True)
     name = time.strftime('saves-%Y%m%d-%H%M%S.zip')
     storage = WEB_DATA / 'storage'
-    with zipfile.ZipFile(BACKUPS / name, 'w', zipfile.ZIP_DEFLATED) as archive:
-        for path in storage.rglob('*') if storage.exists() else []:
-            if path.is_file():
-                archive.write(path, path.relative_to(WEB_DATA))
+    temp = BACKUPS / f'.{name}.part'  # a full card leaves no half backup in the list
+    try:
+        with zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for path in storage.rglob('*') if storage.exists() else []:
+                if path.is_file():
+                    archive.write(path, path.relative_to(WEB_DATA))
+        os.replace(temp, BACKUPS / name)
+    finally:
+        temp.unlink(missing_ok=True)
     return name
 
 
@@ -363,8 +436,15 @@ def restore_saves(name):
         staging.mkdir(parents=True)
         with zipfile.ZipFile(BACKUPS / name) as archive:
             safe_extract(archive, staging)
-        shutil.rmtree(WEB_DATA / 'storage', ignore_errors=True)
-        (staging / 'storage').rename(WEB_DATA / 'storage')
+        if not (staging / 'storage').is_dir():
+            raise ValueError('the backup has no saves')
+        # Swap, then delete: the current saves are kept until the new ones are in place.
+        current, previous = WEB_DATA / 'storage', WEB_DATA / '.storage-old'
+        shutil.rmtree(previous, ignore_errors=True)
+        if current.exists():
+            current.rename(previous)
+        (staging / 'storage').rename(current)
+        shutil.rmtree(previous, ignore_errors=True)
         shutil.rmtree(staging, ignore_errors=True)
         notice = 'restored'
     except Exception as e:  # reported to the launcher on its next load
@@ -373,24 +453,38 @@ def restore_saves(name):
         BUSY_FLAG.unlink(missing_ok=True)
 
 
+MAX_COVER = 2 << 20  # bytes
+cover_misses = {}  # game id -> when no cover was found, so it is not looked up on every load
+
+
 def cover_path(gid):
-    """Cover image for a game: from the installed game, else cached from the store."""
+    """Cover image for a game: from the installed game, else cached from the
+    store. The cache is per cover address, so a new version's cover replaces
+    the old one."""
     for name in ('cover.png', 'cover.jpg', 'cover.webp'):
         local = GAMES / gid / name
         if local.exists():
             return local
-    cached = CACHE / 'covers' / gid
-    if cached.exists():
-        return cached
+    if time.monotonic() - cover_misses.get(gid, -600) < 600:
+        return None
     entry = find_catalog_entry(gid)
     if not entry or not entry.get('cover'):
+        cover_misses[gid] = time.monotonic()
         return None
+    cached = CACHE / 'covers' / f'{gid}-{hashlib.sha1(entry["cover"].encode()).hexdigest()[:12]}'
+    if cached.exists():
+        return cached
     try:
         with open_url(entry['cover']) as r:
-            data = r.read()
-    except OSError:
+            data = r.read(MAX_COVER + 1)
+        if len(data) > MAX_COVER:
+            raise ValueError('cover too large')
+    except (OSError, ValueError):
+        cover_misses[gid] = time.monotonic()
         return None
     cached.parent.mkdir(parents=True, exist_ok=True)
+    for old in cached.parent.glob(f'{gid}-*'):
+        old.unlink(missing_ok=True)
     cached.write_bytes(data)
     return cached
 
@@ -454,6 +548,7 @@ def check_update(force=False):
 
 def install_update():
     """Download the new app, check it, swap it in and restart PocketVibe."""
+    package = HOME / '.app-update.zip'
     try:
         release = check_update()
         if not release['available']:
@@ -461,7 +556,6 @@ def install_update():
         if not re.fullmatch(r'[0-9a-f]{64}', release['sha256']):
             raise ValueError('the release has no checksum')
         set_job('__app__', state='downloading', progress=0, error=None)
-        package = HOME / '.app-update.zip'
         digest = hashlib.sha256()
         with open_url(release['url'], timeout=30) as r, open(package, 'wb') as out:
             total = int(r.headers.get('Content-Length') or release['size'] or 0)
@@ -492,6 +586,7 @@ def install_update():
         ports = Path('/storage/roms/ports')
         if (staging / 'PocketVibe.sh').exists() and ports.is_dir():
             shutil.copy(staging / 'PocketVibe.sh', ports / 'PocketVibe.sh')
+            os.chmod(ports / 'PocketVibe.sh', 0o755)  # zips do not keep the executable bit
         if (staging / 'ports' / 'pocketvibe-image.png').exists() and (ports / 'images').is_dir():
             shutil.copy(staging / 'ports' / 'pocketvibe-image.png', ports / 'images' / 'pocketvibe-image.png')
         shutil.rmtree(staging, ignore_errors=True)
@@ -500,6 +595,8 @@ def install_update():
         global notice
         notice = f'updated:{release["version"]}'
         (HOME / 'notice').write_text(notice)  # survives the restart
+        # Until the new version's service starts, PocketVibe.sh may roll back to app.old.
+        (HOME / 'update-pending').touch()
 
         # PocketVibe.sh sees the flag when the browser closes and starts over.
         RESTART_FLAG.touch()
@@ -508,17 +605,37 @@ def install_update():
         threading.Thread(target=launcher_server.shutdown, daemon=True).start()
     except Exception as e:  # reported to the launcher
         set_job('__app__', state='error', error=str(e))
+    finally:
+        package.unlink(missing_ok=True)
+        shutil.rmtree(HOME / '.app-update', ignore_errors=True)
+
+
+def game_port(gid):
+    """The game's port, the same on every run: it is part of the game's origin,
+    and so of where its saves are. A new game starts from a hash of its id
+    (the ports games had before this registry) and moves on if that is taken,
+    so no two games share an origin."""
+    with files_lock:
+        ports = read_json(PORTS_FILE, {})
+        if not isinstance(ports, dict):
+            ports = {}
+        if gid not in ports:
+            taken = set(ports.values())
+            port = 20000 + zlib.crc32(gid.encode()) % 20000
+            while port in taken:
+                port = 20000 + (port - 20000 + 1) % 20000
+            ports[gid] = port
+            write_json(PORTS_FILE, ports)
+        return ports[gid]
 
 
 def game_url(gid):
     """Start (once) the game's own server and return its address."""
     game_dir = GAMES / gid
     meta = read_manifest(game_dir)
+    port = game_port(gid)
     with lock:
         if gid not in game_servers:
-            # A stable port per game id keeps the game's origin, and so its
-            # saved data, the same across runs.
-            port = 20000 + zlib.crc32(gid.encode()) % 20000
             server = ThreadingHTTPServer(('127.0.0.1', port), partial(GameHandler, directory=str(game_dir)))
             threading.Thread(target=server.serve_forever, daemon=True).start()
             game_servers[gid] = (server, port)
@@ -663,11 +780,39 @@ def watch_buttons():
 
 
 class LauncherHandler(SimpleHTTPRequestHandler):
+    """The launcher's files and its /api. Games run on other 127.0.0.1 ports,
+    and the browser lets their pages send requests here, so every /api call
+    must carry the X-PocketVibe header: a page on another origin can only add
+    it after a CORS preflight, which this server never answers. Covers and
+    cached audio, which change nothing, are the exceptions. A Host check
+    stops pages that point their own domain at 127.0.0.1."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(APP / 'launcher'), **kwargs)
 
     def log_message(self, *args):
         pass
+
+    def end_headers(self):
+        # The launcher must never run cached files from before an update.
+        if not self.path.startswith('/api/'):
+            self.send_header('Cache-Control', 'no-cache')
+        super().end_headers()
+
+    def allowed(self):
+        route = self.path.split('?', 1)[0]
+        if self.headers.get('Host') not in (f'127.0.0.1:{PORT}', f'localhost:{PORT}'):
+            return False
+        if not route.startswith('/api/'):
+            return True
+        if self.headers.get('Origin') not in (None, f'http://127.0.0.1:{PORT}'):
+            return False
+        if self.command == 'GET' and route.startswith(('/api/cover/', '/api/cache/')):
+            return True
+        return self.headers.get('X-PocketVibe') == '1'
+
+    def refuse(self):
+        self.send_json({'error': 'not allowed'}, 403)
 
     def send_json(self, data, status=200):
         body = json.dumps(data).encode()
@@ -679,6 +824,8 @@ class LauncherHandler(SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if not self.allowed():
+            return self.refuse()
         route = self.path.split('?', 1)[0]
         if route == '/api/library':
             # The launcher asks for the library when it loads: no game is running.
@@ -740,6 +887,8 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return {}
 
     def do_PUT(self):
+        if not self.allowed():
+            return self.refuse()
         route = self.path.split('?', 1)[0]
         name = route.rsplit('/', 1)[1]
         length = int(self.headers.get('Content-Length') or 0)
@@ -750,6 +899,8 @@ class LauncherHandler(SimpleHTTPRequestHandler):
         return self.send_json({'ok': True})
 
     def do_POST(self):
+        if not self.allowed():
+            return self.refuse()
         route = self.path.split('?', 1)[0]
         if route == '/api/settings':
             return self.send_json(save_settings(self.read_json()))
@@ -780,10 +931,14 @@ class LauncherHandler(SimpleHTTPRequestHandler):
         if action == 'launch':
             if not (GAMES / gid).is_dir():
                 return self.send_json({'error': 'not installed'}, 404)
+            try:
+                url = game_url(gid)
+            except OSError as e:
+                return self.send_json({'error': str(e)}, 500)
             global in_game
             in_game = True
             record_play(gid)
-            return self.send_json({'url': game_url(gid)})
+            return self.send_json({'url': url})
         if action == 'install':
             entry = find_catalog_entry(gid)
             if not entry:
@@ -800,6 +955,24 @@ class LauncherHandler(SimpleHTTPRequestHandler):
         return self.send_json({'error': 'unknown action'}, 404)
 
 
+def clean_up():
+    """Leftovers of work that was cut off (power, crash, quitting mid-download)."""
+    BUSY_FLAG.unlink(missing_ok=True)
+    package = HOME / '.app-update.zip'
+    package.unlink(missing_ok=True)
+    shutil.rmtree(HOME / '.app-update', ignore_errors=True)
+    if not GAMES.is_dir():
+        return
+    for path in GAMES.glob('.*'):
+        # A game being replaced when the power went: put the old one back.
+        if path.name.endswith('.old') and path.is_dir() and not (GAMES / path.name[1:-4]).exists():
+            path.rename(GAMES / path.name[1:-4])
+        elif path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
+
+
 def main():
     global launcher_server, notice
     saved_notice = HOME / 'notice'
@@ -808,9 +981,11 @@ def main():
         saved_notice.unlink()
     GAMES.mkdir(parents=True, exist_ok=True)
     QUIT_FLAG.unlink(missing_ok=True)
+    clean_up()
     threading.Thread(target=watch_buttons, daemon=True).start()
     audio_key.open()
     launcher_server = ThreadingHTTPServer(('127.0.0.1', PORT), LauncherHandler)
+    (HOME / 'update-pending').unlink(missing_ok=True)  # this version starts
     launcher_server.serve_forever()
 
 

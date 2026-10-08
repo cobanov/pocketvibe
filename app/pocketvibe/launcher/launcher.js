@@ -89,10 +89,14 @@ function save() {
   }
 }
 
+// The service only answers calls that carry this header, which pages on
+// other origins (games) cannot add.
+const API_HEADERS = { 'X-PocketVibe': '1' };
+
 async function api(path, method = 'GET', body) {
-  const options = { method };
+  const options = { method, headers: { ...API_HEADERS } };
   if (body !== undefined) {
-    options.headers = { 'Content-Type': 'application/json' };
+    options.headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
   const res = await fetch(path, options);
@@ -640,7 +644,9 @@ function render() {
 
   const groups = sections(tabGames());
   const count = groups.reduce((n, s) => n + s.games.length, 0);
-  const focus = Math.min(state.focus[state.tab], Math.max(count - 1, 0));
+  // Clamp only once there are games: the first render comes before the
+  // library loads, and clamping then would lose the saved focus.
+  const focus = count ? Math.min(state.focus[state.tab], count - 1) : state.focus[state.tab];
   state.focus[state.tab] = focus;
   state.rows = [];
 
@@ -809,7 +815,11 @@ function toast(text) {
 // ---------- Data ----------
 
 async function refreshLibrary() {
-  state.library = await api('/api/library');
+  try {
+    state.library = await api('/api/library');
+  } catch {
+    // Keep what is shown; the next load tries again.
+  }
 }
 
 async function refreshStore() {
@@ -1161,14 +1171,17 @@ async function unlockAudio() {
   refreshStatus();
   setInterval(refreshStatus, 20000);
   render();
-  await Promise.all([refreshLibrary(), refreshStore(), refreshInfo()]);
+  // Buttons work from the start. The store may need the network, so it fills
+  // in when it answers instead of holding up the launcher.
+  requestAnimationFrame(poll);
+  refreshStore().then(() => !keyboard.active && render());
+  await Promise.all([refreshLibrary(), refreshInfo()]);
   render();
   const { notice } = await api('/api/notice').catch(() => ({}));
   if (notice === 'restored') toast(t('restored'));
   else if (notice?.startsWith('updated:')) toast(t('updatedTo', { version: notice.slice(8) }));
   else if (notice?.startsWith('restore-failed:')) toast(t('restoreFailed', { error: notice.slice(15) }));
   pollJobs();
-  requestAnimationFrame(poll);
   if (state.settings?.music || state.settings?.uiSounds) unlockAudio();
   await checkUpdate();
   renderTabs();

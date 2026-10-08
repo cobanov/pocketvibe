@@ -19,17 +19,22 @@ wait_for() {
   done
 }
 
-if ! curl -s -o /dev/null "$API/api/status"; then
+case $ID in
+  [a-z0-9]*) ;;
+  *) echo "Not a game id: $ID"; exit 1 ;;
+esac
+
+if ! curl -sf -o /dev/null "$API/"; then
   # Start it the way the Ports menu does, through EmulationStation, and wait
   # for the launcher: it tells the app that no game is running as it loads.
-  LOG=/tmp/pocketvibe-cog.log
-  START=$(($(wc -c <"$LOG" 2>/dev/null || echo 0) + 1))
+  # PocketVibe.sh empties the browser's log before it starts the service.
   curl -s -d /storage/roms/ports/PocketVibe.sh http://127.0.0.1:1234/launch >/dev/null
-  wait_for "tail -c +$START $LOG | grep -q '8730/> Loaded successfully'" || { echo "PocketVibe did not start."; exit 1; }
+  wait_for "curl -sf -o /dev/null $API/" || { echo "PocketVibe did not start."; exit 1; }
+  wait_for "grep -q '8730/> Loaded successfully' /tmp/pocketvibe-cog.log" || { echo "PocketVibe did not start."; exit 1; }
   sleep 2
 fi
 
-URL=$(curl -s -X POST "$API/api/launch/$ID" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("url", ""))')
+URL=$(curl -s -X POST -H 'X-PocketVibe: 1' "$API/api/launch/$ID" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("url", ""))')
 [ -n "$URL" ] || { echo "PocketVibe has no game called $ID."; exit 1; }
 $COGCTL open "$URL" || { echo "PocketVibe's browser did not open $ID."; exit 1; }
 echo "Opened $ID. Hold Start + Select on the handheld to go back to the launcher."

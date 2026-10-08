@@ -32,16 +32,43 @@ if [ ! -x "$RUNTIME/usr/bin/cog" ]; then
   [ -x "$RUNTIME/usr/bin/cog" ] || exit 1
 fi
 
+# One launch's browser console; /tmp is in memory.
+: >/tmp/pocketvibe-cog.log
+
 python3 "$APP/pocketvibed.py" >/tmp/pocketvibed.log 2>&1 &
 DAEMON=$!
-trap 'kill $DAEMON 2>/dev/null' EXIT INT TERM
+trap 'kill $DAEMON 2>/dev/null' EXIT
+trap 'exit 1' INT TERM
 
-# Wait until the local service answers.
+# Wait until the local service answers, up to 15 s on a slow card.
 i=0
-until curl -s -o /dev/null http://127.0.0.1:8730/api/library || [ $i -ge 50 ]; do
-  sleep 0.1
+until curl -sf -o /dev/null http://127.0.0.1:8730/; do
   i=$((i + 1))
+  if [ $i -ge 150 ] || ! kill -0 $DAEMON 2>/dev/null; then
+    # A new version that does not start: go back to the one before it.
+    if [ -e "$HOME_DIR/update-pending" ] && [ -d "$HOME_DIR/app.old" ]; then
+      kill $DAEMON 2>/dev/null
+      rm -rf "$HOME_DIR/app.failed" "$HOME_DIR/update-pending" "$HOME_DIR/notice"
+      mv "$APP" "$HOME_DIR/app.failed" && mv "$HOME_DIR/app.old" "$APP"
+      trap - EXIT
+      exec sh /storage/roms/ports/PocketVibe.sh
+    fi
+    exit 1
+  fi
+  sleep 0.1
 done
+
+# Without the service there is no way back from a game, so if it stops, the
+# browser goes too. This also keeps the console log small.
+(
+  while kill -0 $DAEMON 2>/dev/null; do
+    [ "$(wc -c </tmp/pocketvibe-cog.log)" -gt 5000000 ] && : >/tmp/pocketvibe-cog.log
+    sleep 2
+  done
+  pkill -KILL -x cog
+) &
+WATCH=$!
+trap 'kill $DAEMON $WATCH 2>/dev/null' EXIT
 
 # The browser is reopened on the launcher whenever it closes, unless the app
 # was quit on purpose: pocketvibed closes it to leave a game it cannot reach,
@@ -56,11 +83,12 @@ while :; do
   if [ -e /tmp/pocketvibe-restart ]; then
     # pocketvibed installed a new version: start again with the new files.
     rm -f /tmp/pocketvibe-restart
-    kill $DAEMON 2>/dev/null
-    trap - EXIT INT TERM
+    kill $WATCH $DAEMON 2>/dev/null
+    trap - EXIT
     exec sh /storage/roms/ports/PocketVibe.sh
   fi
   [ -e "$QUIT_FLAG" ] && break
+  kill -0 $DAEMON 2>/dev/null || break
   # pocketvibed may close the browser to restore saved data; wait for it.
   while [ -e /tmp/pocketvibe-busy ]; do sleep 0.2; done
   if [ $(($(date +%s) - started)) -lt 5 ]; then
