@@ -1,10 +1,11 @@
 // Coins: a fixed pool drawn as one InstancedMesh, placed in shapes (lines,
-// arcs, blocks, waves, diagonals) by level.js. A coin that would touch a
-// zapper is simply left out.
+// arcs, blocks, waves, diagonals, zigzags, rings, arrows, diamonds) by
+// level.js. A coin that would touch a zapper is simply left out, and only the
+// coins on screen are drawn.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CEIL_Y, DESPAWN_X, HERO_X, cyl } from './shared.js';
+import { CAM_X, CEIL_Y, DESPAWN_X, HERO_X, VIEW_HALF_W, cyl } from './shared.js';
 
 const MAX_COINS = 160;
 const GAP = 0.78; // distance between neighbouring coins in a shape
@@ -18,7 +19,11 @@ function coinGeometry() {
   ]);
 }
 
-export function createCoins(scene, particles, zappers) {
+// sideRoom: how much further than on the 3:2 screen the view reaches to each
+// side; coins beyond the edges are not drawn.
+export function createCoins(scene, particles, zappers, sideRoom = 0) {
+  const minX = CAM_X - VIEW_HALF_W - sideRoom - 0.5;
+  const maxX = CAM_X + VIEW_HALF_W + sideRoom + 0.5;
   const mesh = new THREE.InstancedMesh(
     coinGeometry(),
     new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x6b4600 }),
@@ -48,7 +53,7 @@ export function createCoins(scene, particles, zappers) {
   function draw() {
     let n = 0;
     for (let i = 0; i < MAX_COINS; i++) {
-      if (!alive[i]) continue;
+      if (!alive[i] || cx[i] < minX || cx[i] > maxX) continue;
       dummy.position.set(cx[i], cy[i], 0);
       dummy.rotation.y = spin + cx[i] * 0.4;
       dummy.updateMatrix();
@@ -83,6 +88,47 @@ export function createCoins(scene, particles, zappers) {
     diagonal(x, y, n, rise) {
       for (let i = 0; i < n; i++) add(x + i * GAP, y + i * rise);
       return (n - 1) * GAP;
+    },
+    // Sharp ups and downs, amp above and below y.
+    zigzag(x, y, n, amp) {
+      for (let i = 0; i < n; i++) {
+        const p = (i % 6) / 6;
+        add(x + i * GAP, y + amp * (p < 0.5 ? 4 * p - 1 : 3 - 4 * p));
+      }
+      return (n - 1) * GAP;
+    },
+    // A circle of coins of radius r around (x + r, y).
+    ring(x, y, r) {
+      const n = Math.round((2 * Math.PI * r) / GAP);
+      for (let i = 0; i < n; i++) {
+        const a = (2 * Math.PI * i) / n;
+        add(x + r - Math.cos(a) * r, y + Math.sin(a) * r);
+      }
+      return 2 * r;
+    },
+    // An arrow pointing ahead: two arms of k + 1 coins meeting at the tip.
+    chevron(x, y, k, h) {
+      for (let i = 0; i < k; i++) {
+        add(x + i * GAP, y + (k - i) * h);
+        add(x + i * GAP, y - (k - i) * h);
+      }
+      add(x + k * GAP, y);
+      return k * GAP;
+    },
+    // A filled diamond, 2k + 1 columns wide.
+    diamond(x, y, k) {
+      for (let c = 0; c <= 2 * k; c++) {
+        const m = k + 1 - Math.abs(c - k);
+        for (let j = 0; j < m; j++) add(x + c * GAP, y + (j - (m - 1) / 2) * GAP);
+      }
+      return 2 * k * GAP;
+    },
+    // Coins along a straight path from (x0, y0) to (x1, y1), ends included.
+    trail(x0, y0, x1, y1, spacing = GAP) {
+      const len = Math.hypot(x1 - x0, y1 - y0);
+      const n = Math.max(1, Math.round(len / spacing));
+      for (let i = 0; i <= n; i++) add(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n);
+      return x1 - x0;
     },
 
     clear() {

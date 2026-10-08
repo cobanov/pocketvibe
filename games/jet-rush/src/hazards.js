@@ -1,10 +1,11 @@
 // Hazards: electric zappers (two emitter nodes and a crackling beam, some of
-// them rotating) and missiles that announce themselves with a blinking icon
-// at the right edge before they fly in. Fixed pools, one InstancedMesh per part.
+// them rotating, some riding up and down a rail) and missiles that announce
+// themselves with a blinking, beeping icon at the right edge before they fly
+// in. Fixed pools, one InstancedMesh per part.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAM_X, CAM_Z, DESPAWN_X, RIGHT_EDGE, VIEW_HALF_W, box, canvasTexture, cyl, paint } from './shared.js';
+import { CAM_X, CAM_Z, DESPAWN_X, RIGHT_EDGE, VIEW_HALF_W, box, canvasTexture, cyl, paint, segDist2 } from './shared.js';
 
 // ---------------------------------------------------------------- zappers
 
@@ -17,6 +18,14 @@ function nodeGeometry() {
     cyl(0.27, 0.4, 10, 'z', 0, 0, 0, 0xffc93a),
     cyl(0.13, 0.46, 8, 'z', 0, 0, 0, 0xe9fdff),
     box(0.5, 0.18, 0.3, -0.28, 0, 0, 0x5b6274), // bracket pointing away from the beam
+  ]);
+}
+
+// The rail a moving zapper rides on, behind it; scaled to its travel.
+function railGeometry() {
+  return mergeGeometries([
+    box(0.16, 1, 0.06, 0, 0, 0, 0x2a3042),
+    box(0.05, 1, 0.07, 0, 0, 0.01, 0x8794b2),
   ]);
 }
 
@@ -54,7 +63,8 @@ export function createZappers(scene, particles) {
     depthWrite: false,
   });
   const glows = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 0.85), glowMaterial, MAX_ZAPPERS);
-  for (const mesh of [nodes, cores, glows]) {
+  const rails = new THREE.InstancedMesh(railGeometry(), lambert, MAX_ZAPPERS * 2);
+  for (const mesh of [nodes, cores, glows, rails]) {
     mesh.frustumCulled = false; // instances move, so the cached bounds would be wrong
     mesh.count = 0;
     scene.add(mesh);
@@ -67,6 +77,10 @@ export function createZappers(scene, particles) {
     len: 0, // node to node
     angle: 0,
     spin: 0, // radians per second, 0 for a fixed zapper
+    baseY: 0, // a moving zapper rides amp above and below baseY
+    amp: 0,
+    omega: 0,
+    phase: 0,
     ax: 0,
     ay: 0,
     bx: 0,
@@ -85,11 +99,37 @@ export function createZappers(scene, particles) {
     z.by = z.y + hy;
   }
 
+  // A rail at x from y0 to y1.
+  function rail(index, x, y0, y1) {
+    dummy.position.set(x, (y0 + y1) / 2, -0.32);
+    dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, y1 - y0, 1);
+    dummy.updateMatrix();
+    rails.setMatrixAt(index, dummy.matrix);
+  }
+
+  // True if a coin at (x, y) is within margin of zapper z moved up by dy.
+  function near(z, x, y, margin, dy) {
+    return segDist2(x, y, z.ax, z.ay + dy, z.bx, z.by + dy) < margin * margin;
+  }
+
   function draw() {
     let n = 0;
+    let nr = 0;
     for (let i = 0; i < MAX_ZAPPERS; i++) {
       const z = zappers[i];
       if (!z.active) continue;
+      if (z.amp > 0) {
+        // One rail under each node's travel, or one for both if they share it.
+        const off = z.y - z.baseY;
+        const lo = Math.min(z.ay, z.by) - off - z.amp - 0.45;
+        const hi = Math.max(z.ay, z.by) - off + z.amp + 0.45;
+        if (Math.abs(z.ax - z.bx) < 0.1) rail(nr++, z.ax, lo, hi);
+        else {
+          rail(nr++, z.ax, z.ay - off - z.amp - 0.45, z.ay - off + z.amp + 0.45);
+          rail(nr++, z.bx, z.by - off - z.amp - 0.45, z.by - off + z.amp + 0.45);
+        }
+      }
       // Nodes: the bracket of each one points away from the beam.
       dummy.scale.set(1, 1, 1);
       dummy.position.set(z.ax, z.ay, 0);
@@ -115,22 +155,30 @@ export function createZappers(scene, particles) {
     nodes.count = n * 2;
     cores.count = n;
     glows.count = n;
+    rails.count = nr;
     nodes.instanceMatrix.needsUpdate = true;
     cores.instanceMatrix.needsUpdate = true;
     glows.instanceMatrix.needsUpdate = true;
+    rails.instanceMatrix.needsUpdate = true;
   }
 
   return {
     list: zappers,
 
     // A zapper centred at (x, y), len between the nodes, angle in radians.
-    add(x, y, len, angle, spin) {
+    // A moving one rides amp above and below y, omega radians per second,
+    // starting at phase.
+    add(x, y, len, angle, spin, amp = 0, omega = 0, phase = 0) {
       for (let i = 0; i < MAX_ZAPPERS; i++) {
         const z = zappers[i];
         if (z.active) continue;
         z.active = true;
         z.x = x;
-        z.y = y;
+        z.baseY = y;
+        z.amp = amp;
+        z.omega = omega;
+        z.phase = phase;
+        z.y = y + Math.sin(phase) * amp;
         z.len = len;
         z.angle = angle;
         z.spin = spin;
@@ -149,15 +197,15 @@ export function createZappers(scene, particles) {
           const dy = y - z.y;
           const r = z.len * 0.5 + margin;
           if (dx * dx + dy * dy < r * r) return true;
-        } else {
-          const dx = z.bx - z.ax;
-          const dy = z.by - z.ay;
-          const len2 = dx * dx + dy * dy;
-          let t = ((x - z.ax) * dx + (y - z.ay) * dy) / len2;
-          t = t < 0 ? 0 : t > 1 ? 1 : t;
-          const ex = z.ax + dx * t - x;
-          const ey = z.ay + dy * t - y;
-          if (ex * ex + ey * ey < margin * margin) return true;
+        } else if (z.amp > 0) {
+          // Anywhere along its ride: a few positions a coin's width apart.
+          const steps = Math.ceil((2 * z.amp) / margin);
+          const off = z.y - z.baseY;
+          for (let k = 0; k <= steps; k++) {
+            if (near(z, x, y, margin, -off - z.amp + (2 * z.amp * k) / steps)) return true;
+          }
+        } else if (near(z, x, y, margin, 0)) {
+          return true;
         }
       }
       return false;
@@ -174,6 +222,10 @@ export function createZappers(scene, particles) {
         if (!z.active) continue;
         z.x -= move;
         z.angle += z.spin * dt;
+        if (z.amp > 0) {
+          z.phase += z.omega * dt;
+          z.y = z.baseY + Math.sin(z.phase) * z.amp;
+        }
         ends(z);
         if (z.x < DESPAWN_X) z.active = false;
         else if (Math.random() < dt * 3) {
@@ -191,6 +243,18 @@ export function createZappers(scene, particles) {
         coreMaterial.color.setHex(Math.random() < 0.5 ? 0xffffff : 0x9ff4ff);
       }
       draw();
+    },
+
+    // Distance from (px, py) to the nearest beam close by, for the hum.
+    nearest(px, py) {
+      let best = 1e9;
+      for (let i = 0; i < MAX_ZAPPERS; i++) {
+        const z = zappers[i];
+        if (!z.active || Math.abs(z.x - px) > z.len * 0.5 + 6) continue;
+        const d2 = segDist2(px, py, z.ax, z.ay, z.bx, z.by);
+        if (d2 < best) best = d2;
+      }
+      return Math.sqrt(best);
     },
 
     // The zapper touching the hero, or null.
@@ -211,6 +275,8 @@ const MAX_MISSILES = 4;
 const TRACK_TIME = 0.75; // the warning follows the hero's height
 const LOCK_TIME = 0.4; // then it stops and blinks fast before launch
 const FLY_SPEED = 15; // on top of the scroll speed
+const BEEP_EVERY = 2 / 7; // s: a beep with every other blink while it aims
+const FLYBY_X = 7; // the fly-by whoosh starts here, peaking as it passes the hero
 const MISSILE_R = 0.2;
 const OFF = 0;
 const TRACK = 1;
@@ -257,7 +323,7 @@ function warningTexture() {
 // sideRoom: how much further than on the 3:2 screen the view reaches to the
 // right. Icons sit at the real edge and missiles start that much further
 // out, leaving that much earlier, so they arrive when they would on 3:2.
-export function createMissiles(scene, particles, sideRoom = 0) {
+export function createMissiles(scene, particles, sound, sideRoom = 0) {
   const iconX = CAM_X + ((VIEW_HALF_W + sideRoom) * (CAM_Z - ICON_Z)) / CAM_Z - 0.75;
   const startX = RIGHT_EDGE + 1.2 + sideRoom;
   const bodies = new THREE.InstancedMesh(
@@ -277,7 +343,7 @@ export function createMissiles(scene, particles, sideRoom = 0) {
     scene.add(mesh);
   }
 
-  const missiles = Array.from({ length: MAX_MISSILES }, () => ({ state: OFF, x: 0, y: 0, t: 0 }));
+  const missiles = Array.from({ length: MAX_MISSILES }, () => ({ state: OFF, x: 0, y: 0, t: 0, beep: 0, whoosh: false }));
   const dummy = new THREE.Object3D();
   const yellow = new THREE.Color(0xffd23f);
   const red = new THREE.Color(0xff3b3b);
@@ -323,6 +389,7 @@ export function createMissiles(scene, particles, sideRoom = 0) {
         m.state = TRACK;
         m.t = 0;
         m.y = heroY;
+        m.beep = 0;
         return;
       }
     },
@@ -355,9 +422,15 @@ export function createMissiles(scene, particles, sideRoom = 0) {
         m.t += dt;
         if (m.state === TRACK) {
           m.y += (heroY - m.y) * Math.min(1, dt * 9);
+          m.beep -= dt;
+          if (m.beep <= 0) {
+            m.beep += BEEP_EVERY;
+            sound.play('warn', { volume: 0.65, pan: 0.6 });
+          }
           if (m.t > TRACK_TIME) {
             m.state = LOCK;
             m.t = 0;
+            sound.play('lock', { volume: 0.85, pan: 0.6 });
           }
         } else if (m.state === LOCK) {
           const lead = sideRoom / (FLY_SPEED + move / Math.max(dt, 0.001));
@@ -365,9 +438,15 @@ export function createMissiles(scene, particles, sideRoom = 0) {
             m.state = FLY;
             m.t = 0;
             m.x = startX;
+            m.whoosh = false;
+            sound.play('launch', { volume: 0.7, pan: 0.8, rate: 0.96 + Math.random() * 0.08 });
           }
         } else {
           m.x -= FLY_SPEED * dt + move;
+          if (!m.whoosh && m.x < FLYBY_X) {
+            m.whoosh = true;
+            sound.play('flyby', { volume: 0.9, pan: 0.25, rate: 0.96 + Math.random() * 0.08 });
+          }
           if (puff) {
             particles.emit(m.x + 0.6, m.y + (Math.random() - 0.5) * 0.1, -0.1, 4, (Math.random() - 0.5), 0.22, 0.32, 0xfff07a, 0xff4a1f, 0);
             particles.emit(m.x + 0.8, m.y, -0.2, 2, (Math.random() - 0.5) * 1.5, 0.55, 0.36, 0xc9d0dc, 0x4c5368, -2);

@@ -2,14 +2,15 @@
   "id": "jet-rush",
   "title": "Jet Rush",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Fly a jetpack through an endless lab corridor, dodging electric zappers and incoming missiles while grabbing coins.",
+  "version": "1.2.0",
+  "description": "Fly a jetpack through an endless lab corridor, dodging electric zappers, homing missiles and laser walls while grabbing coins.",
   "genre": "Arcade",
   "responsive": true,
   "controls": {
-    "A": "Hold to fly up, let go to fall; start",
+    "A": "Hold to fly up, let go to fall; select in menus",
     "UP": "Fly up (same as A)",
-    "START": "Pause / resume",
-    "B": "Back to title (paused or game over)"
+    "D-pad": "Choose in menus",
+    "START": "Pause menu / resume",
+    "B": "Back; title from game over"
   }
 }

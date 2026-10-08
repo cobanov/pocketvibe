@@ -1,6 +1,6 @@
-// The hero: jetpack physics, run and flight animation, flames and the tumble
-// after a hit. Drawn as a few meshes (body, two legs, two arms, flames) that
-// share one vertex-colored material.
+// The hero: jetpack physics, run and flight animation, flames, the sounds of
+// the feet and the jetpack, and the tumble after a hit. Drawn as a few meshes
+// (body, two legs, two arms, flames) that share one vertex-colored material.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -15,6 +15,7 @@ const KICK = 3.2; // instant lift when taking off from the floor
 const MAX_RISE = 10.5;
 const MAX_FALL = 17;
 const HIT_R = 0.27; // radius around the three hit points
+const RELIGHT = 0.2; // s off the throttle before the ignition sounds again
 
 // Where the jetpack's two nozzles are, relative to the hero's feet.
 const NOZZLE_X = -0.44;
@@ -70,7 +71,7 @@ function flameGeometry() {
   return mergeGeometries(parts);
 }
 
-export function createHero(scene, particles) {
+export function createHero(scene, particles, sound) {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
 
   // root sits at the hero's centre so the tumble spins around it; `model`
@@ -120,12 +121,23 @@ export function createHero(scene, particles) {
   let flameTimer = 0;
   let squash = 0;
   let tilt = 0;
+  let offTime = 1; // s since the jetpack last burned
+  let flashColor = 0x55e8ff; // the electrocuted glow
+  let stepFlip = false;
+
+  // Plays an effect if the hero is the player's (not on the title screen),
+  // a little higher or lower each time so repeats do not sound the same.
+  function play(name, volume, rate = 1) {
+    if (hero.sfx) sound.play(name, { volume, rate: rate * (0.96 + Math.random() * 0.08) });
+  }
 
   const hero = {
     y: 0,
     vy: 0,
     grounded: true,
     thrusting: false,
+    scraping: false, // thrusting against the ceiling
+    sfx: false, // the hero's own sounds (off on the title screen)
     phase: 0,
     dead: false,
     settled: false,
@@ -140,6 +152,7 @@ export function createHero(scene, particles) {
       this.vy = 0;
       this.grounded = true;
       this.thrusting = false;
+      this.scraping = false;
       this.dead = false;
       this.settled = false;
       this.freeze = 0;
@@ -148,6 +161,7 @@ export function createHero(scene, particles) {
       this.spin = 0;
       squash = 0;
       tilt = 0;
+      offTime = 1;
       material.emissive.setHex(0x000000);
       this.draw(0);
     },
@@ -155,15 +169,20 @@ export function createHero(scene, particles) {
     // thrust: A or UP held. speed: world speed, for the run cycle.
     update(dt, thrust, speed) {
       if (thrust && this.grounded) this.vy = KICK;
+      if (thrust && !this.thrusting && offTime > RELIGHT) play('jet_on', 0.7);
+      offTime = thrust ? 0 : offTime + dt;
       this.thrusting = thrust;
       this.vy -= (GRAVITY - (thrust ? THRUST : 0)) * dt;
       if (this.vy > MAX_RISE) this.vy = MAX_RISE;
       if (this.vy < -MAX_FALL) this.vy = -MAX_FALL;
       this.y += this.vy * dt;
 
+      this.scraping = false;
       if (this.y >= MAX_Y) {
         this.y = MAX_Y;
+        if (this.vy > 4) play('bump', Math.min(1, this.vy / MAX_RISE));
         if (this.vy > 0) this.vy = 0;
+        this.scraping = thrust;
         // Sparks while scraping along the ceiling.
         if (thrust && Math.random() < dt * 25) {
           particles.emit(HERO_X + 0.1, CEIL_Y - 0.08, 0.3, -3 - Math.random() * 3, -1 - Math.random() * 2, 0.3, 0.12, 0xffffff, 0xffb02e, 12);
@@ -174,6 +193,7 @@ export function createHero(scene, particles) {
         this.y = 0;
         if (!wasGrounded && this.vy < -5) {
           squash = 0.12;
+          play('land', Math.min(1, 0.35 - this.vy / 25));
           for (let k = 0; k < 6; k++) {
             const side = k < 3 ? -1 : 1;
             particles.emit(HERO_X + side * 0.2, 0.08, 0.3, side * (1.5 + Math.random() * 2), 0.8 + Math.random(), 0.35, 0.22, 0xe9eef5, 0x8f9ab0, 3);
@@ -188,8 +208,10 @@ export function createHero(scene, particles) {
       if (this.grounded) {
         const before = Math.sin(this.phase);
         this.phase += dt * (6 + speed * 0.55);
-        // A little puff of dust at every footstep.
+        // A little puff of dust and a footstep sound at every step.
         if ((before < 0) !== (Math.sin(this.phase) < 0)) {
+          stepFlip = !stepFlip;
+          play('step', 0.75, stepFlip ? 1.04 : 0.95);
           particles.emit(HERO_X - 0.1, 0.06, 0.3, -1 - Math.random(), 0.6, 0.3, 0.16, 0xdfe5ee, 0x9aa5ba, 2);
         }
       } else {
@@ -243,17 +265,20 @@ export function createHero(scene, particles) {
       return this.y + CENTER;
     },
 
-    // kind: 'zap' (a short electrocuted freeze first) or 'boom'.
+    // kind: 'zap' or 'laser' (a short electrocuted freeze first) or 'boom'.
     die(kind) {
+      const shock = kind !== 'boom';
       this.dead = true;
       this.settled = false;
       this.thrusting = false;
+      this.scraping = false;
       this.cy = this.y + CENTER;
-      this.vy = kind === 'zap' ? 4 : 9;
-      this.spin = kind === 'zap' ? 7 : 11;
+      this.vy = shock ? 4 : 9;
+      this.spin = shock ? 7 : 11;
       this.rot = 0;
-      this.freeze = kind === 'zap' ? 0.4 : 0;
-      this.zapFlash = kind === 'zap' ? 0.9 : 0;
+      this.freeze = shock ? 0.4 : 0;
+      this.zapFlash = shock ? 0.9 : 0;
+      flashColor = kind === 'laser' ? 0xff6a3a : 0x55e8ff;
     },
 
     // The tumble: bounce along the floor until the hero lies still.
@@ -261,7 +286,7 @@ export function createHero(scene, particles) {
       if (this.zapFlash > 0) {
         this.zapFlash -= dt;
         const on = this.zapFlash > 0 && Math.floor(this.zapFlash * 18) % 2 === 0;
-        material.emissive.setHex(on ? 0x55e8ff : 0x000000);
+        material.emissive.setHex(on ? flashColor : 0x000000);
       }
       if (this.freeze > 0) {
         this.freeze -= dt;
@@ -283,6 +308,7 @@ export function createHero(scene, particles) {
       if (this.cy <= floor) {
         this.cy = floor;
         if (this.vy < -3) {
+          play('thud', Math.min(1, -this.vy / 12), 1);
           this.vy = -this.vy * 0.45;
           this.spin *= 0.6;
           for (let k = 0; k < 5; k++) {

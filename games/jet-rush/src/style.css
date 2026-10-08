@@ -284,8 +284,85 @@ body.handheld #legend {
   color: #ffd23f;
 }
 
+.panel .dim {
+  color: #9fb0c8;
+}
+
 .panel .blink {
   animation: blink 1s steps(2, start) infinite;
+}
+
+/* Menus: the chosen item is yellow with an arrow (a CSS triangle) in front. */
+
+.panel .menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+
+.panel .item {
+  position: relative;
+  padding: 2px 18px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #c3d0e2;
+}
+
+.panel .item.on {
+  color: #ffd23f;
+}
+
+.panel .item.on::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  margin-top: -9px;
+  border-style: solid;
+  border-width: 9px 0 9px 14px;
+  border-color: transparent transparent transparent #ffd23f;
+  filter: drop-shadow(0 2px 0 #000);
+}
+
+/* Records on the title: three numbers with their names under them. */
+
+.panel .records {
+  display: flex;
+  gap: 18px;
+  padding: 8px 4px 6px;
+  border-top: 2px solid rgba(255, 210, 63, 0.25);
+}
+
+.panel .records div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.panel .records b {
+  font-size: 24px;
+  color: #ffd23f;
+}
+
+.panel .records span {
+  font-size: 18px;
+  color: #d6e2f0;
+}
+
+.panel .new {
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #ffd23f;
+  color: #1a2340;
+  font-size: 18px;
+  font-style: normal;
+  text-shadow: none;
+  vertical-align: 2px;
 }
 
 @keyframes blink {
