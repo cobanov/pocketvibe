@@ -1366,6 +1366,118 @@ h2 {
   font-weight: 400;
 }
 
+/* How it works: the layers a frame goes down, the parts on the handheld, and
+   what happens when you press A. */
+.layers {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+}
+
+.layers li {
+  display: grid;
+  grid-template-columns: minmax(9em, auto) minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+/* The game on top in the handheld's yellow, the hardware at the bottom. */
+.layers li:first-child {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.layers li:first-child span,
+.layers li:first-child em {
+  color: #5c4a10;
+}
+
+.layers li:last-child {
+  background: var(--panel-2);
+}
+
+.layers strong {
+  font-size: 17px;
+}
+
+.layers span {
+  color: var(--body);
+  font-size: 15px;
+}
+
+/* What each layer hands the one below. */
+.layers em {
+  color: var(--muted);
+  font: 13px 'DejaVu Sans Mono', ui-monospace, monospace;
+  font-style: normal;
+}
+
+.parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 14px;
+  margin: 0 0 22px;
+}
+
+.part {
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--panel);
+}
+
+.part > code {
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.part p {
+  margin: 8px 0 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.sequence {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.sequence li {
+  position: relative;
+  padding-left: 40px;
+  color: var(--body);
+  line-height: 1.55;
+  counter-increment: step;
+}
+
+/* Each step's number as a button cap, like the launcher's hints. */
+.sequence li::before {
+  content: counter(step);
+  position: absolute;
+  top: 3px;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 21px;
+  border: 2px solid var(--accent);
+  border-radius: 5px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
 /* Tables of measured limits on the game-making page. */
 .table {
   margin: 0 0 22px;
@@ -1404,6 +1516,19 @@ h2 {
 
 .table td:last-child {
   color: var(--body);
+}
+
+/* ROCKNIX beside Android, on How it works. */
+.table.compare td:nth-child(2) {
+  color: var(--body);
+  font-weight: 400;
+  white-space: normal;
+}
+
+.table.compare tbody th {
+  color: var(--muted);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .column h3.section {
@@ -1531,6 +1656,11 @@ h2 {
 }
 
 @media (max-width: 560px) {
+  .layers li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
   .band {
     padding-top: 56px;
   }
