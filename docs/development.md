@@ -8,7 +8,8 @@
 | `app/pocketvibe/pocketvibed.py` | The local service on `127.0.0.1:8730`: Library, Store, downloads, saves, app updates, and Start + Select. Python standard library only. |
 | `app/pocketvibe/runtime.py` | Runs Cog inside the runtime (a Debian root with WPE WebKit) in its own mount namespace, so WebKit's sandbox works. |
 | `app/pocketvibe/setup.sh` | The first-run download of the runtime, drawn with `dialog`. |
-| `app/pocketvibe/launcher/` | The launcher: plain HTML, CSS and JavaScript, no build step. |
+| `app/pocketvibe/launcher/` | The launcher: plain HTML, CSS and JavaScript, no build step. `play.html` is the game shell (see below). |
+| `app/pocketvibe/screens.py` | The handheld's screens, read from Sway: turns a second screen on while PocketVibe runs and spreads the browser's window over both. |
 | `template/` | The starter project. `packages/create-pocketvibe` copies it; `packages/pocketvibe` is the command line tool. |
 | `store/worker/` | The store: a Cloudflare Worker with D1 (catalog, uploads, download counts) and R2 (zips, covers). |
 | `site/` | The website, with the launcher running in the browser. |
@@ -32,6 +33,34 @@ store download into `$POCKETVIBE_HOME/games`.
 FONTS=<folder with DejaVuSans.ttf and DejaVuSans-Bold.ttf> \
   node tools/ui-shots.mjs http://127.0.0.1:8730/ shots wait:1500 shot:library key:KeyW shot:store
 ```
+
+`POCKETVIBE_PORT` moves the service off 8730, to run a second copy beside one that is running.
+
+## Screens
+
+The launcher fills whatever screen it gets: its cards take as many columns as the width holds
+(three from 640 to 720 pixels), and on a big screen it is enlarged by quarters. It is drawn in
+720×480 pixels, so on the RG34XX SP it looks exactly as it always has.
+
+Games are made for one 720×480 screen and stay that way. On any other screen pocketvibed opens
+them in the game shell, `/__pocketvibe__/play.html` on the game's own port: the game runs in a
+720×480 frame fitted to the screen. The shell is on the game's origin so the game keeps its saves
+(WebKit keeps a frame's storage apart from the same origin opened on its own).
+
+A handheld with two screens (the Anbernic RG DS) gets both: `screens.py` turns the second one on,
+which EmulationStation keeps off, and makes the browser's window span the two. The launcher draws
+on the main screen and shows the focused game's details on the other; the game shell shows the
+game's controls there. `PocketVibe.sh` turns the second screen off again on the way out.
+
+To try a layout on the computer, give the launcher its screens in the address, and set the window
+to their size:
+
+```sh
+SIZE=1280x480 node tools/ui-shots.mjs 'http://127.0.0.1:8730/?screens=0,0,640,480;640,0,640,480' shots ...
+```
+
+`POCKETVIBE_SCREENS=640x480+0+0,640x480+640+0` makes pocketvibed itself act as a two-screen
+handheld, so games open in the shell.
 
 ## Work on a handheld
 

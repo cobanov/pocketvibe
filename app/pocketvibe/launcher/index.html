@@ -2,33 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=720, height=480" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>PocketVibe</title>
     <link rel="stylesheet" href="launcher.css" />
   </head>
   <body>
-    <header>
-      <div class="brand">PocketVibe</div>
-      <nav>
-        <span class="hint">L</span>
-        <span class="tab" data-tab="library"></span>
-        <span class="tab" data-tab="store"></span>
-        <span class="tab" data-tab="settings"></span>
-        <span class="hint">R</span>
-      </nav>
-      <div id="status"></div>
-    </header>
-    <main><div id="content"></div></main>
-    <div id="scrollbar" hidden><div class="thumb"></div></div>
-    <footer>
-      <div id="hints"></div>
-      <div id="position"></div>
-    </footer>
-    <div id="picker" hidden></div>
-    <div id="dialog" hidden></div>
-    <div id="keyboard" hidden></div>
-    <div id="toast" hidden></div>
-    <div id="celebrate" hidden><canvas width="720" height="480"></canvas><div class="celebrate-card"></div></div>
+    <div id="app">
+      <header>
+        <div class="brand">PocketVibe</div>
+        <nav>
+          <span class="hint">L</span>
+          <span class="tab" data-tab="library"></span>
+          <span class="tab" data-tab="store"></span>
+          <span class="tab" data-tab="settings"></span>
+          <span class="hint">R</span>
+        </nav>
+        <div id="status"></div>
+      </header>
+      <main><div id="content"></div></main>
+      <div id="scrollbar" hidden><div class="thumb"></div></div>
+      <footer>
+        <div id="hints"></div>
+        <div id="position"></div>
+      </footer>
+      <div id="picker" hidden></div>
+      <div id="dialog" hidden></div>
+      <div id="keyboard" hidden></div>
+      <div id="toast" hidden></div>
+      <div id="celebrate" hidden><canvas width="720" height="480"></canvas><div class="celebrate-card"></div></div>
+    </div>
+    <aside id="companion" hidden></aside>
     <script type="module" src="launcher.js"></script>
   </body>
 </html>
