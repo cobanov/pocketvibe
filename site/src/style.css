@@ -1077,6 +1077,83 @@ h2 {
   font-size: 16px;
 }
 
+/* What you need: a card for each kind of handheld, then the handhelds it was
+   tested on. */
+.needs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
+}
+
+.need {
+  padding: 18px 22px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.need h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.need dl {
+  margin: 0;
+}
+
+.need dl div {
+  padding: 9px 0;
+  border-top: 1px solid var(--panel-2);
+}
+
+.need dl div:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.need dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.need dd {
+  margin: 2px 0 0;
+  color: var(--body);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.devices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.devices li {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.devices strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.devices span {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .note {
   margin: 18px 0 0;
   color: var(--muted);

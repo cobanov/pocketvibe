@@ -19,6 +19,7 @@
       <a class="brand" href="/">PocketVibe</a>
       <nav>
         <a href="#games">Games</a>
+        <a href="#requirements">Requirements</a>
         <a href="#install">Install</a>
         <a href="#make">Make your own</a>
         <a href="https://github.com/cobanov/pocketvibe">GitHub</a>
@@ -102,6 +103,44 @@
         <ul class="covers"></ul>
       </section>
 
+      <section class="column" id="requirements">
+        <h2>What you need</h2>
+        <p>PocketVibe runs on ROCKNIX and Android handhelds with buttons.</p>
+        <div class="needs">
+          <div class="need">
+            <h3>ROCKNIX handhelds</h3>
+            <dl>
+              <div><dt>System</dt><dd>ROCKNIX. PocketVibe does not run on muOS or other firmware.</dd></div>
+              <div><dt>Chip</dt><dd>64-bit Arm, such as the Allwinner H700 or the Rockchip RK3566</dd></div>
+              <div><dt>Memory</dt><dd>1 GB of RAM or more</dd></div>
+              <div><dt>Graphics</dt><dd>The Panfrost driver. On libmali, PocketVibe offers to switch.</dd></div>
+              <div><dt>Storage</dt><dd>About 1 GB free on the SD card</dd></div>
+              <div><dt>Network</dt><dd>Wi-Fi, for the first start (150 MB, once) and the store</dd></div>
+            </dl>
+          </div>
+          <div class="need">
+            <h3>Android handhelds</h3>
+            <dl>
+              <div><dt>System</dt><dd>Android 10 or newer</dd></div>
+              <div><dt>Web engine</dt><dd>Android System WebView 94 or newer, updated from the Play Store</dd></div>
+              <div><dt>Controls</dt><dd>Built-in buttons: a d-pad, A, B, X, Y, L, R, Start and Select</dd></div>
+              <div><dt>Network</dt><dd>Wi-Fi, for the store</dd></div>
+            </dl>
+          </div>
+        </div>
+        <h3 class="platform">Tested on</h3>
+        <ul class="devices">
+          <li><strong>Anbernic RG34XX SP</strong><span>ROCKNIX, H700</span></li>
+          <li><strong>Anbernic RG34XX</strong><span>ROCKNIX, H700</span></li>
+          <li><strong>Anbernic RG DS</strong><span>ROCKNIX, RK3566, two screens</span></li>
+          <li><strong>Anbernic RG Rotate</strong><span>Android</span></li>
+        </ul>
+        <p class="note">
+          Other ROCKNIX handhelds with the same chips, such as the RG35XX and RG40XX families, should
+          work too, but are not tested yet.
+        </p>
+      </section>
+
       <section class="column" id="install">
         <h2>Put it on your handheld</h2>
         <h3 class="platform">On ROCKNIX</h3>
@@ -110,14 +149,18 @@
             <kbd>1</kbd>
             <div>
               <h3><a href="/download/rocknix">Download PocketVibe.zip</a></h3>
-              <p>5 MB. The handheld needs ROCKNIX, Wi-Fi and about 1 GB free on its SD card.</p>
+              <p>5 MB. The handheld needs ROCKNIX, Wi-Fi and about 1 GB free on its SD card (<a href="#requirements">what you need</a>).</p>
             </div>
           </li>
           <li>
             <kbd>2</kbd>
             <div>
               <h3>Unzip it into <code>roms/ports</code></h3>
-              <p>On the handheld's SD card, from your computer or over the handheld's network share.</p>
+              <p>
+                Over the network: turn on Samba in ROCKNIX's network settings, then open the
+                handheld's <code>games-roms</code> share from your computer. A second SD card for
+                games can also be filled straight from your computer.
+              </p>
             </div>
           </li>
           <li>

@@ -44,10 +44,13 @@ porting needed: unzip it once and it keeps itself up to date.
 Just curious? The [website](https://pocketvibe.cobanov.dev) runs the real launcher with the
 store's games in your browser.
 
-On your handheld, with ROCKNIX, Wi-Fi and about 1 GB free on the SD card:
+On your handheld, with ROCKNIX (PocketVibe does not run on muOS or other firmware), a 64-bit
+Arm chip, 1 GB of RAM or more, Wi-Fi and about 1 GB free on the SD card:
 
 1. Download [PocketVibe.zip](https://pocketvibe.cobanov.dev/download/rocknix) (5 MB).
-2. Unzip it into `roms/ports` on the handheld's SD card, with a card reader or over the handheld's network share.
+2. Unzip it into the handheld's `roms/ports`. Over the network, turn on Samba in ROCKNIX's
+   network settings and open the handheld's `games-roms` share; a second SD card for games can
+   also be filled with a card reader.
 3. Restart the handheld (or update the game lists) and open **Ports**, then **PocketVibe**.
 
 The first start downloads PocketVibe's game engine (about 150 MB) and installs it, with a
@@ -64,8 +67,9 @@ To make your own game, run `npm create pocketvibe@latest my-game` and follow
 [Get started](docs/getting-started.md). [Making games that run well](docs/performance.md)
 has the handheld's measured limits.
 
-**Made on an Anbernic RG34XX SP** with ROCKNIX, and runs on the two-screen Anbernic RG DS.
-On Android it runs on the Anbernic RG Rotate. Other handhelds may work, but are not tested yet.
+**Made on an Anbernic RG34XX SP** with ROCKNIX, and tested on the RG34XX and the two-screen
+Anbernic RG DS. On Android it runs on the Anbernic RG Rotate. Other ROCKNIX handhelds with the
+same chips, such as the RG35XX and RG40XX families, should work too, but are not tested yet.
 
 ## Want to tinker?
 
