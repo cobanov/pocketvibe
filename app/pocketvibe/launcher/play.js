@@ -26,6 +26,7 @@ const splash = document.getElementById('splash');
 const splashInner = splash.querySelector('.splash-inner');
 let size = NATIVE; // the game's screen
 let second = null; // { width, height, layout } when the game uses the second screen too
+let swapped = false; // a two-screen game takes the other screen as its first (see gameScreens)
 
 // Where the second screen is, seen from the first: the game lays its two
 // screens out the same way, so one frame covers both.
@@ -40,8 +41,18 @@ function placeSplash(main) {
   splashInner.classList.add('placed');
 }
 
-function layout() {
+// The game's first screen and the other one. Usually the first is the
+// handheld's main screen (where EmulationStation was). But a game that uses
+// two screens lays the second out right of or below the first, so when the
+// main screen is the lower one (EmulationStation on an RG DS's bottom
+// screen), the game takes the top screen as its first, as on a DS.
+function gameScreens() {
   const { main, other } = fitScreens(screens, primary, innerWidth, innerHeight);
+  return swapped ? { main: other, other: main } : { main, other };
+}
+
+function layout() {
+  const { main, other } = gameScreens();
   placeSplash(main);
   if (second && other) {
     // One frame over both screens, scaled as one.
@@ -170,7 +181,9 @@ setTimeout(hideSplash, SPLASH_MAX);
 const meta = await manifest();
 fillSplash(meta);
 if (meta.responsive === true) {
-  const { main, other } = fitScreens(screens, primary, innerWidth, innerHeight);
+  const fitted = fitScreens(screens, primary, innerWidth, innerHeight);
+  swapped = meta.screens === 2 && fitted.other !== null && !secondLayout(fitted.main, fitted.other) && secondLayout(fitted.other, fitted.main) !== null;
+  const { main, other } = gameScreens();
   size = gameSize(main.width / main.height);
   // A game that uses two screens ("screens": 2) gets the second one too,
   // instead of the controls card, when it sits beside or below the first.
