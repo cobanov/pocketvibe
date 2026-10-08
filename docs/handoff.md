@@ -18,24 +18,23 @@ Bu dosyayı baştan sona oku, sonra "Kalan işler"den devam et. Önce `docs/plan
 - Denetim (iki alt ajan) ve düzeltmeler: yerel API artık `X-PocketVibe` başlığı, Origin ve Host denetimi istiyor; güncelleme açılmazsa `app.old`'a dönüş; daemon ölürse tarayıcıyı kapatan gözcü; kalıcı port kaydı (`ports.json`); dosyaların atomik yazılması; mağazada kimlik sahipliği, zip bombası, sürüm geri alma ve manifest doğrulaması; CLI'ın Windows'ta çalışması.
 - Cihazda tam test: her ekran, 11 oyunun hepsi, güncelleme, yedekleme ve geri yükleme, gözcü, geri dönüş, sıfırdan kurulum.
 
-## Güncel iş listesi (2026-10-08 öğleden sonra, en günceli bu)
+## Güncel iş listesi (2026-10-08 akşam, en günceli bu)
 
-Bitenler: npm paketleri; dokuz yeni oyun mağazada; cihaz sınırları raporu, `docs/performance.md`, yeni bütçe; cihaz Tailscale'de; site işi commit'lendi, Android kurulum adımları ve `/download/android`; pil göstergesi; `screens` ve `android` dalları main'de; 0.6.0 ve 0.6.1 (yeni kurulum 5 oyunla gelir) yayında ve SP'de güncellemeyle test edildi; responsive altyapısı (template `handheld.js`, kabuk `"responsive": true` oyunlara ekran oranında çerçeve verir, `AGENTS.md` "Screen shapes").
+Bitenler (bugün): npm paketleri; dokuz yeni oyun; cihaz sınırları raporu ve `docs/performance.md`; Tailscale; site (Android adımları, `/download/android`, demo 21 oyun); pil göstergesi; `screens` ve `android` dalları main'de; 0.6.0 ve 0.6.1 (yeni kurulum 5 oyunla) yayında; responsive altyapısı ve 20 oyunun hepsi responsive + performans geçişi, 1.1.0 olarak mağazada; template'te kısa basışlar ve CSS düzeltildi.
 
 Sürenler:
-1. Oyun geçişi (responsive + performans): 20 oyun beş alt ajanda (`/private/tmp/.../scratchpad/game-pass-brief.md`). Dördü bitti (star-defender, rock-blaster, tank-brigade, maze-chase; 1.1.0, `"responsive": true`). Bitince: kontrol, commit, SP'de `?perflog` ile ölçüm, mağazaya yükleme, site.
-2. Runtime-v2: Debian forky, WPE 2.54 MiniBrowser, Mesa 26. SP'de ekranda 50 bin üçgen 60 fps (eski: 15). Yapım betiği `device/build-runtime.sh` (cihazda `/storage/pocketvibe/runtime-2` kuruluyor). Yazıldı: `app/pocketvibe/padkeys.py` (Debian'ın WPE 2.54'ünde gamepad yok; tuşları sanal klavyeye çevirir). Kalan: `runtime.py --bind`, `PocketVibe.sh`/`setup.sh`/`pocketvibed.py` (MiniBrowser, kayıtlar `/storage/pocketvibe/profile`, v1'den kopyalama, launcher'a dönüş cogctl yerine kabuk üzerinden, olmazsa tarayıcıyı yeniden başlatma), `screens.py` MiniBrowser penceresi, runtime-2 release, uygulama 0.7.0, SP ve RG DS testi. Açık sorun: WebKit sandbox'ı açıkken MiniBrowser çöküyor (şimdilik `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`).
-3. Ses efektleri ve menü müziği: alt ajan ayrı worktree'de, `audio` dalı (`scratchpad/audio-brief.md`). Ölçüm: cihazda OGG çözmek dosya başına ~1,5 sn, WAV 60 ms; efektler WAV, müzik OGG (arka planda ~5 sn). Bitince cihazda dinleme testi (kullanıcıyla) ve birleştirme.
+1. Ses efektleri ve menü müziği: alt ajan ayrı worktree'de, `audio` dalı (`scratchpad/audio-brief.md`). Efektler WAV, müzik OGG (cihazda ölçüldü). Bitince birleştirme ve cihazda dinleme testi (kullanıcıyla).
+2. Runtime 2: `runtime-v2` dalında, yayınlanmadı (bkz. `bench/results/2026-10-08-limits.md`, "Runtime 2 denemesi"). GPU'da 5 kat kazanç, ama kare başına 2-3 ms işlemci kaybı; Turbo Circuit daha kötü. Kare senkronu ek yükü araştırılmalı. Gamepad yok (`padkeys.py` köprüsü), sandbox kapalı. Release `runtime-v2` (pre-release) GitHub'da duruyor, main'in `config.json`'u onu kullanmıyor. Cihazda `/storage/pocketvibe/runtime-2`, `/storage/pocketvibe/profile`, `/storage/pocketvibe/app.v2dev` duruyor; cihaz gerçek 0.6.1'de.
 
 Bekleyenler:
-4. Template düzeltmeleri (oyun ajanının raporu): `handheld.js` bir kareden kısa basışları kaçırıyor (düzelt, sonra 20 oyuna kopyala); `template/src/style.css` hâlâ sabit 720x480 diyor; `tools/game-shots.mjs` öldürülünce Chrome ve Vite açık kalıyor.
-5. `create-pocketvibe` 0.1.1 (template değişti; kullanıcı onayıyla).
-6. Android: uygulama içi güncelleme kontrolü, kayıt yedekleme, 5 hazır oyun, yeni APK; RP3+ testi.
-7. RG DS: A/B ters (cihaz açık olmalı; `padkeys.py`'da RG DS için takas hazır, gerçek tuşlarla doğrulanmalı).
-8. Site: iPhone Safari testi (kullanıcı).
-9. Küçükler: oyunlar arası bellek birikmesi (runtime-v2'de tekrar bak), limits ses testi, güncellemeden sonra "Restarting..." metni.
-10. Eski denetim maddeleri: yönetici için bekleyen yüklemeyi inceleme, yükleme kotası, sayısal GitHub kimliği, OAuth device flow, site demo oyunları ayrı origin.
-11. Cihaz temizliği: `/storage/pv-runtime-m25`, `/storage/pv-runtime-m26` (~1,5 GB), `/storage/pv-*.sh`, `/tmp/pvbench` http sunucusu (8811), collector (8799), sanal pad (`/tmp/handheld-pad.py`).
+3. Turbo Circuit'in işlemci yükü (araba dururken çekirdeğin %81'i; gerçek yarışta 48-60 fps): oyunu profille ve hafiflet. Her iki runtime'a yarar.
+4. `create-pocketvibe` 0.1.1 (template değişti; kullanıcı onayıyla).
+5. Android: uygulama içi güncelleme kontrolü, kayıt yedekleme, 5 hazır oyun, yeni APK; RP3+ testi.
+6. RG DS: A/B ters (cihaz açık olmalı). Runtime 1'de libmanette eşlemesiyle çözülmeli (bkz. önceki devir notu, `gamecontrollerdb`).
+7. Site: iPhone Safari testi (kullanıcı).
+8. Küçükler: oyunlar arası bellek birikmesi, güncellemeden sonra "Restarting..." metni, `run-game.sh` ilk istekte uygulama yeni açılmışsa beklesin (runtime-v2 dalında).
+9. Eski denetim maddeleri: bekleyen yüklemeyi inceleme, yükleme kotası, sayısal GitHub kimliği, OAuth device flow, demo oyunları ayrı origin.
+10. Cihaz temizliği: `/storage/pv-runtime-m25`, `/storage/pv-runtime-m26`, `/storage/pv-*.sh`, `/tmp/handheld-pad.py`, `/storage/pocketvibe/app.v2dev`; runtime 2 kararına göre `runtime-2` ve `profile`.
 
 ## Yarım kalan: cihazın sınırları (2026-10-08 öğlen)
 
