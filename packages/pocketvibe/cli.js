@@ -18,9 +18,11 @@ import { zipSync } from 'fflate';
 
 const STORE = (process.env.POCKETVIBE_STORE ?? 'https://pocketvibe-store.mertcobanov.workers.dev').replace(/\/$/, '');
 
+// Thrown for problems the user can fix; printed without a stack trace.
+class Failure extends Error {}
+
 function fail(message) {
-  console.error(message);
-  process.exit(1);
+  throw new Failure(message);
 }
 
 function githubToken() {
@@ -33,9 +35,11 @@ function githubToken() {
 }
 
 async function call(path, { method = 'GET', body, type } = {}) {
+  // The token is a GitHub sign-in: never send it unencrypted.
+  if (!/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(STORE)) fail(`The store address must start with https://, not ${STORE}.`);
   const headers = { Authorization: `Bearer ${githubToken()}` };
   if (type) headers['Content-Type'] = type;
-  const res = await fetch(`${STORE}${path}`, { method, headers, body });
+  const res = await fetch(`${STORE}${path}`, { method, headers, body }).catch(() => fail(`Cannot reach the store at ${STORE}.`));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) fail(`Store: ${data.error ?? res.statusText}`);
   return data;
@@ -64,7 +68,14 @@ async function publish(dir = '.') {
   const out = mkdtempSync(join(tmpdir(), 'pocketvibe-'));
   try {
     console.log(`Building ${manifest.title} ${manifest.version}...`);
-    execFileSync('npx', ['vite', 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'warn'], { cwd: project, stdio: 'inherit' });
+    // The project's own Vite, run by this Node: the same on every system.
+    const vite = join(project, 'node_modules', 'vite', 'bin', 'vite.js');
+    if (!existsSync(vite)) fail(`Vite is not installed in ${project}. Run npm install there first.`);
+    try {
+      execFileSync(process.execPath, [vite, 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'warn'], { cwd: project, stdio: 'inherit' });
+    } catch {
+      fail('The build failed; see the messages above.');
+    }
     writeFileSync(join(out, 'pocketvibe.json'), JSON.stringify({ entry: 'index.html', ...manifest }, null, 2));
     for (const cover of ['cover.png', 'cover.jpg']) {
       if (existsSync(join(project, cover))) writeFileSync(join(out, cover), readFileSync(join(project, cover)));
@@ -121,4 +132,10 @@ if (!commands[command]) {
 Store: ${STORE}`);
   process.exit(command ? 1 : 0);
 }
-await commands[command]();
+try {
+  await commands[command]();
+} catch (e) {
+  if (!(e instanceof Failure)) throw e;
+  console.error(e.message);
+  process.exitCode = 1;
+}

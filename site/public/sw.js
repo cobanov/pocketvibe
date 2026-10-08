@@ -58,7 +58,7 @@ async function getState() {
   const saved = await (await caches.open(CACHE)).match(STATE_KEY);
   state = saved ? await saved.json() : null;
   if (!state) {
-    const { games } = await getCatalog();
+    const { games, online } = await getCatalog();
     const popular = [...games].sort((a, b) => (b.downloads || 0) - (a.downloads || 0)).slice(0, FIRST_GAMES);
     state = {
       settings: { language: 'en', music: false, musicVolume: 0.5, uiSounds: true, showFps: false, stores: [STORE] },
@@ -66,7 +66,8 @@ async function getState() {
       jobs: {},
       backups: [],
     };
-    await saveState();
+    // Offline on a first visit: start empty, but do not keep it.
+    if (online) await saveState();
   }
   return state;
 }
