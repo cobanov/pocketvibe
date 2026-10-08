@@ -31,6 +31,9 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Sıradaki işler
 
+Teknik işler GitHub issue'larında (#1-#16, 2026-10-08): https://github.com/cobanov/pocketvibe/issues.
+Aşağıdaki liste kısa özet.
+
 1. `serve`'i gerçek bir handheld'de denemek (Ayarlar > Stores > Add a store, Mac mini'nin
    Tailscale adresi `http://100.70.248.21:8740`).
 2. İnceleme ölçütlerini (`/make/#review`, `agents.md` 7. bölüm) kullanıcı onaylamadı; ben yazdım.
@@ -89,7 +92,7 @@ geçmişinde (`git log -- docs/handoff.md`).
   Bundan sonra günde en fazla bir iki yer, aralarda yorum.
 - r/linux_gaming: AI destekli projeler için 2 ay geliştirme geçmişi şartı var; Aralık'tan önce ya da
   yalnızca teknik bir yazıyla.
-- Sırada: three.js forumu (Showcase), Show HN (metinler sohbette hazırlandı), ROCKNIX ve Retro
+- Sırada (2026-10-09 ve sonrası, günde bir iki yer): r/aigamedev, r/ANBERNIC, three.js forumu (Showcase), Show HN (metinler sohbette hazırlandı), ROCKNIX ve Retro
   Handhelds Discord'ları.
 - Tanıtım videosu MacBook'ta `~/workspace/pocketvibe/` (sessiz kopya `pocketvibe_promo_sessiz.mp4`).
 - GitHub: açıklama ve 18 etiket ayarlandı, README ve CONTRIBUTING.md yenilendi. Reponun paylaşım
