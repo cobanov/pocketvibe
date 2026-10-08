@@ -4,3 +4,4 @@ dist/
 packages/create-pocketvibe/template/
 store/public/
 __pycache__/
+.claude/
