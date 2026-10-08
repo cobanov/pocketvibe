@@ -50,6 +50,8 @@ DEFAULT_STORE = os.environ.get('POCKETVIBE_STORE', CONFIG['store_url'])
 SETTINGS_FILE = HOME / 'settings.json'
 PLAYS_FILE = HOME / 'plays.json'  # when each game was last played, for "Recently played"
 PORTS_FILE = HOME / 'ports.json'  # the port each game is served on, kept for good
+BUNDLED = APP / 'bundled'  # game zips a new install starts with (app/release.sh adds them)
+BUNDLED_DONE = HOME / '.bundled'  # they are unpacked once, never again
 DEFAULT_SETTINGS = {
     'language': 'en',
     'music': True,
@@ -303,11 +305,41 @@ def safe_extract(archive, target):
     archive.extractall(target)
 
 
+def unpack(gid, archive_path, entry):
+    """Puts a game zip in the Library as games/<gid>, replacing what is there."""
+    staging = GAMES / f'.{gid}.new'
+    try:
+        shutil.rmtree(staging, ignore_errors=True)
+        staging.mkdir(parents=True)
+        with zipfile.ZipFile(archive_path) as archive:
+            safe_extract(archive, staging)
+        # Accept zips that wrap the game in a single top-level folder.
+        entries = [p for p in staging.iterdir() if not p.name.startswith('__MACOSX')]
+        root = entries[0] if len(entries) == 1 and entries[0].is_dir() else staging
+        manifest = read_manifest(root)
+        if not (root / entry.get('entry', manifest['entry'])).exists():
+            raise ValueError('archive has no index.html')
+        for key in ('id', 'title', 'author', 'version', 'description', 'entry'):
+            if key in entry:
+                manifest[key] = entry[key]
+        manifest['id'] = gid
+        (root / 'pocketvibe.json').write_text(json.dumps(manifest, indent=2))
+
+        target = GAMES / gid
+        old = GAMES / f'.{gid}.old'
+        shutil.rmtree(old, ignore_errors=True)
+        if target.exists():
+            target.rename(old)
+        root.rename(target)
+        shutil.rmtree(old, ignore_errors=True)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+
+
 def install(entry):
     gid = entry['id']
     GAMES.mkdir(parents=True, exist_ok=True)
     download = GAMES / f'.{gid}.zip'
-    staging = GAMES / f'.{gid}.new'
     try:
         set_job(gid, state='downloading', progress=0, error=None)
         digest = hashlib.sha256()
@@ -322,36 +354,31 @@ def install(entry):
                     set_job(gid, progress=min(done / total, 1))
         if entry.get('sha256') and digest.hexdigest() != entry['sha256']:
             raise ValueError('download is corrupted (checksum mismatch)')
-
         set_job(gid, state='installing', progress=1)
-        shutil.rmtree(staging, ignore_errors=True)
-        staging.mkdir()
-        with zipfile.ZipFile(download) as archive:
-            safe_extract(archive, staging)
-        # Accept zips that wrap the game in a single top-level folder.
-        entries = [p for p in staging.iterdir() if not p.name.startswith('__MACOSX')]
-        root = entries[0] if len(entries) == 1 and entries[0].is_dir() else staging
-        if not (root / entry.get('entry', 'index.html')).exists():
-            raise ValueError('archive has no index.html')
-        manifest = read_manifest(root)
-        for key in ('id', 'title', 'author', 'version', 'description', 'entry'):
-            if key in entry:
-                manifest[key] = entry[key]
-        (root / 'pocketvibe.json').write_text(json.dumps(manifest, indent=2))
-
-        target = GAMES / gid
-        old = GAMES / f'.{gid}.old'
-        shutil.rmtree(old, ignore_errors=True)
-        if target.exists():
-            target.rename(old)
-        root.rename(target)
-        shutil.rmtree(old, ignore_errors=True)
+        unpack(gid, download, entry)
         set_job(gid, state='done')
     except Exception as e:  # reported to the launcher, never crashes the service
         set_job(gid, state='error', error=str(e))
     finally:
         download.unlink(missing_ok=True)
-        shutil.rmtree(staging, ignore_errors=True)
+
+
+def install_bundled():
+    """A new install starts with a few games in its Library, from zips in the
+    app's bundled folder. Only once: games the player removes stay removed, and
+    a game the player already has is left alone."""
+    if BUNDLED_DONE.exists() or not BUNDLED.is_dir():
+        return
+    GAMES.mkdir(parents=True, exist_ok=True)
+    for archive_path in sorted(BUNDLED.glob('*.zip')):
+        gid = archive_path.stem
+        if not valid_id(gid) or (GAMES / gid).exists():
+            continue
+        try:
+            unpack(gid, archive_path, {})
+        except Exception as e:
+            print(f'bundled game {gid} not installed: {e}', file=sys.stderr)
+    BUNDLED_DONE.touch()
 
 
 def remove(gid):
@@ -1032,6 +1059,7 @@ def main():
     GAMES.mkdir(parents=True, exist_ok=True)
     QUIT_FLAG.unlink(missing_ok=True)
     clean_up()
+    install_bundled()
     threading.Thread(target=watch_buttons, daemon=True).start()
     audio_key.open()
     launcher_server = ThreadingHTTPServer(('127.0.0.1', PORT), LauncherHandler)

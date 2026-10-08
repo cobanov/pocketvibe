@@ -150,7 +150,9 @@ in step when the service's answers change.
 2. `NOTES="What changed" sh app/release.sh --publish`
 
 This makes the GitHub release `v<version>` with two files: `PocketVibe.zip`, which people install
-and the website links to, and `pocketvibe-app-<version>.zip`, which installed apps download. Apps
+and the website links to, and `pocketvibe-app-<version>.zip`, which installed apps download.
+`PocketVibe.zip` also carries the store's current copies of the games a new install starts with
+(`BUNDLED_GAMES` in `app/release.sh`); the app unpacks them into the Library on its first start. Apps
 look for a newer release every six hours and offer it in Settings; the checksum is in the notes.
 Run it without `--publish` to only build the zips into `dist/`.
 
