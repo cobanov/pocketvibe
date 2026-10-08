@@ -1,4 +1,4 @@
-# PocketVibe: devir notu (2026-10-09; handheld 0.7.0, Android 0.6.7)
+# PocketVibe: devir notu (2026-10-09; handheld 0.7.0, Android 0.7.0)
 
 Önce bunu, sonra `docs/plan.md` ve `docs/development.md`'yi oku; memory'de `pocketvibe-project.md`,
 `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` var. Eski devir notları git
@@ -22,7 +22,9 @@ geçmişinde (`git log -- docs/handoff.md`).
   bir oyuncu bildirdi. 0.6.8'den beri: her oyun her cihazda kabukta (`play.html`)
   açılıyor; kabuk oyun ilk karelerini çizene kadar kapak, ad ve yükleme çubuğu gösteriyor.
   Turbo Circuit RG34XX'te doğrudan 58, kabukta 57 fps; kayıtlar iki yolda da aynı (denendi).
-- **Android 0.6.7** (`android-v0.6.7`, latest değil): APK'da 5 hazır oyun, Ayarlar > Uygulama
+- **Android 0.7.0** (`android-v0.7.0`, latest değil, 2026-10-09): yalnızca yeni sürüm oyunları APK'da;
+  Android WebView sesi tuşsuz çalıyor, kilit açma gerekmiyor.
+- **Android 0.6.7** (`android-v0.6.7`): APK'da 5 hazır oyun, Ayarlar > Uygulama
   güncellemesi (GitHub'da en yeni `android-v*`, SHA-256 denetimi, `UpdateProvider` ile Android
   kurucusu), oyun WebView'i düşürünce çökme notu. Kullanıcı RG Rotate'te denedi, sorunsuz.
   Sürüm numarası handheld'le ortak (`app/pocketvibe/config.json`); Android yalnızca `android-v*`
