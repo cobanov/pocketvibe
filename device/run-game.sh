@@ -6,12 +6,11 @@
 # The game lives in /storage/pocketvibe/games/<game-id>. The app is started
 # first if it is not running. Hold Start + Select to go back to the launcher.
 # extra is added to the game's address, e.g. "&perflog" to log the frame rate
-# to /tmp/pocketvibe-cog.log as PERF lines.
+# to /tmp/pocketvibe-browser.log as PERF lines.
 
 ID=${1:?usage: run-game.sh <game-id> [extra]}
 EXTRA=$2
 API=http://127.0.0.1:8730
-COGCTL="python3 /storage/pocketvibe/app/runtime.py --root /storage/pocketvibe/runtime -- cogctl"
 
 wait_for() {
   i=0
@@ -28,16 +27,17 @@ case $ID in
 esac
 
 if ! curl -sf -o /dev/null "$API/"; then
-  # Start it the way the Ports menu does, through EmulationStation, and wait
-  # for the launcher: it tells the app that no game is running as it loads.
-  # PocketVibe.sh empties the browser's log before it starts the service.
+  # Start it the way the Ports menu does, through EmulationStation, and give
+  # the launcher time to load.
   curl -s -d /storage/roms/ports/PocketVibe.sh http://127.0.0.1:1234/launch >/dev/null
   wait_for "curl -sf -o /dev/null $API/" || { echo "PocketVibe did not start."; exit 1; }
-  wait_for "grep -q '8730/> Loaded successfully' /tmp/pocketvibe-cog.log" || { echo "PocketVibe did not start."; exit 1; }
-  sleep 2
+  sleep 4
 fi
 
 URL=$(curl -s -X POST -H 'X-PocketVibe: 1' "$API/api/launch/$ID" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("url", ""))')
 [ -n "$URL" ] || { echo "PocketVibe has no game called $ID."; exit 1; }
-$COGCTL open "$URL$EXTRA" || { echo "PocketVibe's browser did not open $ID."; exit 1; }
+# The page on screen takes the address and opens it (pocketvibed's navigate).
+OPENED=$(curl -s -X POST -H 'X-PocketVibe: 1' -H 'Content-Type: application/json' \
+  -d "{\"url\": \"$URL$EXTRA\"}" "$API/api/navigate" | python3 -c 'import json, sys; print(json.load(sys.stdin).get("ok", False))')
+[ "$OPENED" = True ] || { echo "PocketVibe's browser did not open $ID."; exit 1; }
 echo "Opened $ID. Hold Start + Select on the handheld to go back to the launcher."

@@ -64,3 +64,27 @@ export function place(el, rect, scale = 1) {
   el.style.height = `${rect.height / scale}px`;
   el.style.transform = scale === 1 ? '' : `scale(${scale})`;
 }
+
+// PocketVibe on a handheld steers the browser through the pages it shows: a
+// page asks the local service, on its own origin, where to go next, and goes
+// there (the launcher when the player holds Start + Select in a game). Where
+// nothing answers (the Android app, the website) it stops asking.
+export async function followNavigation() {
+  let since = -1;
+  for (;;) {
+    let next;
+    try {
+      const res = await fetch(`/__pocketvibe__/next?since=${since}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      next = await res.json();
+    } catch {
+      await new Promise((r) => setTimeout(r, 1000));
+      continue;
+    }
+    if (since >= 0 && next.url) {
+      location.href = next.url;
+      return;
+    }
+    since = next.serial;
+  }
+}

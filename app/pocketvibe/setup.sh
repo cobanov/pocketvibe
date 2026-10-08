@@ -1,11 +1,12 @@
 #!/bin/sh
 # First-run setup: downloads and installs PocketVibe's browser runtime (WPE
-# WebKit in a small Debian root) into /storage/pocketvibe/runtime.
+# WebKit in a small Debian root) into the folder config.json names, under
+# /storage/pocketvibe. A new runtime version gets a new folder, and the old
+# one stays for the app version before it.
 # PocketVibe.sh runs it in a full-screen terminal; it draws with dialog.
 
 HOME_DIR=/storage/pocketvibe
 APP="$HOME_DIR/app"
-RUNTIME="$HOME_DIR/runtime"
 DOWNLOAD="$HOME_DIR/.runtime.tar.xz"
 STAGING="$HOME_DIR/.runtime-new"
 TITLE="PocketVibe"
@@ -16,6 +17,7 @@ export DIALOGRC="$APP/setup.dialogrc"
 setting() {
   python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['runtime'][sys.argv[2]])" "$APP/config.json" "$1"
 }
+RUNTIME="$HOME_DIR/$(setting dir)"
 URL=$(setting url)
 SHA=$(setting sha256)
 SIZE_MB=$(setting size_mb)

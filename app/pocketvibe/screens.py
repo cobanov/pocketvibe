@@ -19,7 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-BROWSER = '[app_id="com.igalia.Cog"]'
+BROWSER = '[app_id="org.wpewebkit.MiniBrowser"]'
 TURNED_ON = Path('/tmp/pocketvibe-screens')  # the screens PocketVibe turned on, to turn off again
 # Connectors for a TV or monitor: never spread the launcher onto one.
 EXTERNAL = ('HDMI', 'DP-', 'VGA', 'DVI')

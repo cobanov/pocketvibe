@@ -5,7 +5,7 @@ import { LANGUAGES, getLanguage, setLanguage, t } from './i18n.js';
 import { LauncherAudio } from './audio.js';
 import { Keyboard } from './keyboard.js';
 import { Celebration } from './celebrate.js';
-import { fitScreens, parseScreens, place, uiScale } from './screens.js';
+import { fitScreens, followNavigation, parseScreens, place, uiScale } from './screens.js';
 
 const PADMAP = { 0: 'B', 1: 'A', 2: 'X', 3: 'Y', 4: 'L', 5: 'R', 8: 'SELECT', 9: 'START', 12: 'UP', 13: 'DOWN', 14: 'LEFT', 15: 'RIGHT' };
 const KEYMAP = {
@@ -1274,6 +1274,7 @@ async function unlockAudio() {
   }
   refreshStatus();
   setInterval(refreshStatus, 20000);
+  followNavigation();
   applyScreens();
   addEventListener('resize', applyScreens);
   refreshScreens();

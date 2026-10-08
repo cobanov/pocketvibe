@@ -8,7 +8,7 @@
 //   /__pocketvibe__/play.html?entry=index.html&perf=0&lang=en&screens=0,0,640,480;640,0,640,480&primary=0
 
 import { setLanguage, t } from './i18n.js';
-import { NATIVE, fitScreens, gameSize, parseScreens, place, uiScale } from './screens.js';
+import { NATIVE, fitScreens, followNavigation, gameSize, parseScreens, place, uiScale } from './screens.js';
 
 const params = new URLSearchParams(location.search);
 setLanguage(params.get('lang') || 'en');
@@ -92,6 +92,7 @@ if (meta.responsive === true) {
 layout();
 let entry = new URL(params.get('entry') || 'index.html', `${location.origin}/`);
 if (entry.origin !== location.origin) entry = new URL('/index.html', location.origin); // a game runs on its own port only
-entry.search = `?handheld${params.get('perf') === '1' ? '&perf' : ''}${size === NATIVE ? '' : `&screen=${size.width}x${size.height}`}`;
+entry.search = `?handheld${params.get('perf') === '1' ? '&perf' : ''}${params.has('perflog') ? '&perflog' : ''}${size === NATIVE ? '' : `&screen=${size.width}x${size.height}`}`;
 frame.src = entry.href;
 fillSide(meta);
+followNavigation();

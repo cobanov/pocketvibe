@@ -6,7 +6,10 @@ its root with pivot_root. WebKit sandboxes every page with bubblewrap, and
 bubblewrap refuses to work inside a chroot; in a real mount namespace it
 does, so games run sandboxed.
 
-    runtime.py [--root DIR] -- COMMAND [ARGS...]
+    runtime.py [--root DIR] [--bind SRC:DST]... -- COMMAND [ARGS...]
+
+--bind makes a folder of the system appear inside the runtime at DST (the
+browser's profile lives outside the runtime, so a new runtime keeps it).
 
 The command gets a clean environment with the session's Wayland, PulseAudio
 and D-Bus sockets; COG_*, WEBKIT_* and GST_* variables are passed through.
@@ -44,7 +47,7 @@ def bind(source, target):
     mount(source, target, flags=MS_BIND | MS_REC)
 
 
-def enter(root):
+def enter(root, binds=()):
     os.unshare(os.CLONE_NEWNS)
     mount(None, '/', flags=MS_REC | MS_PRIVATE)  # nothing done here leaks back to the system
     bind(root, root)  # the new root has to be a mount point
@@ -58,6 +61,9 @@ def enter(root):
     if Path('/run/udev').is_dir():  # lets libmanette find the gamepad
         bind('/run/udev', root / 'run/udev')
     (root / 'etc/resolv.conf').write_text(Path('/etc/resolv.conf').read_text())
+    for source, target in binds:
+        Path(source).mkdir(parents=True, exist_ok=True)
+        bind(source, root / target.lstrip('/'))
 
     old = root / '.oldroot'
     old.mkdir(exist_ok=True)
@@ -71,6 +77,11 @@ def main(argv):
     root = Path(DEFAULT_ROOT)
     if argv[:1] == ['--root']:
         root, argv = Path(argv[1]), argv[2:]
+    binds = []
+    while argv[:1] == ['--bind']:
+        source, _, target = argv[1].partition(':')
+        binds.append((source, target or source))
+        argv = argv[2:]
     if argv[:1] == ['--']:
         argv = argv[1:]
     if not argv:
@@ -87,7 +98,7 @@ def main(argv):
     }
     env.update({k: v for k, v in os.environ.items() if k.startswith(('COG_', 'WEBKIT_', 'GST_'))})
 
-    enter(root.resolve())
+    enter(root.resolve(), binds)
     # After pivot_root the system's Python library is out of sight, so use
     # nothing that could import a module now: find the program by hand.
     program = argv[0]

@@ -3,9 +3,10 @@
   "store_url": "https://pocketvibe-store.mertcobanov.workers.dev/catalog.json",
   "update_url": "https://api.github.com/repos/cobanov/pocketvibe/releases?per_page=20",
   "runtime": {
-    "version": 1,
-    "url": "https://github.com/cobanov/pocketvibe/releases/download/runtime-v1/pocketvibe-runtime-1.tar.xz",
-    "sha256": "b70707018a044a143a7d646462b9c48034a6196ce7d1b5a930c8ee0ef033ea60",
-    "size_mb": 147
+    "version": 2,
+    "dir": "runtime-2",
+    "url": "https://github.com/cobanov/pocketvibe/releases/download/runtime-v2/pocketvibe-runtime-2.tar.xz",
+    "sha256": "TO-BE-FILLED",
+    "size_mb": 0
   }
 }

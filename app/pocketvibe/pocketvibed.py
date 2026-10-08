@@ -33,6 +33,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+import padkeys
 import screens
 
 APP = Path(__file__).resolve().parent
@@ -62,11 +63,24 @@ DEFAULT_SETTINGS = {
 }
 LAUNCHER_URL = f'http://127.0.0.1:{PORT}/'
 GAME_ID = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
-RUNTIME = HOME / 'runtime'  # the Debian root with WPE WebKit; runtime.py runs things in it
+# The Debian root with WPE WebKit; runtime.py runs things in it. Each
+# runtime version has its own folder, so going back to an app version from
+# before it still finds the runtime that version knows.
+RUNTIME = HOME / CONFIG['runtime'].get('dir', 'runtime')
+BROWSER = 'MiniBrowser'  # the browser's process name
+BROWSER_PROCESSES = 'MiniBrowser|WPENetworkProce|WPEWebProcess|WPEGPUProcess'  # names are cut to 15 characters
 QUIT_FLAG = Path('/tmp/pocketvibe-quit')  # tells PocketVibe.sh not to restart the browser
 RESTART_FLAG = Path('/tmp/pocketvibe-restart')  # tells PocketVibe.sh to start again (after an update)
 BUSY_FLAG = Path('/tmp/pocketvibe-busy')  # PocketVibe.sh waits for it to go before reopening the browser
-WEB_DATA = RUNTIME / 'root' / '.local' / 'share' / 'wpe'  # WebKit's data; storage/ holds every game's saves
+# The browser's profile lives outside the runtime, so a new runtime keeps
+# every game's saves. WEB_DATA/storage holds them.
+PROFILE = HOME / 'profile'
+WEB_DATA = PROFILE / 'data'
+OLD_WEB_DATA = HOME / 'runtime' / 'root' / '.local' / 'share' / 'wpe'  # runtime 1's, where Cog kept them
+BROWSER_SETTINGS = '''[websettings]
+media-playback-requires-user-gesture=false
+enable-write-console-messages-to-stdout=true
+'''
 BACKUPS = HOME / 'backups'
 BACKUP_NAME = re.compile(r'saves-\d{8}-\d{6}\.zip')
 AUDIO_CACHE = CACHE / 'audio'  # audio the launcher rendered once (menu music)
@@ -481,7 +495,7 @@ def restore_saves(name):
         # Wait for WebKit's helpers too: the network process writes the saves.
         # (Process names are cut to 15 characters.)
         for _ in range(50):
-            running = subprocess.run(['pgrep', '-x', 'cog|WPENetworkProce|WPEWebProcess'], capture_output=True)
+            running = subprocess.run(['pgrep', '-x', BROWSER_PROCESSES], capture_output=True)
             if running.returncode != 0:
                 break
             time.sleep(0.2)
@@ -558,6 +572,11 @@ class GameHandler(SimpleHTTPRequestHandler):
         if route.startswith(SHELL_PATH) and route[len(SHELL_PATH):] in SHELL_FILES:
             return str(APP / 'launcher' / route[len(SHELL_PATH):])
         return super().translate_path(path)
+
+    def do_GET(self):
+        if urllib.parse.urlsplit(self.path).path == SHELL_PATH + 'next':
+            return answer_next(self)
+        return super().do_GET()
 
 
 def version_tuple(text):
@@ -701,21 +720,18 @@ def game_url(gid):
             game_servers[gid] = (server, port)
         port = game_servers[gid][1]
     settings = load_settings()
-    current = screens.layout()
-    if screens.needs_shell(current):
-        # Games are made for one 720x480 screen. On any other screen, or on
-        # two, the shell shows the game at that size, fitted to the main
-        # screen, and the game's controls on the second.
-        query = urllib.parse.urlencode({
-            'entry': meta['entry'],
-            'perf': int(settings['showFps']),
-            'lang': settings['language'],
-            'screens': ';'.join(f'{s["x"]},{s["y"]},{s["width"]},{s["height"]}' for s in current['screens']),
-            'primary': current['primary'],
-        })
-        return f'http://127.0.0.1:{port}{SHELL_PATH}play.html?{query}'
-    perf = '&perf' if settings['showFps'] else ''
-    return f'http://127.0.0.1:{port}/{meta["entry"]}?handheld{perf}'
+    current = screens.layout() or {'screens': [], 'primary': 0}
+    # Every game runs in the shell: it fits the game to the screen (games
+    # are made for 720x480), shows its controls on a second screen, and takes
+    # the player back to the launcher when asked (see navigate).
+    query = urllib.parse.urlencode({
+        'entry': meta['entry'],
+        'perf': int(settings['showFps']),
+        'lang': settings['language'],
+        'screens': ';'.join(f'{s["x"]},{s["y"]},{s["width"]},{s["height"]}' for s in current['screens']),
+        'primary': current['primary'],
+    })
+    return f'http://127.0.0.1:{port}{SHELL_PATH}play.html?{query}'
 
 
 class AudioKey:
@@ -758,11 +774,63 @@ audio_key = AudioKey()
 
 
 def close_browser():
-    """End the browser engine at once. Cog 0.18's Wayland code crashes while
-    shutting down (SIGTERM and cogctl quit alike) and leaves a coredump entry;
-    SIGKILL skips that code. Saves are safe: WebKit's network process writes
-    localStorage, and it finishes on its own (tested on the handheld)."""
-    subprocess.run(['pkill', '-KILL', '-x', 'cog'], check=False)
+    """End the browser at once. Saves are safe: WebKit's network process
+    writes localStorage and finishes on its own (tested on the handheld)."""
+    subprocess.run(['pkill', '-KILL', '-x', BROWSER], check=False)
+
+
+# The browser has no remote control, so the pages steer it: the launcher and
+# the game shell (every game runs in it) keep asking SHELL_PATH + "next" on
+# their own origin where to go, and go there.
+navigation = {'serial': 0, 'url': None, 'taken': 0}
+navigation_changed = threading.Condition()
+
+
+def navigate(url, wait=0):
+    """Send whichever page is open to url. With wait, returns whether a page
+    took it within that many seconds."""
+    with navigation_changed:
+        navigation['serial'] += 1
+        navigation['url'] = url
+        serial = navigation['serial']
+        navigation_changed.notify_all()
+        if wait:
+            navigation_changed.wait_for(lambda: navigation['taken'] >= serial, timeout=wait)
+        return navigation['taken'] >= serial
+
+
+def next_navigation(since, timeout=20):
+    """For a page: the next place to go after serial `since`, waiting for one
+    up to timeout seconds. A page asks first with since=-1 to learn the
+    current serial without going anywhere."""
+    with navigation_changed:
+        if since >= 0:
+            navigation_changed.wait_for(lambda: navigation['serial'] > since, timeout=timeout)
+        serial = navigation['serial']
+        if since < 0 or serial <= since:
+            return {'serial': serial, 'url': None}
+        navigation['taken'] = serial
+        navigation_changed.notify_all()
+        return {'serial': serial, 'url': navigation['url']}
+
+
+def answer_next(handler):
+    """GET SHELL_PATH + 'next?since=N' on the launcher's or a game's port."""
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(handler.path).query)
+    try:
+        since = int(query.get('since', ['-1'])[0])
+    except ValueError:
+        since = -1
+    body = json.dumps(next_navigation(since)).encode()
+    try:
+        handler.send_response(200)
+        handler.send_header('Content-Type', 'application/json')
+        handler.send_header('Content-Length', str(len(body)))
+        handler.send_header('Cache-Control', 'no-store')
+        handler.end_headers()
+        handler.wfile.write(body)
+    except OSError:
+        pass  # the page went away while it waited
 
 
 def quit_app():
@@ -776,16 +844,10 @@ def go_home():
     """Leave the running game and show the launcher."""
     global in_game
     in_game = False
-    try:
-        # Ask the running browser to open the launcher (fast, keeps it running).
-        done = subprocess.run(
-            [sys.executable, str(APP / 'runtime.py'), '--root', str(RUNTIME), '--', 'cogctl', 'open', LAUNCHER_URL],
-            capture_output=True, timeout=3,
-        ).returncode == 0
-    except (OSError, subprocess.TimeoutExpired):
-        done = False
-    if not done:
-        # Restart the browser instead; PocketVibe.sh reopens it on the launcher.
+    # The game's shell takes the launcher's address at once. If it does not
+    # (a game that hangs the page), restart the browser; PocketVibe.sh
+    # reopens it on the launcher.
+    if not navigate(LAUNCHER_URL, wait=2.5):
         close_browser()
 
 
@@ -901,6 +963,8 @@ class LauncherHandler(SimpleHTTPRequestHandler):
         if not self.allowed():
             return self.refuse()
         route = self.path.split('?', 1)[0]
+        if route == SHELL_PATH + 'next':
+            return answer_next(self)
         if route == '/api/library':
             # The launcher asks for the library when it loads: no game is running.
             global in_game
@@ -990,6 +1054,12 @@ class LauncherHandler(SimpleHTTPRequestHandler):
             return self.send_json({'ok': True})
         if route == '/api/unlock-audio':
             return self.send_json({'ok': audio_key.tap()})
+        if route == '/api/navigate':
+            # For tools on the handheld (device/run-game.sh): open a page here.
+            url = str(self.read_json().get('url', ''))
+            if not url.startswith('http://127.0.0.1:'):
+                return self.send_json({'error': 'only pages on this handheld'}, 400)
+            return self.send_json({'ok': navigate(url, wait=5)})
         if route == '/api/saves/backup':
             return self.send_json({'name': backup_saves()})
         if route.startswith('/api/saves/restore/'):
@@ -1050,6 +1120,22 @@ def clean_up():
             path.unlink(missing_ok=True)
 
 
+def prepare_profile():
+    """The browser's profile: its settings, and on the first start with
+    runtime 2 every game's saves, copied from runtime 1 (which keeps its own,
+    so an older app version still has them)."""
+    WEB_DATA.mkdir(parents=True, exist_ok=True)
+    old = OLD_WEB_DATA / 'storage'
+    if not (WEB_DATA / 'storage').exists() and old.is_dir():
+        try:
+            shutil.copytree(old, WEB_DATA / '.storage-copy', symlinks=True)
+            (WEB_DATA / '.storage-copy').rename(WEB_DATA / 'storage')
+        except OSError as e:
+            print(f'saves not copied from runtime 1: {e}', file=sys.stderr)
+            shutil.rmtree(WEB_DATA / '.storage-copy', ignore_errors=True)
+    (PROFILE / 'browser.ini').write_text(BROWSER_SETTINGS)
+
+
 def main():
     global launcher_server, notice
     saved_notice = HOME / 'notice'
@@ -1059,8 +1145,10 @@ def main():
     GAMES.mkdir(parents=True, exist_ok=True)
     QUIT_FLAG.unlink(missing_ok=True)
     clean_up()
+    prepare_profile()
     install_bundled()
     threading.Thread(target=watch_buttons, daemon=True).start()
+    threading.Thread(target=padkeys.run, daemon=True).start()
     audio_key.open()
     launcher_server = ThreadingHTTPServer(('127.0.0.1', PORT), LauncherHandler)
     (HOME / 'update-pending').unlink(missing_ok=True)  # this version starts

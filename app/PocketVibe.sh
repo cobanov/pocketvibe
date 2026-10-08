@@ -7,8 +7,8 @@
 
 HOME_DIR=/storage/pocketvibe
 APP="$HOME_DIR/app"
-RUNTIME="$HOME_DIR/runtime"
 QUIT_FLAG=/tmp/pocketvibe-quit
+LOG=/tmp/pocketvibe-browser.log
 # The install zip puts the app next to this script; on the first run it moves
 # to its home, where updates also go.
 SEED="$(cd "$(dirname "$0")" && pwd)/pocketvibe"
@@ -20,8 +20,13 @@ if [ -f "$SEED/pocketvibed.py" ]; then
   python3 "$APP/add-to-gamelist.py" >/dev/null 2>&1
 fi
 
-# The browser runtime is downloaded on the first run.
-if [ ! -x "$RUNTIME/usr/bin/cog" ]; then
+# The runtime this version of the app uses (config.json names its folder).
+RUNTIME="$HOME_DIR/$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['runtime'].get('dir', 'runtime'))" "$APP/config.json")"
+BROWSER=/usr/lib/aarch64-linux-gnu/wpe-webkit-2.0/MiniBrowser
+
+# The browser runtime is downloaded on the first run, and again when a new
+# version of the app needs a new runtime.
+if [ ! -x "$RUNTIME$BROWSER" ]; then
   # ROCKNIX has terminfo for xterm only, which dialog needs. The palette
   # gives setup.dialogrc PocketVibe's colors.
   LC_ALL=en_US.UTF-8 foot --fullscreen --term=xterm -o font=monospace:size=13 \
@@ -29,11 +34,11 @@ if [ ! -x "$RUNTIME/usr/bin/cog" ]; then
     -o colors-dark.regular4=1a1c26 -o colors-dark.regular3=ffc83d -o colors-dark.bright3=ffc83d \
     -o colors-dark.regular7=f2f2f5 -o colors-dark.bright7=ffffff \
     sh "$APP/setup.sh"
-  [ -x "$RUNTIME/usr/bin/cog" ] || exit 1
+  [ -x "$RUNTIME$BROWSER" ] || exit 1
 fi
 
 # One launch's browser console; /tmp is in memory.
-: >/tmp/pocketvibe-cog.log
+: >"$LOG"
 
 python3 "$APP/pocketvibed.py" >/tmp/pocketvibed.log 2>&1 &
 DAEMON=$!
@@ -65,10 +70,10 @@ done
 # browser goes too. This also keeps the console log small.
 (
   while kill -0 $DAEMON 2>/dev/null; do
-    [ "$(wc -c </tmp/pocketvibe-cog.log)" -gt 5000000 ] && : >/tmp/pocketvibe-cog.log
+    [ "$(wc -c <"$LOG")" -gt 5000000 ] && : >"$LOG"
     sleep 2
   done
-  pkill -KILL -x cog
+  pkill -KILL -x MiniBrowser
 ) &
 WATCH=$!
 trap 'kill $DAEMON $WATCH 2>/dev/null; $SCREENS 2>/dev/null' EXIT
@@ -79,10 +84,14 @@ trap 'kill $DAEMON $WATCH 2>/dev/null; $SCREENS 2>/dev/null' EXIT
 quick=0
 while :; do
   started=$(date +%s)
-  COG_PLATFORM_WL_VIEW_FULLSCREEN=1 python3 "$APP/runtime.py" --root "$RUNTIME" -- \
-    cog -P wl --gamepad=manette --enable-write-console-messages-to-stdout=true \
-    --media-playback-requires-user-gesture=false --bg-color=black http://127.0.0.1:8730/ \
-    >>/tmp/pocketvibe-cog.log 2>&1
+  # The profile (saves, settings) lives outside the runtime. WebKit's
+  # sandbox is off for now: with it, this WebKit (2.54) aborts on start in
+  # the runtime's namespace.
+  WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 \
+    python3 "$APP/runtime.py" --root "$RUNTIME" --bind "$HOME_DIR/profile:/profile" -- \
+    "$BROWSER" --fullscreen --bg-color=black --profile-dir=/profile \
+    --config-file=/profile/browser.ini http://127.0.0.1:8730/ \
+    >>"$LOG" 2>&1
   if [ -e /tmp/pocketvibe-restart ]; then
     # pocketvibed installed a new version: start again with the new files.
     rm -f /tmp/pocketvibe-restart
