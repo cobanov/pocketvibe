@@ -712,20 +712,16 @@ def game_url(gid):
         port = game_servers[gid][1]
     settings = load_settings()
     current = screens.layout()
-    if screens.needs_shell(current):
-        # Games are made for one 720x480 screen. On any other screen, or on
-        # two, the shell shows the game at that size, fitted to the main
-        # screen, and the game's controls on the second.
-        query = urllib.parse.urlencode({
-            'entry': meta['entry'],
-            'perf': int(settings['showFps']),
-            'lang': settings['language'],
-            'screens': ';'.join(f'{s["x"]},{s["y"]},{s["width"]},{s["height"]}' for s in current['screens']),
-            'primary': current['primary'],
-        })
-        return f'http://127.0.0.1:{port}{SHELL_PATH}play.html?{query}'
-    perf = '&perf' if settings['showFps'] else ''
-    return f'http://127.0.0.1:{port}/{meta["entry"]}?handheld{perf}'
+    # Every game opens in the shell: it covers the game with a splash until
+    # the game has drawn, fits a game made for one 720x480 screen to any other
+    # (or gives a responsive game the screen's shape) and, on a second screen,
+    # shows the game's controls. Measured on the H700 with Turbo Circuit, the
+    # shell costs about 1.5 fps of 58.
+    query = {'entry': meta['entry'], 'perf': int(settings['showFps']), 'lang': settings['language']}
+    if current:
+        query['screens'] = ';'.join(f'{s["x"]},{s["y"]},{s["width"]},{s["height"]}' for s in current['screens'])
+        query['primary'] = current['primary']
+    return f'http://127.0.0.1:{port}{SHELL_PATH}play.html?{urllib.parse.urlencode(query)}'
 
 
 class AudioKey:

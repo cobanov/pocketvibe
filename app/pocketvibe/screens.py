@@ -23,8 +23,6 @@ BROWSER = '[app_id="com.igalia.Cog"]'
 TURNED_ON = Path('/tmp/pocketvibe-screens')  # the screens PocketVibe turned on, to turn off again
 # Connectors for a TV or monitor: never spread the launcher onto one.
 EXTERNAL = ('HDMI', 'DP-', 'VGA', 'DVI')
-# PocketVibe's own screen size; games are made for it.
-NATIVE = (720, 480)
 
 
 def sway(*args):
@@ -90,15 +88,6 @@ def layout():
         for o in found
     ]
     return {'screens': screens, 'primary': main_index(found)}
-
-
-def needs_shell(current):
-    """Whether games need the shell that fits them to the screens: any screen
-    but one at PocketVibe's own size."""
-    if not current:
-        return False
-    screens = current['screens']
-    return len(screens) > 1 or (screens[0]['width'], screens[0]['height']) != NATIVE
 
 
 def span():

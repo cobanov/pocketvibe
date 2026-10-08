@@ -43,10 +43,13 @@ The launcher fills whatever screen it gets: its cards take as many columns as th
 (three from 640 to 720 pixels), and on a big screen it is enlarged by quarters. It is drawn in
 720×480 pixels, so on the RG34XX SP it looks exactly as it always has.
 
-Games are made for one 720×480 screen and stay that way. On any other screen pocketvibed opens
-them in the game shell, `/__pocketvibe__/play.html` on the game's own port: the game runs in a
-720×480 frame fitted to the screen. The shell is on the game's origin so the game keeps its saves
-(WebKit keeps a frame's storage apart from the same origin opened on its own).
+Games are made for one 720×480 screen and stay that way. pocketvibed opens every game in the
+game shell, `/__pocketvibe__/play.html` on the game's own port: the game runs in a 720×480 frame
+fitted to the screen (or, if it is responsive, in a frame of the screen's shape), behind a splash
+with its cover and name until it has drawn its first frames. The shell is on the game's origin,
+so the game keeps its saves: a save made with the game opened on its own is there in the shell,
+and the other way round (checked on the handheld). On the H700 the shell costs about 1.5 fps of
+58 in Turbo Circuit. `&perflog` on the shell's address is handed on to the game.
 
 A handheld with two screens (the Anbernic RG DS) gets both: `screens.py` turns the second one on,
 which EmulationStation keeps off, and makes the browser's window span the two. The launcher draws
