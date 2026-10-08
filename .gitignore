@@ -3,3 +3,4 @@ dist/
 .DS_Store
 packages/create-pocketvibe/template/
 store/public/
+__pycache__/
