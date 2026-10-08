@@ -1,0 +1,672 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is the game's
+   screen inside it (720x480, or larger on other shapes; handheld.js sets the
+   size) and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: var(--screen-width, 720px);
+  height: var(--screen-height, 480px);
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+/* Game HUD: neon pink, cyan and gold over the dark club. */
+
+#play[hidden] {
+  display: none;
+}
+
+#progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+#progress div {
+  height: 100%;
+  background: linear-gradient(90deg, #ff4fd8, #ffc83d);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.stat {
+  position: absolute;
+  top: 12px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 8px rgba(0, 0, 0, 0.6);
+}
+
+.stat.left {
+  left: 18px;
+}
+
+.stat.right {
+  right: 18px;
+  text-align: right;
+}
+
+.stat .label {
+  font-size: 15px;
+  letter-spacing: 2px;
+  color: #ffb3ef;
+}
+
+.stat .value {
+  font-size: 34px;
+  line-height: 1.05;
+}
+
+.money {
+  color: #8dffa0;
+}
+
+.value.bump {
+  animation: bump 0.2s ease-out;
+}
+
+@keyframes bump {
+  0% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.stat.left .value {
+  transform-origin: left center;
+}
+
+.stat.right .value {
+  transform-origin: right center;
+}
+
+#meter {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 250px;
+  text-align: center;
+}
+
+#move {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 0 6px #ff4fd8, 0 2px 0 #000;
+}
+
+#move.bump {
+  animation: bump 0.35s ease-out;
+}
+
+#bar {
+  position: relative;
+  height: 14px;
+  margin-top: 5px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 9px;
+  background: rgba(20, 6, 30, 0.75);
+  overflow: hidden;
+}
+
+#fill {
+  position: absolute;
+  inset: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: linear-gradient(90deg, #9b6bff, #ff4fd8);
+  transition: transform 0.12s linear;
+}
+
+#fill.t3,
+#fill.t4 {
+  background: linear-gradient(90deg, #ff4fd8, #ffc83d);
+}
+
+#fill.t5 {
+  background: linear-gradient(90deg, #ffc83d, #fff6c8);
+}
+
+#bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+/* The beat: a ring closes in on the A button, landing on the next beat. */
+#beat {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+}
+
+#button {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #2a1240;
+  border: 3px solid #ff4fd8;
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+}
+
+#button.hit {
+  animation: press 0.18s ease-out;
+}
+
+#button.hit.good {
+  border-color: #ffc83d;
+  background: #5a3a00;
+}
+
+@keyframes press {
+  0% {
+    transform: scale(0.82);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+#ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 4px solid #ffc83d;
+  opacity: 0;
+}
+
+#ring.go {
+  animation: ring 0.5s linear;
+}
+
+@keyframes ring {
+  0% {
+    opacity: 0.15;
+    transform: scale(2.3);
+  }
+  85% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+#tip {
+  position: absolute;
+  right: 74px;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 20px;
+  font-weight: 800;
+  color: #8dffa0;
+  text-shadow: 0 2px 0 #000;
+}
+
+#combo {
+  position: absolute;
+  left: 74px;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 30px;
+  font-weight: 800;
+  color: #ffc83d;
+  text-shadow: 0 2px 0 #000, 0 0 10px rgba(255, 200, 61, 0.6);
+}
+
+#combo.bump {
+  animation: bump 0.2s ease-out;
+}
+
+#judge {
+  position: absolute;
+  bottom: 74px;
+  left: 50%;
+  opacity: 0;
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, 0.6);
+  transform: translateX(-50%);
+}
+
+#judge.gold {
+  font-size: 26px;
+  color: #ffc83d;
+}
+
+#judge.bad {
+  color: #ff6b8a;
+}
+
+#judge.dim {
+  font-size: 19px;
+  color: #c9b8d8;
+}
+
+#judge.show {
+  animation: judge 0.55s ease-out forwards;
+}
+
+@keyframes judge {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 6px) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -4px) scale(1.1);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -8px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -22px) scale(1);
+  }
+}
+
+/* "BONK!" over the dancer. */
+.popup {
+  position: absolute;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.popup.gold {
+  font-size: 26px;
+  color: #ffc83d;
+}
+
+.popup.bad {
+  font-size: 30px;
+  color: #ff6b8a;
+}
+
+.popup.dim {
+  font-size: 18px;
+  color: #c9b8d8;
+}
+
+.popup.show {
+  animation: rise 0.8s ease-out forwards;
+}
+
+@keyframes rise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -20%) scale(0.5);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -70%) scale(1.12);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -160%) scale(1);
+  }
+}
+
+/* The MC. */
+#callout {
+  position: absolute;
+  top: 74px;
+  left: 16px;
+  right: 16px;
+  text-align: center;
+}
+
+#callout .pop {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 10px;
+  background: rgba(20, 6, 30, 0.6);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+  animation: callout 2.6s ease-out forwards;
+}
+
+#callout .pop b {
+  color: #ffc83d;
+}
+
+#callout .pop.hot {
+  color: #ffe9a8;
+  font-size: 24px;
+}
+
+#callout .pop.sad {
+  color: #c9b8d8;
+}
+
+@keyframes callout {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  8% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  14% {
+    transform: scale(1);
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Texts arriving on your phone. */
+#phone {
+  position: absolute;
+  left: 14px;
+  top: 128px;
+}
+
+#phone .sms {
+  max-width: 210px;
+  padding: 7px 12px 8px;
+  border-radius: 12px 12px 12px 3px;
+  background: #f4f1f8;
+  color: #1c1424;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+  animation: sms 4s ease-out forwards;
+}
+
+#phone .from {
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #8a3cc8;
+}
+
+@keyframes sms {
+  0% {
+    opacity: 0;
+    transform: translateX(-240px);
+  }
+  8% {
+    opacity: 1;
+    transform: translateX(8px);
+  }
+  12% {
+    transform: translateX(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-240px);
+  }
+}
+
+#flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: #fff;
+}
+
+#flash.on {
+  animation: flash 0.4s ease-out;
+}
+
+@keyframes flash {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+#hud.paused * {
+  animation-play-state: paused;
+}
+
+#hud.paused #popups,
+#hud.paused #callout,
+#hud.paused #phone {
+  visibility: hidden;
+}
+
+/* Panels: title, pause, results. */
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+#message.top {
+  align-items: flex-start;
+  padding-top: 18px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: 640px;
+  padding: 12px 30px 14px;
+  border-radius: 16px;
+  background: rgba(20, 6, 30, 0.72);
+  border: 2px solid rgba(255, 79, 216, 0.55);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+}
+
+#message.top .panel {
+  background: rgba(20, 6, 30, 0.55);
+}
+
+.panel .logo {
+  font-size: 58px;
+  line-height: 1;
+  letter-spacing: 4px;
+  color: #ffe6fa;
+  text-shadow: 0 0 4px #fff, 0 0 12px #ff4fd8, 0 0 24px #ff4fd8, 0 3px 0 #5a0a48;
+}
+
+.panel .tag {
+  font-size: 18px;
+  font-weight: 700;
+  color: #9fe9ff;
+}
+
+.panel .tag b {
+  color: #ffc83d;
+}
+
+.panel .go {
+  margin-top: 4px;
+  font-size: 24px;
+}
+
+.panel .title {
+  font-size: 42px;
+  line-height: 1.05;
+  letter-spacing: 3px;
+  color: #ffe6fa;
+  text-shadow: 0 0 10px #ff4fd8, 0 3px 0 #5a0a48;
+}
+
+.panel .stars {
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 4px;
+  color: #ffc83d;
+  text-shadow: 0 0 10px rgba(255, 200, 61, 0.7), 0 2px 0 #000;
+}
+
+.panel .stars span {
+  color: rgba(255, 255, 255, 0.22);
+  text-shadow: none;
+}
+
+.panel .big {
+  font-size: 54px;
+  line-height: 1;
+}
+
+.panel .small {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e3d6f0;
+}
+
+.panel .small b {
+  font-weight: 800;
+}
+
+.panel .gold {
+  color: #ffc83d;
+}
+
+.panel .review {
+  margin: 4px 0;
+  font-size: 20px;
+  font-style: italic;
+  color: #9fe9ff;
+}
+
+/* The perf overlay goes bottom right, out of the way of the stats. */
+#perf {
+  top: auto;
+  bottom: 6px;
+}

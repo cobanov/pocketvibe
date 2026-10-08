@@ -1,0 +1,14 @@
+{
+  "id": "pole-star",
+  "title": "Pole Star",
+  "author": "cobanov",
+  "version": "1.0.0",
+  "description": "A very serious pole fitness show starring Sergio and his moustache. Tip a dollar on the beat to build the hype, from a bored lean on the pole to the money-swirling tornado.",
+  "genre": "Arcade",
+  "controls": {
+    "A": "Tip $1 (on the beat for combos); start / play again",
+    "B": "Clap along; back to title (paused or results)",
+    "START": "Pause / resume"
+  },
+  "responsive": true
+}
