@@ -9,6 +9,7 @@
 | `app/pocketvibe/runtime.py` | Runs Cog inside the runtime (a Debian root with WPE WebKit) in its own mount namespace, so WebKit's sandbox works. |
 | `app/pocketvibe/setup.sh` | The first-run download of the runtime, drawn with `dialog`. |
 | `app/pocketvibe/launcher/` | The launcher: plain HTML, CSS and JavaScript, no build step. `play.html` is the game shell (see below). |
+| `android/` | PocketVibe for Android handhelds: the same launcher in a WebView, with a Kotlin version of the local service. |
 | `app/pocketvibe/screens.py` | The handheld's screens, read from Sway: turns a second screen on while PocketVibe runs and spreads the browser's window over both. |
 | `template/` | The starter project. `packages/create-pocketvibe` copies it; `packages/pocketvibe` is the command line tool. |
 | `store/worker/` | The store: a Cloudflare Worker with D1 (catalog, uploads, download counts) and R2 (zips, covers). |
@@ -86,6 +87,30 @@ Two things to know:
   your own session. Kill by PID, or write the pattern so it cannot match itself (`serve[r]`).
 - The browser is ended with SIGKILL on purpose: Cog 0.18 crashes in its own shutdown code.
   Saves are written by WebKit's network process and are not lost.
+
+## Android
+
+`android/` is PocketVibe for Android handhelds (Retroid Pocket 3+, Anbernic RG Rotate). It
+shows the same launcher and game shell, copied from `app/pocketvibe/launcher` at build time, in
+a full-screen WebView. `PocketVibe.kt` does pocketvibed's work: it serves the launcher and its
+`/api` on 127.0.0.1, each game on its own port, and talks to the stores. Other apps can reach
+127.0.0.1 too, so the API also wants a cookie that only the app's own page gets.
+`MainActivity.kt` turns the handheld's buttons into the keyboard keys the pages already read and
+watches Start + Select. Games always open in the shell; the launcher scales by the screen's
+real pixels, so it looks the same on a 1334×750 screen as on a 720×720 one.
+
+You need JDK 21 and the Android SDK (`brew install openjdk@21` and
+`brew install --cask android-commandlinetools android-platform-tools`, then
+`sdkmanager "platforms;android-35" "build-tools;35.0.0"`):
+
+```sh
+cd android
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+`adb logcat -s PocketVibe` shows the pages' console. A debug build can be inspected from
+`chrome://inspect` on the computer.
 
 ## The store
 

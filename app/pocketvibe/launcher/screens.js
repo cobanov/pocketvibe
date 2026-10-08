@@ -33,10 +33,14 @@ export function fitScreens(screens, primary, width, height) {
   return { main: { x: 0, y: 0, width, height }, other: null };
 }
 
-// How much to enlarge the interface on a big screen: by quarters, never
-// below 1, so small screens keep every pixel and big ones are not tiny.
+// How much to enlarge the interface on a big screen, in CSS pixels: by
+// quarters of the screen's real pixels, never below 1, so small screens keep
+// every pixel and big ones are not tiny. On the handhelds a CSS pixel is a
+// screen pixel; Android phones and handhelds have two or three per CSS pixel.
 export function uiScale(rect) {
-  return Math.max(1, Math.floor(Math.min(rect.width / NATIVE.width, rect.height / NATIVE.height) * 4) / 4);
+  const ratio = window.devicePixelRatio || 1;
+  const fit = Math.min((rect.width * ratio) / NATIVE.width, (rect.height * ratio) / NATIVE.height);
+  return Math.max(1, Math.floor(fit * 4) / 4) / ratio;
 }
 
 // Put an element on a screen, laid out at 1/scale of its size and enlarged.

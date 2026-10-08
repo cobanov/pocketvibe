@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The site's favicon (site/public/favicon.svg), a little handheld, inside
+     the adaptive icon's safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.9"
+        android:scaleY="0.9"
+        android:translateX="25.2"
+        android:translateY="25.2">
+        <path
+            android:fillColor="#ffc83d"
+            android:pathData="M16,3 H48 A6,6 0 0 1 54,9 V27 A6,6 0 0 1 48,33 H16 A6,6 0 0 1 10,27 V9 A6,6 0 0 1 16,3 Z" />
+        <path
+            android:fillColor="#0f1016"
+            android:pathData="M17,8 H47 A2,2 0 0 1 49,10 V26 A2,2 0 0 1 47,28 H17 A2,2 0 0 1 15,26 V10 A2,2 0 0 1 17,8 Z" />
+        <path
+            android:fillColor="#ffc83d"
+            android:pathData="M16,35 H48 A6,6 0 0 1 54,41 V55 A6,6 0 0 1 48,61 H16 A6,6 0 0 1 10,55 V41 A6,6 0 0 1 16,35 Z" />
+        <path
+            android:fillColor="#232634"
+            android:pathData="M19,42h4v4h4v4h-4v4h-4v-4h-4v-4h4z" />
+        <path
+            android:fillColor="#232634"
+            android:pathData="M38,45 A3,3 0 1 0 44,45 A3,3 0 1 0 38,45 Z" />
+        <path
+            android:fillColor="#232634"
+            android:pathData="M44,50 A3,3 0 1 0 50,50 A3,3 0 1 0 44,50 Z" />
+    </group>
+</vector>
