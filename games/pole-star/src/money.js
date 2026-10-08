@@ -1,9 +1,8 @@
 // Dollar bills: thrown from your seat in a fluttering arc, they land on the
-// stage and stay there, piling up over the show. A bill thrown in a hurry
-// can hit the dancer in the face first. During the tornado every bill on the
-// stage lifts off and swirls round the pole, then settles back where it was.
-// All bills are one InstancedMesh: the first FLY slots are in the air, the
-// rest are the pile on the stage.
+// stage and stay there, piling up over the show. During her showpiece spin
+// every bill on the stage lifts off and swirls round the pole, then settles
+// back where it was. All bills are one InstancedMesh: the first FLY slots
+// are in the air, the rest are the pile on the stage.
 
 import * as THREE from 'three';
 import { STAGE_Y, canvasTexture, clamp, smooth } from './shared.js';
@@ -11,13 +10,11 @@ import { STAGE_Y, canvasTexture, clamp, smooth } from './shared.js';
 const FLY = 40;
 const PILE = 360;
 const FLIGHT = 0.62; // seconds from your hand to the stage
-const BONK_FLIGHT = 0.42;
-const DROP = 0.5; // falling off his face to the stage
 const W = 0.36;
 const H = 0.17;
 
-// A one-dollar bill, drawn once: green paper, a dark border and, in the
-// middle, a portrait with a moustache.
+// A one-dollar bill, drawn once: green paper, a dark border and a portrait
+// in the middle.
 function billTexture() {
   return canvasTexture(128, 64, (g, w, h) => {
     g.fillStyle = '#a6d9a0';
@@ -36,8 +33,6 @@ function billTexture() {
     g.arc(w / 2, h / 2 - 3, 8, 0, Math.PI * 2);
     g.fill();
     g.fillRect(w / 2 - 11, h / 2 + 7, 22, 8);
-    g.fillStyle = '#1b3d1d';
-    g.fillRect(w / 2 - 7, h / 2, 14, 3);
     g.font = 'bold 22px sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -55,17 +50,11 @@ export function createMoney(scene, camera) {
   mesh.frustumCulled = false;
   scene.add(mesh);
 
-  const white = new THREE.Color(1, 1, 1);
-  const gold = new THREE.Color(1.35, 1.15, 0.55);
   const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
-  for (let i = 0; i < FLY + PILE; i++) {
-    mesh.setMatrixAt(i, hidden);
-    mesh.setColorAt(i, white);
-  }
+  for (let i = 0; i < FLY + PILE; i++) mesh.setMatrixAt(i, hidden);
 
   // Bills in the air.
   const live = new Uint8Array(FLY);
-  const phase = new Uint8Array(FLY); // 0 to the stage, 1 to his face, 2 falling off it
   const age = new Float32Array(FLY);
   const dur = new Float32Array(FLY);
   const from = new Float32Array(FLY * 3);
@@ -74,7 +63,6 @@ export function createMoney(scene, camera) {
   const axis = new Float32Array(FLY * 3);
   const spinRate = new Float32Array(FLY);
   const yawEnd = new Float32Array(FLY);
-  const shiny = new Uint8Array(FLY);
   let nextFly = 0;
 
   // Bills on the stage.
@@ -87,7 +75,6 @@ export function createMoney(scene, camera) {
   let swirl = 0; // 0 resting, 1 fully airborne
   let time = 0;
   let pileDirty = false;
-  let onBonk = null;
 
   const pos = new THREE.Vector3();
   const scl = new THREE.Vector3(1, 1, 1);
@@ -104,7 +91,7 @@ export function createMoney(scene, camera) {
   const fwd = new THREE.Vector3();
 
   // A random spot on the stage, more often at the front where you see it.
-  function stageSpot(i3, arr) {
+  function stageSpot(i3) {
     let a = 0;
     let r = 0;
     for (let k = 0; k < 2; k++) {
@@ -112,9 +99,9 @@ export function createMoney(scene, camera) {
       r = 0.4 + Math.sqrt(Math.random()) * 1.55;
       if (Math.cos(a) * r > -0.6) break;
     }
-    arr[i3] = Math.sin(a) * r;
-    arr[i3 + 1] = STAGE_Y + 0.012;
-    arr[i3 + 2] = Math.cos(a) * r;
+    to[i3] = Math.sin(a) * r;
+    to[i3 + 1] = STAGE_Y + 0.012;
+    to[i3 + 2] = Math.cos(a) * r;
   }
 
   function flatQuat(yaw, out) {
@@ -123,6 +110,7 @@ export function createMoney(scene, camera) {
   }
 
   function land(i) {
+    live[i] = 0;
     const p = nextPile;
     nextPile = (nextPile + 1) % PILE;
     piled = Math.min(PILE, piled + 1);
@@ -161,61 +149,34 @@ export function createMoney(scene, camera) {
     mesh.setMatrixAt(FLY + p, mat);
   }
 
-  function launch(target, isBonk, glow) {
-    const i = nextFly;
-    nextFly = (nextFly + 1) % FLY;
-    if (live[i] && phase[i] === 0) land(i); // the oldest bill lands early
-    live[i] = 1;
-    age[i] = 0;
-    shiny[i] = glow ? 1 : 0;
-    // From your hand: below the bottom of the screen, a little off centre.
-    camera.updateMatrixWorld();
-    right.setFromMatrixColumn(camera.matrixWorld, 0);
-    camUp.setFromMatrixColumn(camera.matrixWorld, 1);
-    fwd.setFromMatrixColumn(camera.matrixWorld, 2).negate();
-    pos.copy(camera.position).addScaledVector(fwd, 2.2).addScaledVector(camUp, -0.85).addScaledVector(right, (Math.random() - 0.5) * 0.8);
-    from[i * 3] = pos.x;
-    from[i * 3 + 1] = pos.y;
-    from[i * 3 + 2] = pos.z;
-    if (isBonk) {
-      to[i * 3] = target.x;
-      to[i * 3 + 1] = target.y;
-      to[i * 3 + 2] = target.z;
-      phase[i] = 1;
-      dur[i] = BONK_FLIGHT;
-      arc[i] = 0.35;
-    } else {
-      stageSpot(i * 3, to);
-      phase[i] = 0;
-      dur[i] = FLIGHT * (0.9 + Math.random() * 0.2);
-      arc[i] = 1.1 + Math.random() * 0.5;
-    }
-    ax.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
-    axis[i * 3] = ax.x;
-    axis[i * 3 + 1] = ax.y;
-    axis[i * 3 + 2] = ax.z;
-    spinRate[i] = 9 + Math.random() * 8;
-    yawEnd[i] = Math.random() * Math.PI * 2;
-    mesh.setColorAt(i, glow ? gold : white);
-    mesh.instanceColor.needsUpdate = true;
-  }
-
   return {
     texture,
 
-    get count() {
-      return piled;
-    },
-
-    // A bill to the stage; glow for one thrown on the beat.
-    toss(glow) {
-      launch(null, false, glow);
-    },
-
-    // A bill at his face (world position); bonk() is called when it hits.
-    tossAt(face, bonk) {
-      onBonk = bonk;
-      launch(face, true, false);
+    // A bill from your hand to the stage.
+    toss() {
+      const i = nextFly;
+      nextFly = (nextFly + 1) % FLY;
+      if (live[i]) land(i); // the oldest bill lands early
+      live[i] = 1;
+      age[i] = 0;
+      // From your hand: below the bottom of the screen, a little off centre.
+      camera.updateMatrixWorld();
+      right.setFromMatrixColumn(camera.matrixWorld, 0);
+      camUp.setFromMatrixColumn(camera.matrixWorld, 1);
+      fwd.setFromMatrixColumn(camera.matrixWorld, 2).negate();
+      pos.copy(camera.position).addScaledVector(fwd, 2.2).addScaledVector(camUp, -0.85).addScaledVector(right, (Math.random() - 0.5) * 0.8);
+      from[i * 3] = pos.x;
+      from[i * 3 + 1] = pos.y;
+      from[i * 3 + 2] = pos.z;
+      stageSpot(i * 3);
+      dur[i] = FLIGHT * (0.9 + Math.random() * 0.2);
+      arc[i] = 1.1 + Math.random() * 0.5;
+      ax.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+      axis[i * 3] = ax.x;
+      axis[i * 3 + 1] = ax.y;
+      axis[i * 3 + 2] = ax.z;
+      spinRate[i] = 9 + Math.random() * 8;
+      yawEnd[i] = Math.random() * Math.PI * 2;
     },
 
     clear() {
@@ -240,26 +201,6 @@ export function createMoney(scene, camera) {
         age[i] += dt;
         const t = Math.min(1, age[i] / dur[i]);
         if (t >= 1) {
-          if (phase[i] === 1) {
-            // Hit his face: drop from there onto the stage.
-            if (onBonk) onBonk();
-            from[i * 3] = to[i * 3];
-            from[i * 3 + 1] = to[i * 3 + 1];
-            from[i * 3 + 2] = to[i * 3 + 2];
-            stageSpot(i * 3, to);
-            to[i * 3] = from[i * 3] * 0.4 + to[i * 3] * 0.6;
-            to[i * 3 + 2] = from[i * 3 + 2] * 0.4 + to[i * 3 + 2] * 0.6;
-            phase[i] = 2;
-            age[i] = 0;
-            dur[i] = DROP;
-            arc[i] = 0.25;
-            continue;
-          }
-          live[i] = 0;
-          if (shiny[i]) {
-            mesh.setColorAt(i, white);
-            mesh.instanceColor.needsUpdate = true;
-          }
           land(i);
           continue;
         }
@@ -273,7 +214,7 @@ export function createMoney(scene, camera) {
         ax.set(axis[i3], axis[i3 + 1], axis[i3 + 2]);
         qSpin.setFromAxisAngle(ax, age[i] * spinRate[i]);
         // Flutter down flat for the landing.
-        const settle = phase[i] === 1 ? 0 : smooth((t - 0.7) / 0.3);
+        const settle = smooth((t - 0.7) / 0.3);
         if (settle > 0) {
           flatQuat(yawEnd[i], qFlat);
           q.copy(qSpin).slerp(qFlat, settle);
@@ -282,7 +223,7 @@ export function createMoney(scene, camera) {
         mesh.setMatrixAt(i, mat);
       }
 
-      // The tornado lifts the pile; it settles back once the spin ends.
+      // The showpiece lifts the pile; it settles back once the spin ends.
       const goal = tornado ? 1 : 0;
       const before = swirl;
       swirl += (goal - swirl) * Math.min(1, dt * (tornado ? 1.6 : 1.1));

@@ -272,14 +272,14 @@ export function createClub(scene) {
   let cheer = 0; // seconds of everybody cheering left
   let flicker = 0;
 
-  function placeCrowd(beats, hype) {
-    const bob = 0.02 + hype * 0.0006;
-    const raiseBase = clamp((hype - 50) / 40, 0, 1);
+  function placeCrowd(beats, energy) {
+    const bob = 0.02 + energy * 0.06;
+    const raiseBase = clamp((energy - 0.6) / 0.3, 0, 1);
     for (let i = 0; i < CROWD_X.length; i++) {
       const x = CROWD_X[i];
       const h = crowdH[i];
       const nod = pulse(beats + crowdPhase[i] * 0.25, 7) * bob * (i % 2 ? 1 : 0.7);
-      const sway = Math.sin(beats * Math.PI * 0.5 + i) * 0.03 * (hype / 100);
+      const sway = Math.sin(beats * Math.PI * 0.5 + i) * 0.03 * energy;
       dummy.rotation.set(0, 0, sway);
       dummy.scale.setScalar(1);
       dummy.position.set(x, h + nod, CROWD_Z + (i % 2) * 0.25);
@@ -330,18 +330,17 @@ export function createClub(scene) {
   return {
     textures,
 
-    // beats: the music's position; hype 0-100; tier 0-5.
-    update(dt, beats, hype, tier) {
+    // beats: the music's position; energy 0-1, how much the club is buzzing.
+    update(dt, beats, energy) {
       time += dt;
       cheer = Math.max(0, cheer - dt);
-      const energy = hype / 100;
 
       spin += dt * (0.25 + energy * 0.9);
       ball.rotation.y = spin;
       placeSpots();
       spotMat.opacity = 0.18 + energy * 0.5;
 
-      // Beams sweep over the stage, wider and faster with the hype, and
+      // Beams sweep over the stage, wider and faster with the energy, and
       // change colour every bar.
       const bar = Math.floor(beats / 4);
       for (let i = 0; i < beams.length; i++) {
@@ -359,7 +358,7 @@ export function createClub(scene) {
       if (half !== lastHalf) {
         lastHalf = half;
         for (let i = 0; i < BULBS; i++) {
-          const lit = tier === 0 ? (i + Math.floor(half / 4)) % 2 === 0 : (i + half) % 3 === 0;
+          const lit = energy < 0.4 ? (i + Math.floor(half / 2)) % 2 === 0 : (i + half) % 3 === 0;
           tmpColor.setHex(lit ? 0xfff0b0 : 0x6b4a1a);
           bulbs.setColorAt(i, tmpColor);
         }
@@ -377,13 +376,13 @@ export function createClub(scene) {
       }
       woofers.instanceMatrix.needsUpdate = true;
 
-      // The sign hums and, when nobody is tipping, flickers.
+      // The sign hums and now and then, when the club is quiet, flickers.
       flicker = Math.max(0, flicker - dt);
-      if (tier === 0 && flicker <= 0 && Math.random() < dt * 0.5) flicker = 0.25;
+      if (energy < 0.4 && flicker <= 0 && Math.random() < dt * 0.08) flicker = 0.25;
       const buzz = flicker > 0 && Math.sin(flicker * 90) > 0 ? 0.35 : 1;
       signMat.color.setScalar(buzz * (0.85 + 0.15 * pulse(beats, 4)));
 
-      placeCrowd(beats, hype);
+      placeCrowd(beats, energy);
     },
 
     cheer(seconds) {

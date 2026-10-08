@@ -9,16 +9,6 @@ export const STAGE_R = 2.2; // stage radius; the pole stands at its centre
 export const POLE_TOP = 6.2;
 export const POLE_R = 0.05;
 
-// Hype tiers: the dancer's move for each, from bored to the finale spin.
-export const TIERS = [
-  { name: 'WARMING UP', from: 0 },
-  { name: 'THE STROLL', from: 15 },
-  { name: 'FIREMAN SPIN', from: 35 },
-  { name: 'THE FLAG', from: 55 },
-  { name: 'HELICOPTER', from: 75 },
-  { name: 'TORNADO', from: 95 },
-];
-
 export function clamp(v, lo, hi) {
   return v < lo ? lo : v > hi ? hi : v;
 }

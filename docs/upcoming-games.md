@@ -52,13 +52,13 @@ Oyunlar `games/` altında, her biri kendi klasöründe.
 
 | # | Oyun | Fikir | Durum | Klasör |
 |---|---|---|---|---|
-| 21 | Direk dansı | Tek tuşlu ritim komedisi: ritimde atılan her $1 bahşiş hype'ı artırıyor, low-poly dansçı Sergio sıkılmış bir yaslanmadan tornadoya kadar figürlerini büyütüyor. Müstehcenlik yok, sanatsal ve komik bir pole fitness gösterisi. | Bitti | `games/pole-star` |
+| 21 | Direk dansı | Kendi rutinini dans eden low-poly bir direk dansçısı (Stella); oyuncu istediği zaman A ile $1 atıyor, para yağdırınca gösteri dönüşü yapıyor. Puan yok, müstehcenlik yok. | Bitti | `games/pole-star` |
 
 ## Notlar
 
 - Store'da marka adları kullanılmıyor. Oyunların adları özgün: Sky Hopper, Jet Rush, Block Drop, Star Defender, Rock Blaster, Road Hopper, Turbo Circuit, Neon Pinball, Brick Breaker, Snake, Lane Runner, Maze Chase, Tank Brigade, Tower Stack, Pulse Dash, Cloud Climber, Snow Slalom, Mini Golf, Tile Merge, Crate Pusher, Pole Star.
 - Uzay istilası (4) şu an klasik Space Invaders düzeninde yazılıyor: yana kayan uzaylı filosu ve kalkanlar var. Galaga tarzı dalış saldırıları yok.
 - Low-poly yarış (16) şu an tek pistli: 3 tur ve 3 yapay zekâ rakip var. Yeni pistler sonra eklenebilir.
-- Ritim zıplayıcı (12) ve direk dansı (21) müziği olan oyunlar: parçalar Web Audio ile oyun başlamadan bir kez render ediliyor ve oyun ses saatine kilitli.
+- Ritim zıplayıcı (12) ve direk dansı (21) müziği olan oyunlar: parçalar Web Audio ile oyun başlamadan bir kez render ediliyor ve oyun ses saatine kilitli (direk dansında yalnızca dansçının koreografisi).
 - Kutu itme (20) 30 özgün bölümden oluşuyor; hepsi `tools/solve.mjs` ile çözülebilir olarak doğrulandı ve her bölümün parı en kısa çözüm.
 - Her oyunun klasöründe store için bir `pocketvibe.json` (ad, sürüm, açıklama, tür, tuşlar) ve bir `cover.png` (480×270) var.

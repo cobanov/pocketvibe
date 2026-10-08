@@ -3,9 +3,8 @@
 // The music is a four-bar disco loop in three layers (groove, string stabs,
 // lead), each rendered once at load with an OfflineAudioContext and then
 // looped. All three play from the same moment, so they stay locked
-// together, and the stabs and the lead fade in as the hype climbs. The game
-// reads the beat from the audio clock, so the dancer and the "on the beat"
-// window follow what you hear.
+// together, and the lead joins when the club gets lively. The game reads
+// the beat from the audio clock, so the dancer moves to what you hear.
 
 import { BPM } from './shared.js';
 
@@ -248,34 +247,6 @@ function crowdSound(seconds, claps, roar) {
   return Promise.resolve(buffer);
 }
 
-// A brass-ish note: saw through a lowpass, with a little vibrato.
-function horn(ctx, out, t, freq, len, level, cutoff = 1800, vibrato = 0) {
-  const osc = ctx.createOscillator();
-  osc.type = 'sawtooth';
-  osc.frequency.value = freq;
-  if (vibrato > 0) {
-    const lfo = ctx.createOscillator();
-    const depth = ctx.createGain();
-    lfo.frequency.value = 6;
-    depth.gain.value = vibrato;
-    lfo.connect(depth).connect(osc.frequency);
-    lfo.start(t);
-    lfo.stop(t + len + 0.02);
-  }
-  const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.value = cutoff;
-  const env = ctx.createGain();
-  env.gain.setValueAtTime(0, t);
-  env.gain.linearRampToValueAtTime(level, t + 0.03);
-  env.gain.setValueAtTime(level, t + len * 0.75);
-  env.gain.linearRampToValueAtTime(0, t + len);
-  osc.connect(filter).connect(env).connect(out);
-  osc.start(t);
-  osc.stop(t + len + 0.02);
-  return filter;
-}
-
 const SOUNDS = {
   // The flick of a bill leaving your hand.
   toss: () =>
@@ -295,63 +266,13 @@ const SOUNDS = {
       src.start(0);
       src.stop(0.16);
     }),
-  // On the beat: ka-ching.
+  // A tip: ka-ching.
   ching: () =>
     renderSound(0.6, (ctx, out) => {
       noiseHit(ctx, out, noiseBuffer(ctx), 0, 'highpass', 3000, 0.8, 0.35, 0.03);
       tone(ctx, out, 0.05, 2093, 0.5, 'sine', 0.22, 0.002);
       tone(ctx, out, 0.05, 2637, 0.45, 'sine', 0.18, 0.002);
       tone(ctx, out, 0.05, 4186, 0.2, 'sine', 0.06, 0.002);
-    }),
-  // Your own clap (B).
-  clap: () =>
-    renderSound(0.25, (ctx, out) => {
-      clap(ctx, out, noiseBuffer(ctx), 0, 0.9);
-    }),
-  // A bill to the face: a cartoon bonk with a wobble.
-  bonk: () =>
-    renderSound(0.5, (ctx, out) => {
-      const osc = tone(ctx, out, 0, 520, 0.18, 'triangle', 0.5, 0.002);
-      osc.frequency.setValueAtTime(520, 0);
-      osc.frequency.exponentialRampToValueAtTime(180, 0.15);
-      const boing = tone(ctx, out, 0.04, 260, 0.42, 'sine', 0.3, 0.005);
-      const lfo = ctx.createOscillator();
-      const depth = ctx.createGain();
-      lfo.frequency.value = 22;
-      depth.gain.value = 40;
-      lfo.connect(depth).connect(boing.frequency);
-      lfo.start(0.04);
-      lfo.stop(0.47);
-    }),
-  // A new move: a short brass fanfare.
-  fanfare: () =>
-    renderSound(0.9, (ctx, out) => {
-      [69, 73, 76, 81].forEach((n, i) => horn(ctx, out, i * 0.08, midiToHz(n), i === 3 ? 0.55 : 0.12, 0.16, 2400));
-    }),
-  // The tornado: an air horn, three blasts.
-  airhorn: () =>
-    renderSound(1.3, (ctx, out) => {
-      for (const [t, len] of [[0, 0.16], [0.22, 0.16], [0.44, 0.75]]) {
-        for (const f of [415, 440, 830]) horn(ctx, out, t, f, len, 0.11, 2600);
-      }
-    }),
-  // He got bored: wah, wah, wah, wahhh.
-  sad: () =>
-    renderSound(2.2, (ctx, out) => {
-      [55, 54, 53, 52].forEach((n, i) => {
-        const len = i === 3 ? 1.1 : 0.36;
-        const filter = horn(ctx, out, i * 0.4, midiToHz(n), len, 0.3, 900, i === 3 ? 5 : 0);
-        filter.frequency.setValueAtTime(350, i * 0.4);
-        filter.frequency.linearRampToValueAtTime(1100, i * 0.4 + 0.12);
-        filter.frequency.linearRampToValueAtTime(500, i * 0.4 + len);
-      });
-    }),
-  // The end of the show: one big chord and a cymbal.
-  sting: () =>
-    renderSound(2.2, (ctx, out) => {
-      for (const n of [45, 57, 61, 64, 69]) horn(ctx, out, 0, midiToHz(n), 1.6, 0.08, 2200);
-      noiseHit(ctx, out, noiseBuffer(ctx), 0, 'highpass', 4000, 0.5, 0.3, 1.8);
-      kick(ctx, out, 0, 0.9);
     }),
   cheer: () => crowdSound(1.4, 110, 0.5),
   applause: () => crowdSound(3.6, 520, 0.7),
@@ -375,6 +296,7 @@ export function createAudio() {
   let lastWall = 0;
   let songTime = 0;
   let layers = null; // [groove, stabs, lead] once rendered; [] if that failed
+  let leadOn = false;
   const sounds = {};
 
   if (canRender) {
@@ -408,7 +330,7 @@ export function createAudio() {
       sfxGain = ctx.createGain();
       sfxGain.gain.value = 0.8;
       sfxGain.connect(output);
-      layerGains = [1, 0, 0].map((v) => {
+      layerGains = [1, 0.9, 0].map((v) => {
         const g = ctx.createGain();
         g.gain.value = v;
         g.connect(musicGain);
@@ -452,6 +374,9 @@ export function createAudio() {
       musicGain.gain.cancelScheduledValues(ctx.currentTime);
       musicGain.gain.setValueAtTime(0.75, ctx.currentTime);
       startAt = ctx.currentTime + LEAD_IN;
+      leadOn = false;
+      layerGains[2].gain.cancelScheduledValues(ctx.currentTime);
+      layerGains[2].gain.setValueAtTime(0, ctx.currentTime);
       sources = layers.map((buffer, i) => {
         const src = ctx.createBufferSource();
         src.buffer = buffer;
@@ -463,15 +388,12 @@ export function createAudio() {
       latency = Math.min(0.3, Math.max(0, (ctx.outputLatency || 0) + (ctx.baseLatency || 0)));
     },
 
-    // How full the band is (hype 0 to 1): the stabs join from the fireman
-    // spin on, the lead from the helicopter.
+    // How lively the club is, 0 to 1: the lead plays from 0.6 on.
     intensity(k) {
-      if (!ctx || !sources.length) return;
-      const now = ctx.currentTime;
-      const stabsOn = k >= 0.35 ? 0.9 : 0;
-      const leadOn = k >= 0.75 ? 0.8 : 0;
-      layerGains[1].gain.setTargetAtTime(stabsOn, now, 0.3);
-      layerGains[2].gain.setTargetAtTime(leadOn, now, 0.3);
+      const lead = k >= 0.6;
+      if (!ctx || !sources.length || lead === leadOn) return;
+      leadOn = lead;
+      layerGains[2].gain.setTargetAtTime(lead ? 0.8 : 0, ctx.currentTime, 0.4);
     },
 
     stop(fade) {
