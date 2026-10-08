@@ -66,7 +66,7 @@ fi
 # Download, feeding dialog's gauge its percent and a line on how far it is.
 # Each address is tried in turn, a few times, going on from where the last
 # try stopped. If the gauge goes away, the download carries on without it.
-python3 - "$DOWNLOAD" $URLS <<'EOF' | dialog --title "$TITLE" --gauge "\nDownloading the game engine..." 10 50 0
+python3 - "$DOWNLOAD" $URLS <<'EOF' | dialog --title "$TITLE" --gauge "\nDownloading the game engine..." 12 50 0
 import os, sys, time, urllib.error, urllib.request
 target, urls = sys.argv[1], sys.argv[2:]
 gauge = True
@@ -76,7 +76,7 @@ def show(percent, text):
     if not gauge:
         return
     try:
-        print(f'XXX\n{percent}\n\\nDownloading the game engine. This happens only once.\\n{text}\nXXX', flush=True)
+        print(f'XXX\n{percent}\n\\nDownloading the game engine.\\nThis happens only once.\\n\\n{text}\nXXX', flush=True)
     except BrokenPipeError:
         sys.stdout = open(os.devnull, 'w')
         gauge = False
@@ -95,13 +95,13 @@ def fetch(url):
             while chunk := r.read(1 << 16):
                 out.write(chunk)
                 done += len(chunk)
-                mb = done >> 20
+                mb = done // 1000000
                 if total and mb != shown:
                     shown = mb
                     rate = (done - have) / max(time.monotonic() - start, 0.5)
                     left = (total - done) / rate if rate > 0 else 0
-                    eta = 'less than a minute left' if left < 60 else f'about {round(left / 60)} min left'
-                    show(done * 100 // total, f'{mb} of {total >> 20} MB, {eta}')
+                    eta = 'Less than a minute left' if left < 60 else f'About {round(left / 60)} min left'
+                    show(done * 100 // total, f'{mb} of {total // 1000000} MB at {rate / 1e6:.1f} MB/s\\n{eta}')
         return total and done >= total
 
 for attempt in range(5):
@@ -128,10 +128,40 @@ if [ "$(sha256sum "$DOWNLOAD" | cut -d' ' -f1)" != "$SHA" ]; then
   fail "The download did not finish or is damaged.\n\nOpen PocketVibe again to go on."
 fi
 
-say "\nInstalling the game engine.\nThis takes about a minute..." 7
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
-tar -xJf "$DOWNLOAD" -C "$STAGING" || fail "Installing failed. The SD card may be full: PocketVibe needs about $UNPACKED_MB MB for its game engine.\n\nFree some space and open PocketVibe again."
+# Unpack, feeding tar the archive while the gauge shows how much is done:
+# tar takes it only as fast as it can unpack it, so the bar follows the work.
+python3 - "$DOWNLOAD" "$STAGING" <<'EOF' | dialog --title "$TITLE" --gauge "\nInstalling the game engine..." 12 50 0
+import os, subprocess, sys, time
+source, staging = sys.argv[1:3]
+total = os.path.getsize(source)
+tar = subprocess.Popen(['tar', '-xJf', '-', '-C', staging], stdin=subprocess.PIPE)
+gauge = True
+done, start, shown = 0, time.monotonic(), -1
+try:
+    with open(source, 'rb') as f:
+        while chunk := f.read(1 << 18):
+            tar.stdin.write(chunk)
+            done += len(chunk)
+            percent = done * 100 // total
+            if percent != shown and gauge:
+                shown = percent
+                elapsed = time.monotonic() - start
+                left = elapsed * (total - done) / done if done else 0
+                eta = 'Less than a minute left' if left < 60 else f'About {round(left / 60)} min left'
+                try:
+                    print(f'XXX\n{percent}\n\\nInstalling the game engine on the SD card.\\n\\n{eta}\nXXX', flush=True)
+                except BrokenPipeError:
+                    sys.stdout = open(os.devnull, 'w')
+                    gauge = False
+    tar.stdin.close()
+except BrokenPipeError:
+    pass  # tar stopped early; its exit status says why
+if tar.wait() == 0:
+    open(os.path.join(staging, '.unpacked'), 'w').close()  # the pipe to dialog hides the exit status
+EOF
+[ -e "$STAGING/.unpacked" ] && rm -f "$STAGING/.unpacked" || fail "Installing failed. The SD card may be full: PocketVibe needs about $UNPACKED_MB MB for its game engine.\n\nFree some space and open PocketVibe again."
 # Never delete through a mount: an old test setup could have bound /dev or
 # /proc inside, and rm would follow it into the system's own files.
 if awk -v dir="$RUNTIME" '$2 == dir || index($2, dir "/") == 1 { found = 1 } END { exit !found }' /proc/mounts; then
