@@ -134,6 +134,10 @@ const STRINGS = {
   check: { en: 'Check', tr: 'Kontrol et' },
   updateAvailableToast: { en: 'PocketVibe {version} is available. Update it in Settings.', tr: "PocketVibe {version} çıktı. Ayarlar'dan güncelleyebilirsin." },
   updateConfirm: { en: 'Update to {version}? PocketVibe restarts.', tr: '{version} sürümüne güncellensin mi? PocketVibe yeniden başlar.' },
+  updateConfirmAndroid: {
+    en: 'Update to {version}? Android asks before installing it; choose Open when it is done.',
+    tr: "{version} sürümüne güncellensin mi? Android kurmadan önce sorar; bitince Aç'ı seç.",
+  },
   updatedTo: { en: 'PocketVibe is now {version}.', tr: 'PocketVibe artık {version}.' },
   updateFailed: { en: 'Update failed: {error}', tr: 'Güncelleme başarısız: {error}' },
 

@@ -465,7 +465,7 @@ function settingsSections() {
       title: t('about'),
       note: CREDITS,
       rows: [
-        ...(android ? [] : [{ id: 'update', label: t('appUpdate'), value: updateValue() }]),
+        { id: 'update', label: t('appUpdate'), value: updateValue() },
         { id: 'version', label: 'PocketVibe', value: info.version ? `${t('version')} ${info.version}` : '' },
       ],
     },
@@ -618,7 +618,9 @@ function settingsAction(button, repeat) {
     askForPanfrost();
   } else if (id === 'update' && button === 'A') {
     if (state.update?.available) {
-      showDialog(t('updateConfirm', { version: state.update.version }), async () => {
+      // Android installs the new version itself, after asking.
+      const confirm = state.info?.platform === 'android' ? 'updateConfirmAndroid' : 'updateConfirm';
+      showDialog(t(confirm, { version: state.update.version }), async () => {
         await api('/api/update/install', 'POST');
         pollJobs();
       });

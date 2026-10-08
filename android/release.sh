@@ -23,6 +23,12 @@ export POCKETVIBE_KEYSTORE=${POCKETVIBE_KEYSTORE:-$HOME/.config/pocketvibe/andro
 POCKETVIBE_KEYSTORE_PASSWORD=${POCKETVIBE_KEYSTORE_PASSWORD:-$(security find-generic-password -s pocketvibe-android-keystore -w)}
 export POCKETVIBE_KEYSTORE_PASSWORD
 
+# The games a new install starts with go into the APK (see build.gradle.kts).
+POCKETVIBE_BUNDLED=$(mktemp -d)
+trap 'rm -rf "$POCKETVIBE_BUNDLED"' EXIT
+python3 "$REPO/tools/bundled-games.py" "$POCKETVIBE_BUNDLED"
+export POCKETVIBE_BUNDLED
+
 (cd "$ANDROID" && ./gradlew --quiet clean assembleRelease)
 OUT="$ANDROID/build/dist"
 APK="$OUT/PocketVibe-$VERSION.apk"

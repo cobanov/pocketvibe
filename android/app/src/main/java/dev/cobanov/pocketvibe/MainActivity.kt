@@ -109,9 +109,10 @@ class MainActivity : Activity() {
             override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest) = request.url.host != "127.0.0.1"
 
             // A page that brings the browser down (a game, most likely): start
-            // again on the launcher instead of closing the app.
+            // again on the launcher instead of closing the app, and say so.
             override fun onRenderProcessGone(v: WebView, detail: RenderProcessGoneDetail): Boolean {
                 Log.w(TAG, "page crashed: ${detail.didCrash()}")
+                service.notice = if (service.inGame) "crashed:game" else "crashed"
                 (v.parent as? ViewGroup)?.removeView(v)
                 v.destroy()
                 web = null

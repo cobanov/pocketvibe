@@ -34,24 +34,9 @@ rm -f "$UPDATE"
 
 # Install package: laid out like roms/ports, with a few games from the
 # store that a new install starts with (the app unpacks them once).
-BUNDLED_GAMES="brick-breaker turbo-circuit jet-rush tower-stack road-hopper"
 copy_app "$STAGE/install/pocketvibe"
 mkdir -p "$STAGE/install/pocketvibe/bundled"
-python3 - "$STAGE/install/pocketvibe/bundled" $BUNDLED_GAMES <<'PY'
-import hashlib, json, sys, urllib.request
-out, ids = sys.argv[1], sys.argv[2:]
-STORE = 'https://pocketvibe-store.mertcobanov.workers.dev/catalog.json'
-# The mirror header keeps these copies out of the games' download counts.
-get = lambda url: urllib.request.urlopen(urllib.request.Request(url, headers={'X-PocketVibe-Mirror': '1', 'User-Agent': 'PocketVibe-release'}), timeout=60).read()
-games = {g['id']: g for g in json.loads(get(STORE))['games']}
-for gid in ids:
-    game = games[gid]
-    data = get(game['download'])
-    if game.get('sha256') and hashlib.sha256(data).hexdigest() != game['sha256']:
-        sys.exit(f'{gid}: checksum mismatch')
-    open(f'{out}/{gid}.zip', 'wb').write(data)
-    print(f'bundled {gid} {game["version"]}')
-PY
+python3 "$REPO/tools/bundled-games.py" "$STAGE/install/pocketvibe/bundled"
 cp "$REPO/app/PocketVibe.sh" "$STAGE/install/"
 mkdir -p "$STAGE/install/images"
 cp "$REPO/app/ports/pocketvibe-image.png" "$STAGE/install/images/"

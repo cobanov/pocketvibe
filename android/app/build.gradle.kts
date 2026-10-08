@@ -58,7 +58,10 @@ android {
 }
 
 // The launcher and the game shell are the handheld app's own files, copied in
-// at build time; the site's DejaVu fonts stand in for the handheld's.
+// at build time; the site's DejaVu fonts stand in for the handheld's. The
+// games a new install starts with come from the folder release.sh fills
+// (POCKETVIBE_BUNDLED); a build without it starts with an empty Library.
+val bundled = System.getenv("POCKETVIBE_BUNDLED")
 val copyWeb by tasks.registering(Sync::class) {
     from(repo.resolve("app/pocketvibe/launcher")) { into("launcher") }
     from(repo.resolve("app/pocketvibe/config.json"))
@@ -66,6 +69,7 @@ val copyWeb by tasks.registering(Sync::class) {
         include("DejaVuSans.woff2", "DejaVuSans-Bold.woff2")
         into("fonts")
     }
+    if (bundled != null) from(bundled) { include("*.zip"); into("bundled") }
     into(layout.buildDirectory.dir("generated/web"))
 }
 

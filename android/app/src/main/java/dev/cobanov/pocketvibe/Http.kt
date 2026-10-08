@@ -20,7 +20,7 @@ import org.json.JSONObject
 // games ask of it: the Android side of what pocketvibed's http.server does on
 // the handheld. One request per connection.
 
-const val MAX_BODY = 8 shl 20 // bytes; the largest upload is a cached audio file
+const val MAX_BODY = 1 shl 20 // bytes; the largest body is the settings
 
 class Request(
     val method: String,
@@ -163,7 +163,7 @@ class HttpServer(val port: Int, private val handle: (Request) -> Response) {
     companion object {
         private val REASONS = mapOf(
             200 to "OK", 400 to "Bad Request", 403 to "Forbidden", 404 to "Not Found",
-            405 to "Method Not Allowed", 500 to "Internal Server Error",
+            405 to "Method Not Allowed", 500 to "Internal Server Error", 502 to "Bad Gateway",
         )
     }
 }

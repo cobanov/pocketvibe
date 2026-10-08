@@ -52,6 +52,8 @@ class PocketVibe private constructor(private val context: Context) {
         private val ACTIVE = setOf("queued", "downloading", "installing")
         private const val MAX_CATALOG = 4 shl 20
         private const val MAX_COVER = 2 shl 20
+        private const val APP_JOB = "__app__" // the app's own update, among the games' jobs
+        private const val UPDATE_CHECK_EVERY = 6 * 3600 * 1000L // ms, so GitHub is not asked on every start
 
         // The handheld's typeface, so text takes the same room as there.
         private val FONTS = """<style>@font-face{font-family:'DejaVu Sans';font-weight:100 599;src:url(${SHELL_PATH}fonts/DejaVuSans.woff2) format('woff2')}@font-face{font-family:'DejaVu Sans';font-weight:600 900;src:url(${SHELL_PATH}fonts/DejaVuSans-Bold.woff2) format('woff2')}</style>"""
@@ -62,9 +64,12 @@ class PocketVibe private constructor(private val context: Context) {
     private val settingsFile = File(context.filesDir, "settings.json")
     private val playsFile = File(context.filesDir, "plays.json")
     private val portsFile = File(context.filesDir, "ports.json")
+    private val bundledDone = File(context.filesDir, ".bundled") // the bundled games are unpacked once, never again
+    private val updating = File(context.filesDir, "updating") // the version Android was asked to install
     private val config = JSONObject(String(asset("config.json") ?: "{}".toByteArray()))
     private val version = config.optString("version", "0.0.0")
     private val defaultStore = config.optString("store_url")
+    private val updateUrl = config.optString("update_url")
     private val token = UUID.randomUUID().toString()
     private val pool = Executors.newCachedThreadPool { Thread(it).apply { isDaemon = true } }
     private val filesLock = Any()
@@ -72,7 +77,8 @@ class PocketVibe private constructor(private val context: Context) {
     private val gameServers = HashMap<String, HttpServer>()
     private val coverMisses = HashMap<String, Long>()
     private var catalogCache = Triple(0L, emptyList<JSONObject>(), JSONArray())
-    private var notice: String? = null
+    /** Something to tell the player when the launcher next loads. */
+    @Volatile var notice: String? = null
 
     /** Set while a game is open; the launcher clears it when it loads. */
     @Volatile var inGame = false
@@ -91,6 +97,8 @@ class PocketVibe private constructor(private val context: Context) {
 
     init {
         cleanUp()
+        installBundled()
+        noticeUpdate()
     }
 
     fun quit() {
@@ -134,6 +142,7 @@ class PocketVibe private constructor(private val context: Context) {
             }
         }
         File(cache, "audio").deleteRecursively() // menu music older launchers rendered and kept here
+        UpdateProvider.file(context).parentFile?.deleteRecursively() // an update Android installed or the player declined
     }
 
     // ---------- Settings and plays ----------
@@ -344,46 +353,45 @@ class PocketVibe private constructor(private val context: Context) {
         }
     }
 
-    private fun install(entry: JSONObject) {
-        val gid = entry.getString("id")
-        games.mkdirs()
-        val download = File(games, ".$gid.zip")
-        val staging = File(games, ".$gid.new")
-        try {
-            setJob(gid, "downloading", 0.0)
-            val digest = MessageDigest.getInstance("SHA-256")
-            val connection = open(entry.getString("download"), 30_000)
-            if (connection.responseCode !in 200..299) throw IOException("HTTP ${connection.responseCode}")
-            val total = connection.contentLengthLong.takeIf { it > 0 } ?: entry.optLong("size", 0)
-            connection.inputStream.use { input ->
-                download.outputStream().use { out ->
-                    val buffer = ByteArray(1 shl 16)
-                    var done = 0L
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        out.write(buffer, 0, n)
-                        digest.update(buffer, 0, n)
-                        done += n
-                        if (total > 0) setJob(gid, progress = minOf(done.toDouble() / total, 1.0))
-                    }
+    /** Downloads url to file, reporting progress as job gid; returns the file's SHA-256. */
+    private fun download(url: String, file: File, gid: String, size: Long): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val connection = open(url, 30_000)
+        if (connection.responseCode !in 200..299) throw IOException("HTTP ${connection.responseCode}")
+        val total = connection.contentLengthLong.takeIf { it > 0 } ?: size
+        connection.inputStream.use { input ->
+            file.outputStream().use { out ->
+                val buffer = ByteArray(1 shl 16)
+                var done = 0L
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                    digest.update(buffer, 0, n)
+                    done += n
+                    if (total > 0) setJob(gid, progress = minOf(done.toDouble() / total, 1.0))
                 }
             }
-            val sha = entry.optString("sha256")
-            if (sha.isNotEmpty() && hex(digest.digest()) != sha) throw IOException("download is corrupted (checksum mismatch)")
+        }
+        return hex(digest.digest())
+    }
 
-            setJob(gid, "installing", 1.0)
+    /** Puts a game zip in the Library as games/<gid>, replacing what is there. */
+    private fun unpack(gid: String, zip: File, entry: JSONObject) {
+        val staging = File(games, ".$gid.new")
+        try {
             staging.deleteRecursively()
             staging.mkdirs()
-            unzip(download, staging)
+            unzip(zip, staging)
             // Accept zips that wrap the game in a single top-level folder.
             val entries = staging.listFiles().orEmpty().filter { !it.name.startsWith("__MACOSX") }
             val root = if (entries.size == 1 && entries[0].isDirectory) entries[0] else staging
-            if (!File(root, entry.optString("entry", "index.html")).exists()) throw IOException("archive has no index.html")
             val manifest = readManifest(root)
+            if (!File(root, entry.optString("entry", manifest.getString("entry"))).exists()) throw IOException("archive has no index.html")
             for (key in listOf("id", "title", "author", "version", "description", "entry")) {
                 if (entry.has(key)) manifest.put(key, entry.get(key))
             }
+            manifest.put("id", gid)
             File(root, "pocketvibe.json").writeText(manifest.toString(2))
 
             val target = File(games, gid)
@@ -392,13 +400,53 @@ class PocketVibe private constructor(private val context: Context) {
             if (target.exists()) target.renameTo(old)
             if (!root.renameTo(target)) throw IOException("could not install the game")
             old.deleteRecursively()
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
+
+    private fun install(entry: JSONObject) {
+        val gid = entry.getString("id")
+        games.mkdirs()
+        val zip = File(games, ".$gid.zip")
+        try {
+            setJob(gid, "downloading", 0.0)
+            val sha = download(entry.getString("download"), zip, gid, entry.optLong("size", 0))
+            if (entry.optString("sha256").let { it.isNotEmpty() && it != sha }) throw IOException("download is corrupted (checksum mismatch)")
+            setJob(gid, "installing", 1.0)
+            unpack(gid, zip, entry)
             setJob(gid, "done")
         } catch (e: Exception) {
             Log.w(TAG, "install $gid", e)
             setJob(gid, "error", error = e.message ?: e.toString())
         } finally {
-            download.delete()
-            staging.deleteRecursively()
+            zip.delete()
+        }
+    }
+
+    /** A new install starts with a few games in its Library, from zips in the
+     *  APK's bundled folder. Only once: games the player removes stay removed,
+     *  and a game the player already has is left alone. */
+    private fun installBundled() {
+        if (bundledDone.exists()) return
+        games.mkdirs()
+        for (name in context.assets.list("bundled").orEmpty().filter { it.endsWith(".zip") }.sorted()) {
+            val gid = name.removeSuffix(".zip")
+            if (!GAME_ID.matches(gid) || File(games, gid).exists()) continue
+            val zip = File(games, ".$gid.zip")
+            try {
+                context.assets.open("bundled/$name").use { input -> zip.outputStream().use { input.copyTo(it) } }
+                unpack(gid, zip, JSONObject())
+            } catch (e: Exception) {
+                Log.w(TAG, "bundled game $gid not installed", e)
+            } finally {
+                zip.delete()
+            }
+        }
+        try {
+            bundledDone.createNewFile()
+        } catch (e: IOException) {
+            // Then it tries again next time; games already there are left alone.
         }
     }
 
@@ -473,6 +521,84 @@ class PocketVibe private constructor(private val context: Context) {
             .put("games", gamesSize)
             .put("ip", address() ?: JSONObject.NULL)
             .put("gpu", JSONObject.NULL)
+    }
+
+    // ---------- Updates ----------
+
+    /** The newest Android release, compared with this app. Cached for a while. */
+    private fun checkUpdate(force: Boolean = false): JSONObject {
+        val cached = File(cache, "update.json")
+        val fresh = System.currentTimeMillis() - cached.lastModified() < UPDATE_CHECK_EVERY
+        val release = (if (force || !fresh) null else readJson(cached) as? JSONObject) ?: latestRelease().also { writeJson(cached, it) }
+        return JSONObject(release.toString()).put("current", version).put("available", newer(release.getString("version"), version))
+    }
+
+    /** GitHub lists releases newest first. Android's are tagged android-v1.2.3
+     *  and carry the APK; the handheld's (v1.2.3) and the runtime's are skipped. */
+    private fun latestRelease(): JSONObject {
+        val connection = open(updateUrl).apply { setRequestProperty("Accept", "application/vnd.github+json") }
+        val text = String(readLimited(connection, MAX_CATALOG)).trim()
+        val releases = if (text.startsWith("[")) JSONArray(text) else JSONArray().put(JSONObject(text))
+        for (i in 0 until releases.length()) {
+            val release = releases.optJSONObject(i) ?: continue
+            val tag = release.optString("tag_name")
+            if (!tag.startsWith("android-v") || release.optBoolean("draft") || release.optBoolean("prerelease")) continue
+            val assets = release.optJSONArray("assets") ?: continue
+            val apk = (0 until assets.length()).mapNotNull { assets.optJSONObject(it) }
+                .firstOrNull { it.optString("name").endsWith(".apk") } ?: continue
+            // The checksum comes from GitHub's asset digest, or a "sha256: ..." line in the notes.
+            val notes = (release.opt("body") as? String).orEmpty()
+            val digest = (apk.opt("digest") as? String)?.removePrefix("sha256:")
+            val noted = Regex("sha256:\\s*([0-9a-f]{64})").find(notes)?.groupValues?.get(1)
+            return JSONObject()
+                .put("version", tag.removePrefix("android-v"))
+                .put("notes", notes.replace(Regex("\\s*sha256:\\s*[0-9a-f]{64}\\s*"), "").trim())
+                .put("url", apk.getString("browser_download_url"))
+                .put("size", apk.optLong("size"))
+                .put("sha256", digest ?: noted.orEmpty())
+        }
+        throw IOException("no Android release yet")
+    }
+
+    /** Downloads the new APK, checks it and hands it to Android's installer,
+     *  which asks the player and, once it is installed, offers to open it. */
+    private fun installUpdate() {
+        val apk = UpdateProvider.file(context)
+        try {
+            val release = checkUpdate()
+            if (!release.getBoolean("available")) throw IOException("already up to date")
+            val sha = release.getString("sha256")
+            if (!Regex("[0-9a-f]{64}").matches(sha)) throw IOException("the release has no checksum")
+            setJob(APP_JOB, "downloading", 0.0)
+            apk.parentFile?.mkdirs()
+            if (download(release.getString("url"), apk, APP_JOB, release.optLong("size")) != sha) {
+                throw IOException("download is corrupted (checksum mismatch)")
+            }
+            setJob(APP_JOB, "installing", 1.0)
+            updating.writeText(release.getString("version"))
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(UpdateProvider.uri(context), UpdateProvider.TYPE)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION),
+            )
+            setJob(APP_JOB, "done")
+        } catch (e: Exception) {
+            Log.w(TAG, "update", e)
+            apk.delete()
+            setJob(APP_JOB, "error", error = e.message ?: e.toString())
+        }
+    }
+
+    /** The first start after Android installed an update: say so in the launcher. */
+    private fun noticeUpdate() {
+        val target = try {
+            updating.readText().trim()
+        } catch (e: IOException) {
+            return
+        }
+        if (newer(target, version)) return // not installed: the player may still say yes later
+        if (target == version) notice = "updated:$version"
+        updating.delete()
     }
 
     // ---------- Games ----------
@@ -571,7 +697,11 @@ class PocketVibe private constructor(private val context: Context) {
         path == "/api/info" -> Response.json(info())
         path == "/api/screens" -> Response.json(JSONObject().put("screens", JSONObject.NULL).put("primary", 0))
         path == "/api/saves" -> Response.json(JSONArray())
-        path == "/api/update" -> Response.json(JSONObject().put("current", version).put("available", false))
+        path == "/api/update" -> try {
+            Response.json(checkUpdate(force = "force" in request.query))
+        } catch (e: Exception) {
+            Response.error(e.message ?: e.toString(), 502)
+        }
         path == "/api/notice" -> Response.json(JSONObject().put("notice", notice ?: JSONObject.NULL)).also { notice = null }
         path == "/api/jobs" -> Response.json(synchronized(jobs) { JSONObject().apply { for ((gid, job) in jobs) put(gid, JSONObject(job.toString())) } })
         path.startsWith("/api/cover/") -> {
@@ -591,7 +721,14 @@ class PocketVibe private constructor(private val context: Context) {
                 quit()
                 return Response.json(JSONObject().put("ok", true))
             }
-            "/api/update/install", "/api/saves/backup" -> return Response.error("not on Android yet", 400)
+            "/api/update/install" -> {
+                if (jobState(APP_JOB) !in ACTIVE) {
+                    setJob(APP_JOB, "queued", 0.0)
+                    pool.execute { installUpdate() }
+                }
+                return Response.json(JSONObject().put("ok", true))
+            }
+            "/api/saves/backup" -> return Response.error("not on Android yet", 400)
         }
         val parts = path.trim('/').split('/')
         val action = parts.getOrNull(1)
@@ -624,6 +761,17 @@ class PocketVibe private constructor(private val context: Context) {
             else -> Response.error("unknown action", 404)
         }
     }
+}
+
+/** Whether version a is newer than b ("0.6.10" > "0.6.9"). */
+private fun newer(a: String, b: String): Boolean {
+    val parts = { v: String -> Regex("\\d+").findAll(v).take(3).map { it.value.toInt() }.toList() }
+    val (x, y) = parts(a) to parts(b)
+    for (i in 0 until maxOf(x.size, y.size)) {
+        val d = x.getOrElse(i) { 0 } - y.getOrElse(i) { 0 }
+        if (d != 0) return d > 0
+    }
+    return false
 }
 
 /** PNG by its signature, else JPEG, as the handheld decides. */
