@@ -23,9 +23,25 @@ android {
         versionName = appVersion
     }
 
+    // Releases are signed with the key android/release.sh hands over in the
+    // environment; it never lives in the repository. Without it a release
+    // build comes out unsigned.
+    val keystore = System.getenv("POCKETVIBE_KEYSTORE")
+    signingConfigs {
+        create("release") {
+            if (keystore != null) {
+                storeFile = file(keystore)
+                storePassword = System.getenv("POCKETVIBE_KEYSTORE_PASSWORD")
+                keyAlias = "pocketvibe"
+                keyPassword = System.getenv("POCKETVIBE_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (keystore != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

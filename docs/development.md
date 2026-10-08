@@ -112,6 +112,13 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 `adb logcat -s PocketVibe` shows the pages' console. A debug build can be inspected from
 `chrome://inspect` on the computer.
 
+`android/release.sh` builds the signed APK; with `--publish` it creates the GitHub release
+`android-v<version>`, never marked latest, so `releases/latest` stays the handheld app. The
+release key is `~/.config/pocketvibe/android-release.keystore`, its password in the macOS
+Keychain as `pocketvibe-android-keystore`. Keep a copy of both somewhere safe: an APK signed
+with another key cannot update the installed app. A debug build is signed with another key, so
+it has to be removed before the release can be installed.
+
 ## The store
 
 ```sh

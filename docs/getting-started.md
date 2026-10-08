@@ -22,6 +22,22 @@ Over Wi-Fi this takes about two minutes, and it happens only once.
   <img src="screenshots/first-run.png" alt="The first start downloading the game engine, with a progress bar" width="360">
 </p>
 
+### On an Android handheld
+
+PocketVibe is also an Android app, made for handhelds such as the Anbernic RG Rotate and the
+Retroid Pocket. It needs Android 10 or newer and an up-to-date Android System WebView
+(version 94 or later; update it from the Play Store if games do not start).
+
+1. On the handheld, open the [Android release](https://github.com/cobanov/pocketvibe/releases/tag/android-v0.6.0)
+   in the browser and download `PocketVibe-0.6.0.apk`.
+2. Open the download. When Android asks, allow the browser (or your file manager) to install
+   apps, then tap **Install**.
+3. Start **PocketVibe** from the app list.
+
+The buttons work as on the other handhelds. Hold **Start + Select**, or press Android's back
+button, to leave a game. A newer version installs over the old one and keeps your games and
+saves.
+
 ### Using it
 
 PocketVibe opens on your **Library**. **L** and **R** switch between Library, **Store** and
