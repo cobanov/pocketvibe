@@ -714,7 +714,7 @@ function renderHints() {
     const g = detailGame();
     const installed = state.library.some((l) => l.id === g?.id);
     if (g && !downloading(g.id)) parts.push(hint('A', g.update ? t('update') : installed ? t('play') : t('download')));
-    if (installed) parts.push(hint('Y', t('remove')));
+    if (installed && !downloading(g.id)) parts.push(hint('Y', t('remove')));
     parts.push(hint('B', t('back')));
   } else if (state.tab === 'settings') {
     const id = state.settingRows[state.focus.settings] ?? '';
@@ -815,16 +815,19 @@ async function pollJobs() {
     const before = state.jobs;
     state.jobs = await api('/api/jobs');
     for (const [id, job] of Object.entries(state.jobs)) {
+      // Only report what changed while this page was watching: a job that
+      // ended before the launcher loaded was reported back then.
+      const changed = before[id] && before[id].state !== job.state;
       if (id === '__app__') {
-        if (before[id]?.state !== job.state && job.state === 'error') toast(t('updateFailed', { error: job.error }));
+        if (changed && job.state === 'error') toast(t('updateFailed', { error: job.error }));
         continue;
       }
-      if (before[id]?.state !== job.state && job.state === 'done') {
+      if (changed && job.state === 'done') {
         await Promise.all([refreshLibrary(), refreshStore()]);
         const game = state.store.games.find((g) => g.id === id);
         if (!downloads.has(id)) toast(t('readyToPlay', { title: game?.title ?? id }));
       }
-      if (before[id]?.state !== job.state && job.state === 'error') toast(t('downloadFailed', { error: job.error }));
+      if (changed && job.state === 'error') toast(t('downloadFailed', { error: job.error }));
     }
     if (!keyboard.active) render();
     const active = Object.values(state.jobs).some((j) => ACTIVE_JOB.includes(j.state));
@@ -971,7 +974,7 @@ function onButton(button) {
       if (downloading(g.id)) return;
       if (!installed || g.update) install(g);
       else play(g);
-    } else if (button === 'Y' && g && installed) {
+    } else if (button === 'Y' && g && installed && !downloading(g.id)) {
       confirmRemove(g);
     }
     return;
