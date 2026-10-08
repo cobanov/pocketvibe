@@ -1,5 +1,5 @@
 {
-  "version": "0.6.3",
+  "version": "0.6.4",
   "store_url": "https://pocketvibe-store.mertcobanov.workers.dev/catalog.json",
   "update_url": "https://api.github.com/repos/cobanov/pocketvibe/releases?per_page=20",
   "runtime": {
