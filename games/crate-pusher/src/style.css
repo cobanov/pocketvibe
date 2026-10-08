@@ -1,0 +1,572 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is always 720x480
+   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: 720px;
+  height: 480px;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 720px;
+  height: 480px;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+
+/* Game HUD */
+
+#bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 16px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+#bar small {
+  font-size: 18px;
+  color: #bfe9e2;
+}
+
+#bar b {
+  display: inline-block;
+  font-size: 28px;
+}
+
+#bar .right {
+  text-align: right;
+}
+
+#name {
+  font-size: 18px;
+  color: #ffd76a;
+}
+
+#par {
+  font-size: 20px;
+}
+
+#moves {
+  min-width: 2ch;
+  color: #ffd76a;
+}
+
+#moves.pop-a {
+  animation: bump-a 0.22s ease-out;
+}
+
+#moves.pop-b {
+  animation: bump-b 0.22s ease-out;
+}
+
+@keyframes bump-a {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes bump-b {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+#hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #dfe6ff;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Title menu: logo, the level grid and the selected level's details. */
+
+#menu {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 8px;
+  padding: 10px 14px 10px;
+  border-radius: 14px;
+  background: rgba(20, 24, 52, 0.8);
+  box-shadow: 0 0 0 3px rgba(90, 209, 196, 0.55);
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+}
+
+.menu-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.logo {
+  font-size: 38px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #ffc93c;
+  text-shadow: 0 3px 0 #a8551f, 0 5px 0 #000;
+}
+
+.logo span {
+  margin-left: 12px;
+  color: #5ad1c4;
+  text-shadow: 0 3px 0 #1f6e66, 0 5px 0 #000;
+}
+
+.menu-press {
+  text-align: right;
+  font-size: 22px;
+}
+
+.small {
+  font-size: 18px;
+  color: #cfd8f5;
+}
+
+.blink {
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+}
+
+.tile {
+  position: relative;
+  height: 44px;
+  border-radius: 8px;
+  background: #3b4775;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.tile b {
+  font-size: 20px;
+}
+
+.tile span {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.tile span:empty {
+  display: none;
+}
+
+.tile.done {
+  background: #2a8f88;
+}
+
+.tile.done b {
+  font-size: 15px;
+  color: #c9fff6;
+  text-shadow: none;
+}
+
+.tile.star {
+  background: #c98a12;
+}
+
+.tile.star b {
+  color: #fff3c4;
+}
+
+.tile.locked {
+  background: #262c48;
+  color: #6f78a0;
+}
+
+.tile.locked b {
+  font-size: 15px;
+  text-shadow: none;
+  margin-bottom: 3px;
+}
+
+/* A little padlock drawn with two boxes. */
+.tile.locked::before {
+  content: '';
+  width: 10px;
+  height: 7px;
+  border: 3px solid #6f78a0;
+  border-bottom: none;
+  border-radius: 7px 7px 0 0;
+  order: 1;
+}
+
+.tile.locked::after {
+  content: '';
+  width: 18px;
+  height: 11px;
+  border-radius: 3px;
+  background: #6f78a0;
+  order: 2;
+}
+
+.tile.locked b {
+  order: 0;
+}
+
+.tile.sel {
+  box-shadow: 0 0 0 3px #fff, 0 0 12px 3px rgba(255, 255, 255, 0.6);
+  animation: sel 0.9s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes sel {
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+.tile.no {
+  animation: no 0.35s ease-out;
+}
+
+@keyframes no {
+  20% {
+    transform: translateX(-6px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+  80% {
+    transform: translateX(-3px);
+  }
+}
+
+.menu-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 8px;
+  font-size: 20px;
+}
+
+#info small {
+  font-size: 18px;
+  color: #cfd8f5;
+}
+
+#info .gold {
+  color: #ffd76a;
+}
+
+#summary {
+  font-size: 18px;
+  color: #cfd8f5;
+}
+
+/* Floating "2/4" over a crate that found its spot. */
+.popup {
+  position: absolute;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+.popup.gold {
+  font-size: 30px;
+  color: #ffd76a;
+}
+
+.popup.show {
+  animation: rise 0.9s ease-out forwards;
+}
+
+@keyframes rise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -30%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -80%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -190%) scale(1);
+  }
+}
+
+/* Banners and callouts */
+
+#banner,
+#callout {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  font-weight: 800;
+  text-shadow: 0 3px 0 #000, 0 0 8px #000;
+}
+
+#banner {
+  top: 150px;
+}
+
+#callout {
+  top: 380px;
+  font-size: 24px;
+  color: #fff;
+}
+
+/* On the title screen callouts sit above the menu. */
+#menu:not([hidden]) ~ #callout {
+  top: 178px;
+}
+
+#callout .warn {
+  color: #ff8a80;
+}
+
+#callout .gold {
+  color: #ffd76a;
+}
+
+#banner .pop {
+  animation: banner 1.6s ease-out forwards;
+}
+
+#banner .big {
+  font-size: 46px;
+  letter-spacing: 3px;
+  color: #ffc93c;
+}
+
+#banner .sub {
+  font-size: 24px;
+  color: #fff;
+}
+
+#callout .pop {
+  animation: callout 1.8s ease-out forwards;
+}
+
+@keyframes banner {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  22% {
+    transform: scale(1);
+  }
+  78% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes callout {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.6);
+  }
+  10% {
+    opacity: 1;
+    transform: translateY(0) scale(1.12);
+  }
+  18% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+/* Panels: pause and level clear */
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 36px;
+  border-radius: 14px;
+  background: rgba(20, 24, 52, 0.82);
+  box-shadow: 0 0 0 3px rgba(90, 209, 196, 0.6);
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+  animation: panel 0.3s ease-out;
+}
+
+@keyframes panel {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  70% {
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.panel .title {
+  font-size: 46px;
+  letter-spacing: 2px;
+  color: #ffc93c;
+}
+
+.panel .gold {
+  color: #ffd76a;
+}
+
+.panel .star {
+  font-size: 34px;
+  color: #ffc93c;
+}
+
+/* The play bar fills the top, so the perf overlay goes bottom right. */
+#perf {
+  top: auto;
+  bottom: 6px;
+}

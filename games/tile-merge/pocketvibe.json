@@ -1,0 +1,16 @@
+{
+  "id": "tile-merge",
+  "title": "Tile Merge",
+  "author": "cobanov",
+  "version": "1.0.0",
+  "description": "Slide chunky number tiles around a little table board and merge equal pairs. Make 2048, then keep going.",
+  "genre": "Puzzle",
+  "controls": {
+    "D-pad": "Slide the tiles",
+    "A": "Start / continue / keep going / play again",
+    "B": "Back to title (paused, 2048 or game over)",
+    "X": "Undo the last move",
+    "Y": "New game (title screen)",
+    "START": "Pause / resume"
+  }
+}

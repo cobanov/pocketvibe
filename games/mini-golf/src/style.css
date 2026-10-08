@@ -1,0 +1,536 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is always 720x480
+   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: 720px;
+  height: 480px;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 720px;
+  height: 480px;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+/* Game HUD */
+
+.hud-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 16px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #12361a, 0 0 6px rgba(0, 0, 0, 0.55);
+}
+
+.hud-top[hidden] {
+  display: none;
+}
+
+.hud-top .right {
+  text-align: right;
+}
+
+.hud-top .big {
+  font-size: 22px;
+  color: #e8ffd8;
+}
+
+.hud-top .big b {
+  display: inline-block;
+  font-size: 34px;
+  color: #fff;
+}
+
+.hud-top .big small {
+  font-size: 20px;
+  color: #c9f0b8;
+}
+
+.hud-top .sub {
+  margin-top: -2px;
+  font-size: 18px;
+  color: #ffe58a;
+}
+
+.hud-top .sub b {
+  font-size: 22px;
+}
+
+#stroke {
+  transform-origin: right center;
+}
+
+#stroke.bump {
+  animation: bump 0.25s ease-out;
+}
+
+@keyframes bump {
+  0% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* The power meter: a gradient revealed from the bottom. */
+#power {
+  position: absolute;
+  left: 22px;
+  top: 128px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+#power.on {
+  opacity: 1;
+  transform: none;
+}
+
+#power .bar {
+  position: relative;
+  width: 26px;
+  height: 200px;
+  border: 3px solid #fff;
+  border-radius: 8px;
+  background: rgba(10, 30, 14, 0.55);
+  box-shadow: 0 2px 0 #12361a, 0 0 6px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+#power .fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, #4fe06a 0%, #d6f24a 45%, #ffc12e 70%, #ff4f4f 100%);
+  clip-path: inset(100% 0 0 0);
+}
+
+/* Quarter marks over the fill. */
+#power .bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to top, transparent 0 calc(25% - 2px), rgba(255, 255, 255, 0.4) calc(25% - 2px) 25%);
+}
+
+#power .last {
+  position: absolute;
+  z-index: 1;
+  left: -2px;
+  right: -2px;
+  height: 3px;
+  margin-bottom: -1px;
+  background: #fff;
+  box-shadow: 0 0 3px #000;
+}
+
+#power .label {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #12361a, 0 0 4px #000;
+}
+
+#hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  text-align: center;
+  font-size: 19px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #12361a, 0 0 5px #000;
+}
+
+/* Banners: "HOLE 3", "BIRDIE!" */
+#banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 120px;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+#banner .pop {
+  animation: banner 2.2s ease-out forwards;
+}
+
+#banner .pop.stay {
+  animation: banner-stay 0.45s ease-out forwards;
+}
+
+#banner .big {
+  font-size: 54px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #ffe14d;
+  text-shadow: 0 4px 0 #b5520f, 0 7px 0 #000, 0 0 12px rgba(0, 0, 0, 0.5);
+}
+
+#banner .ace .big {
+  font-size: 62px;
+  color: #fff;
+  text-shadow: 0 4px 0 #e0337a, 0 7px 0 #000, 0 0 16px #ff8ad0;
+}
+
+#banner .meh .big {
+  color: #d8ecff;
+  text-shadow: 0 4px 0 #2d5c8a, 0 7px 0 #000;
+}
+
+#banner .sub {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #12361a, 0 0 6px #000;
+}
+
+@keyframes banner {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  20% {
+    transform: scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.05) translateY(-14px);
+  }
+}
+
+@keyframes banner-stay {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Floating text over the course. */
+.popup {
+  position: absolute;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  font-weight: 900;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 5px #000;
+  pointer-events: none;
+}
+
+.popup.bad {
+  color: #8fdcff;
+}
+
+.popup.warn {
+  color: #ffd23f;
+}
+
+.popup.show {
+  animation: rise 1.1s ease-out forwards;
+}
+
+@keyframes rise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -30%) scale(0.6);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -80%) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -190%) scale(1);
+  }
+}
+
+#flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+#flash.water {
+  background: #9fe4ff;
+  animation: flash 0.5s ease-out;
+}
+
+#flash.gold {
+  background: #fff6c2;
+  animation: flash 0.6s ease-out;
+}
+
+@keyframes flash {
+  from {
+    opacity: 0.7;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+#message.high {
+  align-items: flex-start;
+  padding-top: 46px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 30px;
+  border-radius: 14px;
+  background: rgba(14, 48, 26, 0.72);
+  font-size: 24px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+}
+
+.panel .title {
+  font-size: 50px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #ffe14d;
+  text-shadow: 0 4px 0 #2f8f3a, 0 7px 0 #0b2410;
+}
+
+.panel .record {
+  font-size: 30px;
+  font-weight: 900;
+  color: #7dff8a;
+}
+
+.panel .small {
+  font-size: 18px;
+  color: #dff5e2;
+}
+
+.panel .score {
+  font-size: 26px;
+}
+
+.panel .score b {
+  color: #ffe14d;
+}
+
+/* Scorecard */
+.card {
+  border-collapse: collapse;
+  font-size: 20px;
+  font-weight: 800;
+  text-shadow: none;
+  color: #233;
+  background: #fffaf0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 3px 0 #0b2410;
+}
+
+.card th,
+.card td {
+  min-width: 36px;
+  height: 34px;
+  padding: 0 4px;
+  border: 1px solid #d9cfb8;
+  text-align: center;
+}
+
+.card th {
+  min-width: 52px;
+  background: #2f8f3a;
+  color: #fff;
+  font-size: 18px;
+}
+
+.card tr:first-child td {
+  background: #e9f5df;
+}
+
+.card .pars td {
+  color: #6a7a6a;
+}
+
+.card td.now {
+  background: #fff1a8 !important;
+}
+
+.card span {
+  display: inline-block;
+  min-width: 26px;
+  line-height: 26px;
+}
+
+.card .under {
+  border-radius: 50%;
+  background: #ff5a5f;
+  color: #fff;
+}
+
+.card .ace {
+  border-radius: 50%;
+  background: #ffc12e;
+  color: #fff;
+  box-shadow: 0 0 0 2px #ff5a5f;
+}
+
+.card .over {
+  color: #3d6fb8;
+}
+
+/* The stats sit top right, so the perf overlay goes bottom right. */
+#perf {
+  top: auto;
+  bottom: 6px;
+}
+
+/* A quick fade when the scene jumps to another hole. */
+#flash.cut {
+  background: #a9def7;
+  animation: flash-cut 0.5s ease-out;
+}
+
+@keyframes flash-cut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Paused: banners and popups hold where they are. */
+.frozen * {
+  animation-play-state: paused !important;
+}

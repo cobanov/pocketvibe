@@ -1,0 +1,14 @@
+{
+  "id": "pulse-dash",
+  "title": "Pulse Dash",
+  "author": "cobanov",
+  "version": "1.0.0",
+  "description": "A neon rhythm runner: your cube slides to a synthesized beat, and every spike, block, pad and ring sits on the music. Three levels, one touch and you start again.",
+  "genre": "Platformer",
+  "controls": {
+    "D-pad": "Left / right: choose a level · UP: jump",
+    "A": "Jump (hold to keep jumping), jump again on rings, start",
+    "B": "Back to title (paused, after a crash or a finished level)",
+    "START": "Pause / resume"
+  }
+}

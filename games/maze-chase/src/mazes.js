@@ -1,0 +1,102 @@
+// The three maze layouts. Each is written as its left half (columns 0 to 15,
+// column 15 is the middle) and mirrored, so every maze is symmetric. Pure
+// data, no three.js here.
+//
+//   #  wall          .  dot           o  power core
+//   (space) path without a dot        -  base door (drones only)
+//   B  inside the drone base
+//
+// All mazes share the base, the ring of paths around it and the player's
+// start cell, so only the walls and tunnels change.
+
+export const W = 31;
+export const H = 19;
+
+export const BASE_X = 15; // middle column
+export const DOOR_Y = 6;
+export const EXIT_Y = 5; // the cell above the door, where drones enter the maze
+export const HOME_Y = 8; // middle row inside the base
+export const START_X = 15;
+export const START_Y = 13;
+
+function mirror(half) {
+  return half.map((row) => row + row.slice(0, 15).split('').reverse().join(''));
+}
+
+export const MAZES = [
+  {
+    name: 'Circuit',
+    hue: 0x3d8bff,
+    rows: mirror([
+      '################',
+      '#o...........###',
+      '#.####.#####.###',
+      '#...............',
+      '#.####.#.#######',
+      '#......#...     ',
+      '######.#### ###-',
+      '######.#### #BBB',
+      '######.#### #BBB',
+      '      .     #BBB',
+      '######.#### ####',
+      '######.....     ',
+      '######.#####.###',
+      '#.............. ',
+      '#.##.####.####.#',
+      '#o..............',
+      '#.##.#####.####.',
+      '#...............',
+      '################',
+    ]),
+  },
+  {
+    name: 'Twin Gates',
+    hue: 0x19d9c2,
+    rows: mirror([
+      '################',
+      '#o......#......#',
+      '#.#####.#.####.#',
+      '#...............',
+      '####.#.####.##.#',
+      '    .......     ',
+      '####.###.## ###-',
+      '#....###... #BBB',
+      '#.##.###### #BBB',
+      '#.##.###### #BBB',
+      '#.##.###### ####',
+      '#....#.....     ',
+      '####.#.###.#.###',
+      '    ........... ',
+      '####.###.####.##',
+      '#o..........#...',
+      '#.####.####.###.',
+      '#...............',
+      '################',
+    ]),
+  },
+  {
+    name: 'Lattice',
+    hue: 0xff4fa3,
+    rows: mirror([
+      '################',
+      '#o.........#...#',
+      '#.###.####.#.#.#',
+      '#...............',
+      '#.##.###.######.',
+      '#.##.......     ',
+      '#.####.#### ###-',
+      '#....#..... #BBB',
+      '####.#.#### #BBB',
+      '    .#..... #BBB',
+      '####.#.#### ####',
+      '#....#.....     ',
+      '#.####.####.####',
+      '#.............. ',
+      '###.###.###.##.#',
+      '#o.............#',
+      '#.###.###.###.##',
+      '#...............',
+      '################',
+    ]),
+  },
+];

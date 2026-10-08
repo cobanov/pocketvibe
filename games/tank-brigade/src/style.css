@@ -1,0 +1,554 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #111;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* #frame takes the scaled size in the page layout; #screen is always 720x480
+   inside it and gets scaled with a transform, so HUD pixel values stay valid. */
+#frame {
+  flex: none;
+  box-shadow: 0 0 0 12px #2a2a2a, 0 0 0 14px #444;
+  border-radius: 4px;
+}
+
+#screen {
+  position: relative;
+  width: 720px;
+  height: 480px;
+  overflow: hidden;
+  background: #000;
+  transform-origin: top left;
+}
+
+#screen canvas {
+  display: block;
+  width: 720px;
+  height: 480px;
+}
+
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#perf {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  font: 12px/1.3 ui-monospace, monospace;
+  white-space: pre;
+}
+
+#perf.over {
+  color: #ff6b6b;
+}
+
+#perf:empty {
+  display: none;
+}
+
+#legend {
+  margin: 0;
+  font-size: 13px;
+  color: #999;
+}
+
+kbd {
+  padding: 1px 5px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  font: 12px ui-monospace, monospace;
+  color: #ddd;
+}
+
+/* On the device the screen is the whole display. */
+body.handheld {
+  background: #000;
+  cursor: none;
+}
+
+body.handheld #frame {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+body.handheld #legend {
+  display: none;
+}
+
+
+/* Game HUD */
+
+.side {
+  position: absolute;
+  top: 10px;
+  width: 104px;
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: rgba(10, 16, 12, 0.66);
+  box-shadow: 0 0 0 2px rgba(242, 197, 61, 0.35);
+  font-weight: 700;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+.side[hidden] {
+  display: none;
+}
+
+.side.left {
+  left: 8px;
+}
+
+.side.right {
+  right: 8px;
+}
+
+.side .label {
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: #f2c53d;
+}
+
+.side .value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 28px;
+  color: #fff;
+}
+
+.side .value.dim {
+  font-size: 22px;
+  color: #cfd8cf;
+}
+
+#score {
+  display: inline-block;
+  transform-origin: left center;
+}
+
+#score.bump,
+#lives.bump {
+  animation: bump 0.25s ease-out;
+}
+
+@keyframes bump {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.side .stars {
+  font-size: 24px;
+  letter-spacing: 1px;
+  color: #ffd84a;
+}
+
+/* Enemy tanks still to come: little tank icons, four to a row. */
+#enemies {
+  display: grid;
+  grid-template-columns: repeat(4, 20px);
+  gap: 6px 5px;
+  margin-top: 6px;
+}
+
+/* A tank seen from above: light hull, dark tracks, a ringed turret and gun. */
+#enemies i,
+.tank-icon,
+.tally .kind {
+  position: relative;
+  display: inline-block;
+  width: 20px;
+  height: 18px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: #b9c3cc;
+  box-shadow: inset 4px 0 0 #2a2c30, inset -4px 0 0 #2a2c30, 0 2px 0 #000;
+  transition: transform 0.25s ease-in, opacity 0.25s ease-in;
+}
+
+#enemies i::before,
+.tank-icon::before,
+.tally .kind::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 2px solid #2a2c30;
+  border-radius: 50%;
+  background: #f2f5f7;
+}
+
+#enemies i::after,
+.tank-icon::after,
+.tally .kind::after {
+  content: '';
+  position: absolute;
+  left: 8.5px;
+  top: -4px;
+  width: 3px;
+  height: 9px;
+  background: #2a2c30;
+}
+
+#enemies i.gone {
+  transform: scale(0);
+  opacity: 0;
+}
+
+.tank-icon {
+  margin-top: 0;
+  background: #f2c53d;
+}
+
+.tank-icon::before {
+  background: #ffe9a6;
+}
+
+/* A small flag on a pole next to the stage number. */
+.flag {
+  position: relative;
+  width: 4px;
+  height: 26px;
+  border-radius: 2px;
+  background: #d8d8d8;
+  box-shadow: 0 2px 0 #000;
+  margin-right: 12px;
+}
+
+.flag::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  border-left: 14px solid #e8483c;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+}
+
+.timer {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.timer.shield {
+  color: #7fe8ff;
+}
+
+.timer.freeze {
+  color: #cfeeff;
+}
+
+.timer.wall {
+  color: #c8d6e6;
+}
+
+/* Floating score over the field. */
+.pop {
+  position: absolute;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+.pop.gold {
+  font-size: 26px;
+  color: #ffd84a;
+}
+
+.pop.show {
+  animation: rise 0.9s ease-out forwards;
+}
+
+@keyframes rise {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -30%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -80%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -190%) scale(1);
+  }
+}
+
+#banner,
+#callout {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  font-weight: 800;
+  text-shadow: 0 3px 0 #000, 0 0 8px #000;
+}
+
+#banner {
+  top: 168px;
+}
+
+#callout {
+  top: 296px;
+  font-size: 28px;
+}
+
+#banner .pop-in {
+  animation: banner 1.9s ease-out forwards;
+}
+
+#banner .pop-in.stay {
+  animation: banner-stay 0.5s ease-out forwards;
+}
+
+#banner .big {
+  font-size: 48px;
+  letter-spacing: 3px;
+  color: #ffd84a;
+}
+
+#banner .stay .big {
+  font-size: 56px;
+  color: #ff5a46;
+}
+
+#banner .sub {
+  font-size: 22px;
+  color: #fff;
+}
+
+#callout .pop-in {
+  animation: callout 1.3s ease-out forwards;
+}
+
+@keyframes banner {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  22% {
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+/* GAME OVER rises into place and stays. */
+@keyframes banner-stay {
+  0% {
+    opacity: 0;
+    transform: translateY(120px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes callout {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  25% {
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+
+#flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  box-shadow: inset 0 0 70px 18px rgba(255, 50, 40, 0.85);
+}
+
+#flash.show {
+  animation: hurt 0.7s ease-out forwards;
+}
+
+@keyframes hurt {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+#hud.paused #banner .pop-in,
+#hud.paused #callout .pop-in,
+#hud.paused .pop,
+#hud.paused #flash {
+  animation-play-state: paused;
+}
+
+#message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#message:empty {
+  display: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 34px;
+  border-radius: 12px;
+  background: rgba(12, 20, 14, 0.74);
+  box-shadow: 0 0 0 3px rgba(242, 197, 61, 0.6);
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 0 #000;
+}
+
+.panel .title {
+  font-size: 46px;
+  letter-spacing: 3px;
+  color: #ffd84a;
+}
+
+.panel .small {
+  font-size: 18px;
+  color: #d8e2d6;
+}
+
+.panel .choice {
+  color: #9fe8ff;
+}
+
+/* The stage tally: one row per enemy kind. */
+.tally {
+  gap: 6px;
+  padding: 16px 30px;
+}
+
+.tally .title {
+  margin-bottom: 4px;
+  font-size: 36px;
+}
+
+.tally .row {
+  display: grid;
+  grid-template-columns: 26px 96px 36px 72px 64px;
+  align-items: center;
+  gap: 6px;
+  font-size: 22px;
+  text-align: left;
+}
+
+.tally .row .n,
+.tally .row .pts {
+  text-align: right;
+}
+
+.tally .row .x {
+  font-size: 18px;
+  color: #cfd8cf;
+}
+
+.tally .kind {
+  margin-top: 0;
+}
+
+.tally .kind.k2 {
+  background: #5fb3d2;
+}
+
+.tally .kind.k3 {
+  background: #b07fc8;
+}
+
+.tally .kind.k4 {
+  background: #4aa652;
+}
+
+.tally .total {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 2px solid rgba(242, 197, 61, 0.5);
+}
+
+.tally .total .name {
+  grid-column: 2;
+}
+
+.tally .total .n {
+  grid-column: 3;
+}
+
+.tally .bonus {
+  min-height: 24px;
+  font-size: 20px;
+  color: #8dff86;
+}
+
+/* The side panels fill the top corners, so the perf overlay goes bottom right. */
+#perf {
+  top: auto;
+  bottom: 6px;
+}

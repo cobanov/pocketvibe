@@ -1,0 +1,14 @@
+{
+  "id": "tower-stack",
+  "title": "Tower Stack",
+  "author": "cobanov",
+  "version": "1.0.0",
+  "description": "Drop sliding slabs onto a rising tower: the overhang is sliced off, perfect drops snap into place and grow the slab back. Climb from day into a starry night.",
+  "genre": "Arcade",
+  "controls": {
+    "D-pad": "UP drops the slab, like A",
+    "A": "Drop the slab; start / play again",
+    "B": "Back to title (paused or game over)",
+    "START": "Pause / resume"
+  }
+}
