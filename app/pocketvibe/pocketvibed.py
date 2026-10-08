@@ -613,18 +613,33 @@ def gamepad_devices():
 
 
 def watch_buttons():
-    """Start + Select, read straight from the kernel's input events."""
-    fds = [os.open(path, os.O_RDONLY | os.O_NONBLOCK) for path in gamepad_devices()]
+    """Start + Select, read straight from the kernel's input events. Gamepads
+    that come and go (USB, Bluetooth) are picked up every few seconds."""
     event = struct.Struct('llHHi')  # struct input_event on 64-bit Linux
+    fds = {}  # device path -> open file descriptor
+    scanned = 0.0
     held = set()
     since = None
     fired = None
     while True:
-        ready, _, _ = select.select(fds, [], [], 0.05)
+        if time.monotonic() - scanned > 5:
+            scanned = time.monotonic()
+            for path in gamepad_devices():
+                if path not in fds:
+                    try:
+                        fds[path] = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+                    except OSError:
+                        pass
+        ready, _, _ = select.select(list(fds.values()), [], [], 0.05)
         for fd in ready:
             try:
                 data = os.read(fd, event.size * 64)
             except BlockingIOError:
+                continue
+            except OSError:  # unplugged
+                os.close(fd)
+                fds = {path: f for path, f in fds.items() if f != fd}
+                held.clear()
                 continue
             for offset in range(0, len(data) - event.size + 1, event.size):
                 _, _, kind, code, value = event.unpack_from(data, offset)
