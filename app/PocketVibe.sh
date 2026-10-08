@@ -20,14 +20,15 @@ if [ -f "$SEED/pocketvibed.py" ]; then
   python3 "$APP/add-to-gamelist.py" >/dev/null 2>&1
 fi
 
-# Early test setups kept the runtime in /storage/debian.
-if [ ! -d "$RUNTIME" ] && [ -x /storage/debian/usr/bin/cog ]; then
-  mv /storage/debian "$RUNTIME"
-fi
-
 # The browser runtime is downloaded on the first run.
 if [ ! -x "$RUNTIME/usr/bin/cog" ]; then
-  foot --fullscreen --term=xterm-256color sh "$APP/setup.sh"
+  # ROCKNIX has terminfo for xterm only, which dialog needs. The palette
+  # gives setup.dialogrc PocketVibe's colors.
+  LC_ALL=en_US.UTF-8 foot --fullscreen --term=xterm -o font=monospace:size=13 \
+    -o colors-dark.background=0f1016 -o colors-dark.foreground=f2f2f5 -o colors-dark.regular0=0f1016 \
+    -o colors-dark.regular4=1a1c26 -o colors-dark.regular3=ffc83d -o colors-dark.bright3=ffc83d \
+    -o colors-dark.regular7=f2f2f5 -o colors-dark.bright7=ffffff \
+    sh "$APP/setup.sh"
   [ -x "$RUNTIME/usr/bin/cog" ] || exit 1
 fi
 

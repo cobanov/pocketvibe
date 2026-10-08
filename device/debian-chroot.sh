@@ -1,6 +1,9 @@
 #!/bin/sh
-# Debian arm64 environment on the handheld, used for the feasibility test.
+# Debian arm64 environment on the handheld, from the feasibility test. It is
+# where PocketVibe's runtime (WPE WebKit + Cog) was built; the app itself runs
+# the runtime with app/pocketvibe/runtime.py, not with this chroot.
 # It lives in /storage/debian and never touches ROCKNIX's own system.
+# Unmount when done: never delete /storage/debian while /dev is bound inside.
 #
 #   debian-chroot.sh fetch          download Debian (trixie, arm64) into /storage/debian
 #   debian-chroot.sh mount          bind /dev, /proc, /sys and the Wayland/Pulse runtime dir
@@ -93,6 +96,7 @@ do_umount() {
 
 run() {
   do_mount
+  trap do_umount EXIT
   chroot "$ROOT" /usr/bin/env -i \
     HOME=/root \
     PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
