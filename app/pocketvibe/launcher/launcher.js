@@ -8,8 +8,12 @@ const KEYMAP = {
   Enter: 'START', ShiftLeft: 'SELECT', ShiftRight: 'SELECT',
 };
 const REPEAT = new Set(['UP', 'DOWN', 'LEFT', 'RIGHT']);
-const COLUMNS = 3;
-const ROWS_VISIBLE = { library: 2, store: 4 };
+const ACTIVE_JOB = ['queued', 'downloading', 'installing'];
+// The two ways a tab can show its games, toggled with Select.
+const LAYOUTS = {
+  grid: { perRow: 3, rowsVisible: 2 },
+  list: { perRow: 1, rowsVisible: 4 },
+};
 
 const ui = {
   content: document.getElementById('content'),
@@ -23,6 +27,7 @@ const ui = {
 const state = {
   tab: load('tab', 'library'),
   focus: load('focus', { library: 0, store: 0 }),
+  layout: load('layout', { library: 'grid', store: 'list' }),
   library: [],
   store: { online: true, games: [] },
   storeLoaded: false,
@@ -45,6 +50,7 @@ function save() {
   try {
     localStorage.setItem('tab', JSON.stringify(state.tab));
     localStorage.setItem('focus', JSON.stringify(state.focus));
+    localStorage.setItem('layout', JSON.stringify(state.layout));
   } catch {
     // Not important if it fails.
   }
@@ -107,7 +113,7 @@ function sizeText(bytes) {
 
 function stateHtml(game) {
   const job = state.jobs[game.id];
-  if (job && ['queued', 'downloading', 'installing'].includes(job.state)) {
+  if (job && ACTIVE_JOB.includes(job.state)) {
     const label = job.state === 'installing' ? 'Installing' : 'Downloading';
     return `<div class="state">${label}<div class="bar"><span style="width:${Math.round(job.progress * 100)}%"></span></div></div>`;
   }
@@ -124,6 +130,48 @@ function renderStatus() {
   parts.push(s.wifi ? 'Wi-Fi' : 'No Wi-Fi');
   if (s.battery !== null) parts.push(`${s.charging ? '⚡' : ''}${s.battery}%`);
   ui.status.textContent = parts.join('   ');
+}
+
+function layout() {
+  return LAYOUTS[state.layout[state.tab]] ?? LAYOUTS.list;
+}
+
+// Small label over a store card's cover: download progress or install state.
+function badgeHtml(game) {
+  const job = state.jobs[game.id];
+  if (job && ACTIVE_JOB.includes(job.state)) {
+    return `<div class="bar overlay"><span style="width:${Math.round(job.progress * 100)}%"></span></div>`;
+  }
+  if (job?.state === 'error') return `<div class="badge error">Failed</div>`;
+  if (game.update) return `<div class="badge update">Update</div>`;
+  if (game.installed) return `<div class="badge installed">Installed</div>`;
+  return '';
+}
+
+function cardHtml(game, focused) {
+  const store = state.tab === 'store';
+  const meta = store ? [game.genre, sizeText(game.size)] : [game.genre || game.author];
+  return `
+    <div class="card${focused ? ' focus' : ''}" data-id="${game.id}">
+      <div class="cover-wrap">${coverHtml(game)}${store ? badgeHtml(game) : ''}</div>
+      <div class="title">${escapeHtml(game.title)}</div>
+      <div class="meta">${escapeHtml(meta.filter(Boolean).join(' · '))}</div>
+    </div>`;
+}
+
+function rowHtml(game, focused) {
+  const store = state.tab === 'store';
+  const meta = store ? [game.author, game.version && `v${game.version}`] : [game.genre, game.author];
+  const right = store ? stateHtml(game) : `<div class="state">${game.version ? `v${escapeHtml(game.version)}` : ''}</div>`;
+  return `
+    <div class="row${focused ? ' focus' : ''}" data-id="${game.id}">
+      ${coverHtml(game)}
+      <div class="info">
+        <div class="title">${escapeHtml(game.title)}</div>
+        <div class="meta">${escapeHtml(meta.filter(Boolean).join(' · '))}</div>
+      </div>
+      ${right}
+    </div>`;
 }
 
 function items() {
@@ -181,28 +229,17 @@ function render() {
   const focus = Math.min(state.focus[state.tab], Math.max(list.length - 1, 0));
   state.focus[state.tab] = focus;
 
-  if (state.tab === 'library') {
-    ui.content.innerHTML = list.length
-      ? `<div class="grid">${list
-          .map((g, i) => `<div class="card${i === focus ? ' focus' : ''}" data-id="${g.id}">${coverHtml(g)}<div class="title">${escapeHtml(g.title)}</div></div>`)
-          .join('')}</div>`
-      : `<div class="empty">No games yet.<br>Press R to open the Store.</div>`;
-  } else {
-    ui.content.innerHTML = !state.storeLoaded
-      ? `<div class="empty">Loading the store...</div>`
-      : list.length
-        ? `<div class="list">${list
-            .map((g, i) => `
-              <div class="row${i === focus ? ' focus' : ''}" data-id="${g.id}">
-                ${coverHtml(g)}
-                <div class="info">
-                  <div class="title">${escapeHtml(g.title)}</div>
-                  <div class="meta">${escapeHtml(g.author || '')}${g.version ? ` · v${escapeHtml(g.version)}` : ''}</div>
-                </div>
-                ${stateHtml(g)}
-              </div>`)
-            .join('')}</div>`
+  if (state.tab === 'store' && !state.storeLoaded) {
+    ui.content.innerHTML = `<div class="empty">Loading the store...</div>`;
+  } else if (!list.length) {
+    ui.content.innerHTML =
+      state.tab === 'library'
+        ? `<div class="empty">No games yet.<br>Press R to open the Store.</div>`
         : `<div class="empty">${state.store.online ? 'The store is empty.' : 'Cannot reach the store.<br>Check the Wi-Fi connection.'}</div>`;
+  } else if (state.layout[state.tab] === 'grid') {
+    ui.content.innerHTML = `<div class="grid">${list.map((g, i) => cardHtml(g, i === focus)).join('')}</div>`;
+  } else {
+    ui.content.innerHTML = `<div class="list">${list.map((g, i) => rowHtml(g, i === focus)).join('')}</div>`;
   }
   scrollToFocus();
   loadCovers();
@@ -210,13 +247,14 @@ function render() {
 }
 
 function scrollToFocus() {
-  const focus = state.focus[state.tab];
-  const perRow = state.tab === 'library' ? COLUMNS : 1;
-  const row = Math.floor(focus / perRow);
-  const firstVisible = Math.max(0, row - ROWS_VISIBLE[state.tab] + 1);
   const container = ui.content.firstElementChild;
-  if (!container) return;
-  const step = state.tab === 'library' ? 168 : 84; // row height + gap
+  if (!container?.children.length) return;
+  const { perRow, rowsVisible } = layout();
+  const row = Math.floor(state.focus[state.tab] / perRow);
+  const firstVisible = Math.max(0, row - rowsVisible + 1);
+  // One row's height plus the gap, measured from the first two rows.
+  const next = container.children[perRow];
+  const step = next ? next.offsetTop - container.children[0].offsetTop : 0;
   container.style.transform = `translateY(${-firstVisible * step}px)`;
 }
 
@@ -234,10 +272,13 @@ function renderHints() {
     parts.push(hint('B', 'Back'));
   } else if (state.tab === 'library') {
     if (game) parts.push(hint('A', 'Play'), hint('X', 'Info'), hint('Y', 'Remove'));
+    if (game) parts.push(hint('Select', state.layout.library === 'grid' ? 'List' : 'Cards'));
     parts.push(hint('B', 'Quit'));
   } else {
     if (game) parts.push(hint('A', 'Open'));
-    parts.push(hint('X', 'Refresh'), hint('B', 'Quit'));
+    parts.push(hint('X', 'Refresh'));
+    if (game) parts.push(hint('Select', state.layout.store === 'grid' ? 'List' : 'Cards'));
+    parts.push(hint('B', 'Quit'));
   }
   ui.hints.innerHTML = parts.join('');
 }
@@ -357,7 +398,7 @@ function onButton(button) {
   }
 
   const list = items();
-  const perRow = state.tab === 'library' ? COLUMNS : 1;
+  const { perRow } = layout();
   const focus = state.focus[state.tab];
   const game = list[focus];
   const move = (delta) => {
@@ -412,6 +453,11 @@ function onButton(button) {
         render();
         refreshStore().then(render);
       }
+      break;
+    case 'SELECT':
+      state.layout[state.tab] = state.layout[state.tab] === 'grid' ? 'list' : 'grid';
+      save();
+      render();
       break;
     case 'B':
       showDialog('Quit PocketVibe?', () => api('/api/quit', 'POST'));

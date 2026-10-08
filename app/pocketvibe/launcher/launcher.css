@@ -81,7 +81,7 @@ nav {
 
 main {
   height: 388px;
-  padding: 16px 24px;
+  padding: 12px 24px 0;
   overflow: hidden;
 }
 
@@ -124,11 +124,56 @@ main {
 }
 
 .card .title {
-  padding: 8px 10px;
+  padding: 6px 10px 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font-weight: 700;
+}
+
+.card .meta {
+  height: 26px;
+  padding: 0 10px 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.cover-wrap {
+  position: relative;
+}
+
+.badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.badge.installed {
+  color: var(--good);
+}
+
+.badge.update {
+  color: var(--accent);
+}
+
+.badge.error {
+  color: var(--bad);
+}
+
+.bar.overlay {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  margin: 0;
 }
 
 /* Store: a list of rows */
