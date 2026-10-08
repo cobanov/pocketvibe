@@ -41,6 +41,7 @@ CONFIG = json.loads((APP / 'config.json').read_text())
 VERSION = CONFIG.get('version', '0.1.0')
 DEFAULT_STORE = os.environ.get('POCKETVIBE_STORE', CONFIG['store_url'])
 SETTINGS_FILE = HOME / 'settings.json'
+PLAYS_FILE = HOME / 'plays.json'  # when each game was last played, for "Recently played"
 DEFAULT_SETTINGS = {
     'language': 'en',
     'music': True,
@@ -122,10 +123,32 @@ def read_manifest(game_dir):
     return meta
 
 
+def load_plays():
+    try:
+        return json.loads(PLAYS_FILE.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def record_play(gid):
+    plays = load_plays()
+    entry = plays.get(gid, {'count': 0})
+    plays[gid] = {'count': entry.get('count', 0) + 1, 'last': time.time()}
+    PLAYS_FILE.write_text(json.dumps(plays))
+
+
 def library():
     if not GAMES.is_dir():
         return []
-    games = [read_manifest(d) for d in sorted(GAMES.iterdir()) if d.is_dir() and not d.name.startswith('.')]
+    plays = load_plays()
+    games = []
+    for game_dir in sorted(GAMES.iterdir()):
+        if game_dir.is_dir() and not game_dir.name.startswith('.'):
+            meta = read_manifest(game_dir)
+            played = plays.get(meta['id'], {})
+            meta['lastPlayed'] = played.get('last', 0)
+            meta['plays'] = played.get('count', 0)
+            games.append(meta)
     return sorted(games, key=lambda g: g['title'].lower())
 
 
@@ -584,6 +607,7 @@ class LauncherHandler(SimpleHTTPRequestHandler):
                 return self.send_json({'error': 'not installed'}, 404)
             global in_game
             in_game = True
+            record_play(gid)
             return self.send_json({'url': game_url(gid)})
         if action == 'install':
             entry = find_catalog_entry(gid)

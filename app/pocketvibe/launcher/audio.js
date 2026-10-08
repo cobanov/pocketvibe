@@ -43,15 +43,22 @@ export class LauncherAudio {
       const Context = window.AudioContext || window.webkitAudioContext;
       if (!Context) return false;
       this.ctx = new Context();
+      // Music and button sounds meet in a compressor, so together they never
+      // clip into a sudden loud burst.
+      this.output = this.ctx.createDynamicsCompressor();
+      this.output.threshold.value = -18;
+      this.output.ratio.value = 6;
+      this.output.connect(this.ctx.destination);
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = 0;
       this.filter = this.ctx.createBiquadFilter();
       this.filter.type = 'lowpass';
       this.filter.frequency.value = 2400;
-      this.musicGain.connect(this.filter).connect(this.ctx.destination);
+      this.musicGain.connect(this.filter).connect(this.output);
       this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = 0.25;
-      this.sfxGain.connect(this.ctx.destination);
+      this.sfxGain.gain.value = 0.3;
+      this.sfxGain.connect(this.output);
+      this.sfxVoices = []; // oscillators of the button sound playing now
       this.noise = this.makeNoise();
     }
     if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -155,12 +162,38 @@ export class LauncherAudio {
     return buffer;
   }
 
-  // Short button sounds: 'move', 'select', 'back', 'tab'.
+  // One short note of a button sound, with a fixed envelope that is fully
+  // silent at its end (no tail that could pile up with the next sound).
+  blip(freq, time, length) {
+    const osc = this.ctx.createOscillator();
+    const env = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    env.gain.setValueAtTime(0, time);
+    env.gain.linearRampToValueAtTime(0.5, time + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.001, time + length);
+    osc.connect(env).connect(this.sfxGain);
+    osc.start(time);
+    osc.stop(time + length + 0.01);
+    this.sfxVoices.push(osc);
+  }
+
+  // Short button sounds: 'move', 'select', 'back', 'tab'. Only one plays at a
+  // time: a new one cuts the previous, so fast presses do not stack up.
   sound(kind) {
-    if (!this.soundsOn || !this.ensure()) return;
-    const now = this.ctx.currentTime;
-    const blip = (freq, at, length = 0.05) => this.tone(freq, now + at, length, 'square', 0.12, 0.004, this.sfxGain);
-    if (kind === 'move') blip(880, 0, 0.03);
+    if (!this.soundsOn || !this.ensure() || this.ctx.state !== 'running') return;
+    for (const osc of this.sfxVoices) {
+      try {
+        osc.stop();
+      } catch {
+        // Already stopped.
+      }
+    }
+    this.sfxVoices = [];
+    // A few milliseconds ahead, so the start of the sound is never cut off.
+    const now = this.ctx.currentTime + 0.01;
+    const blip = (freq, at, length = 0.06) => this.blip(freq, now + at, length);
+    if (kind === 'move') blip(880, 0, 0.04);
     else if (kind === 'tab') blip(740, 0, 0.04);
     else if (kind === 'select') {
       blip(660, 0);

@@ -14,6 +14,11 @@ const KEYMAP = {
 const REPEAT = new Set(['UP', 'DOWN', 'LEFT', 'RIGHT']);
 const ACTIVE_JOB = ['queued', 'downloading', 'installing'];
 const TABS = ['library', 'store', 'settings'];
+// How each tab can list its games, cycled with Y. The first is the default.
+const VIEWS = {
+  library: ['recent', 'az', 'categories'],
+  store: ['latest', 'popular', 'az', 'categories'],
+};
 const COLUMNS = 3; // cards per row in the card layout
 const CREDITS = 'Mert Cobanov · mertcobanov@gmail.com · github.com/cobanov';
 
@@ -38,6 +43,7 @@ const state = {
   tab: load('tab', 'library'),
   focus: load('focus', { library: 0, store: 0, settings: 0 }),
   layout: load('layout2', { library: 'grid', store: 'grid' }),
+  view: load('view', { library: 'recent', store: 'latest' }),
   library: [],
   store: { online: true, games: [], stores: [] },
   storeLoaded: false,
@@ -69,6 +75,7 @@ function save() {
     localStorage.setItem('tab', JSON.stringify(state.tab));
     localStorage.setItem('focus', JSON.stringify(state.focus));
     localStorage.setItem('layout2', JSON.stringify(state.layout));
+    localStorage.setItem('view', JSON.stringify(state.view));
   } catch {
     // Not important if it fails.
   }
@@ -105,9 +112,22 @@ function genreOf(game) {
   return CATEGORIES.find(([, pattern]) => pattern.test(genre))?.[0] ?? 'Other';
 }
 
-// The games of a tab grouped by category: sections sorted by name ("Other"
-// last), games sorted by title. items() is the same games in that order.
-function sections(games) {
+const byTitle = (a, b) => a.title.localeCompare(b.title);
+const time = (iso) => Date.parse(iso || 0) || 0;
+const SORTS = {
+  recent: (a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0) || byTitle(a, b),
+  latest: (a, b) => time(b.updated) - time(a.updated) || byTitle(a, b),
+  popular: (a, b) => (b.downloads || 0) - (a.downloads || 0) || time(b.updated) - time(a.updated) || byTitle(a, b),
+  az: byTitle,
+};
+
+// The games of a tab as sections for the current view: one section for a
+// sorted view, or one per category. items() is the same games in order.
+function sections(games, tab = state.tab) {
+  const view = state.view[tab];
+  if (view !== 'categories') {
+    return games.length ? [{ name: view, games: [...games].sort(SORTS[view] ?? byTitle) }] : [];
+  }
   const groups = new Map();
   for (const game of games) {
     const name = genreOf(game);
@@ -116,7 +136,7 @@ function sections(games) {
   }
   return [...groups.entries()]
     .sort(([a], [b]) => (a === 'Other') - (b === 'Other') || t(a).localeCompare(t(b)))
-    .map(([name, list]) => ({ name, games: list.sort((a, b) => a.title.localeCompare(b.title)) }));
+    .map(([name, list]) => ({ name, games: list.sort(byTitle) }));
 }
 
 function tabGames(tab = state.tab) {
@@ -444,9 +464,8 @@ function settingsAction(button) {
 function renderStatus() {
   const s = state.status;
   if (!s) return;
-  const parts = [s.time, s.wifi ? 'Wi-Fi' : t('noWifi')];
-  if (s.battery !== null) parts.push(`${s.charging ? '⚡' : ''}${s.battery}%`);
-  ui.status.textContent = parts.join('   ');
+  const battery = s.battery !== null ? `${s.charging ? '⚡' : ''}${s.battery}%` : '';
+  ui.status.innerHTML = `<i class="wifi ${s.wifi ? 'on' : 'off'}" title="Wi-Fi"></i>${escapeHtml(s.time)}<span>${escapeHtml(battery)}</span>`;
 }
 
 function renderTabs() {
@@ -502,7 +521,7 @@ function render() {
     let index = 0;
     let html = '';
     for (const section of groups) {
-      html += `<div class="section-title">${escapeHtml(t(section.name))}<span>${section.games.length}</span></div>`;
+      html += `<div class="section-title">${escapeHtml(t(section.name))}<span>${section.games.length}</span></div>`; // a view or a category
       html += `<div class="${grid ? 'grid' : 'list'}">`;
       section.games.forEach((game, i) => {
         if (i % perRow === 0) state.rows.push([]);
@@ -580,7 +599,8 @@ function renderHints() {
     if (game) parts.push(hint('A', state.tab === 'library' ? t('play') : t('open')));
     if (game && state.tab === 'library') parts.push(hint('X', t('info')));
     if (state.tab === 'store') parts.push(hint('X', t('refresh')));
-    if (game) parts.push(hint('Select', state.layout[state.tab] === 'grid' ? t('list') : t('cards')));
+    if (game) parts.push(hint('Y', t(state.view[state.tab])));
+    if (game) parts.push(hint('Sel', state.layout[state.tab] === 'grid' ? t('list') : t('cards')));
     parts.push(hint('B', t('quit')));
   }
   ui.hints.innerHTML = parts.join('');
@@ -858,9 +878,16 @@ function onButton(button) {
         refreshStore().then(render);
       }
       break;
-    case 'Y':
-      if (game && state.tab === 'library') confirmRemove(game);
+    case 'Y': {
+      const views = VIEWS[state.tab];
+      state.view[state.tab] = views[(views.indexOf(state.view[state.tab]) + 1) % views.length];
+      state.focus[state.tab] = 0;
+      state.scroll = 0;
+      save();
+      audio.sound('tab');
+      render();
       break;
+    }
     case 'SELECT':
       state.layout[state.tab] = state.layout[state.tab] === 'grid' ? 'list' : 'grid';
       save();

@@ -44,6 +44,12 @@ const STRINGS = {
   cannotStart: { en: 'Cannot start: {error}', tr: 'Başlatılamadı: {error}' },
   cannotDownload: { en: 'Cannot download: {error}', tr: 'İndirilemedi: {error}' },
 
+  recent: { en: 'Recently played', tr: 'Son oynanan' },
+  latest: { en: 'Latest', tr: 'En yeni' },
+  popular: { en: 'Most downloaded', tr: 'En çok indirilen' },
+  az: { en: 'A to Z', tr: 'A-Z' },
+  categories: { en: 'Categories', tr: 'Kategoriler' },
+
   Arcade: { en: 'Arcade', tr: 'Arcade' },
   Shooter: { en: 'Shooter', tr: 'Nişancı' },
   Racing: { en: 'Racing', tr: 'Yarış' },

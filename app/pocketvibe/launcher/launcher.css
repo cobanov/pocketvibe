@@ -21,7 +21,7 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font: 18px/1.3 system-ui, 'DejaVu Sans', sans-serif;
+  font: 18px/1.3 'DejaVu Sans', Verdana, sans-serif;
   cursor: none;
 }
 
@@ -29,14 +29,15 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   height: 56px;
-  padding: 0 20px;
+  padding: 0 14px;
   background: var(--panel);
 }
 
 .brand {
-  width: 125px;
-  font-size: 20px;
+  flex: none;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--accent);
@@ -44,13 +45,17 @@ header {
 
 nav {
   display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 4px;
 }
 
 .tab {
-  padding: 6px 12px;
-  font-size: 17px;
+  padding: 5px 10px;
+  font-size: 15px;
+  white-space: nowrap;
   border-radius: 999px;
   font-weight: 700;
   color: var(--muted);
@@ -62,28 +67,40 @@ nav {
 }
 
 .tab .count {
-  margin-left: 2px;
-  font-size: 14px;
+  margin-left: 1px;
+  font-size: 12px;
   opacity: 0.75;
 }
 
 .hint {
-  min-width: 26px;
-  padding: 1px 6px;
+  min-width: 24px;
+  padding: 0 5px;
   border: 2px solid var(--muted);
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   text-align: center;
   color: var(--muted);
 }
 
 #status {
-  width: 150px;
-  white-space: pre;
-  font-size: 14px;
-  text-align: right;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
   color: var(--muted);
+}
+
+.wifi {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--good);
+}
+
+.wifi.off {
+  background: var(--bad);
 }
 
 main {
