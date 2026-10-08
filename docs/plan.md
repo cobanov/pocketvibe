@@ -1,17 +1,22 @@
 # PocketVibe planı
 
-## İlerleme (2026-10-08)
+## İlerleme (2026-10-08, sürüm 0.5.0)
 
-- **Adım 0 tamam:** RG SP'de ROCKNIX `next` (Linux 7.2). GPU Panfrost, ekranı Sway (Wayland) yönetiyor, ses PulseAudio, glibc 2.44. Oyunlar Sway altında Wayland penceresi olarak açılıyor.
-- **Adım 1 tamam, karar kapısı geçildi:** WPE WebKit 2.48 + Cog 0.18 (Debian chroot içinde) yeterli. Kurallara uyan sahneler 60 fps, AI'ın varsayılan kodu 3.6-5.6 fps. Ayrıntılar: [bench/results/2026-10-08-rg-sp.md](../bench/results/2026-10-08-rg-sp.md).
-- **Tuşlar:** Gamepad API standart eşlemesiyle geliyor (A=1, B=0, X=2, Y=3, L=4, R=5, Select=8, Start=9, D-pad=12-15).
-- **Gönderme v0 hazır:** `device/play.sh <dist>` oyunu cihaza kopyalayıp tam ekran açıyor; Start + Select ile çıkılıyor.
-- **İlk oyun:** Paralel bir agent'ın `docs/game-prompt.md` ile yazdığı Lane Runner (`games/runner/`) cihazda sabit 60 fps çalıştı.
+- **Cihaz:** Anbernic RG34XX SP (ROCKNIX `next`, Sway, Panfrost, 720×480). Belgelerde eskiden "RG SP" geçiyordu.
+- **Motor kararı (Adım 1) geçildi:** WPE WebKit 2.48 + Cog 0.18. Kurallara uyan sahneler 60 fps, AI'ın varsayılan kodu 3.6-5.6 fps ([ölçüm](../bench/results/2026-10-08-rg-sp.md)).
+- **Cihazdaki uygulama (Adım 2) hazır ve yayında:** Ports menüsünde PocketVibe. Library, Store, Settings; indirme halkası ve kutlama; kayıt yedekleme; Start + Select ile oyundan dönüş, 3 sn ile çıkış. Runtime (Debian + WPE) ayrı bir köke kurulu ve `runtime.py` ile kendi mount namespace'inde çalışıyor, WebKit sandbox'ı açık.
+- **Kurulum:** `PocketVibe.zip` dosyası `roms/ports` klasörüne açılıyor; ilk açılışta runtime GitHub'dan iniyor (147 MB, cihazda yaklaşık 100 sn). Uygulama kendini GitHub sürümlerinden güncelliyor, açılamayan bir güncellemede önceki sürüme dönüyor. 0.5.0 bu yolla cihazda güncellendi.
+- **Mağaza:** Cloudflare Worker (D1 + R2). `pocketvibe publish` ile yükleme; yönetici dışındaki yüklemeler onay bekliyor. 12 oyun yayında.
+- **Geliştirici kiti (Adım 3):** `npm create pocketvibe`, `AGENTS.md` kuralları, tarayıcıda 720×480 önizleme. npm paketleri hazır, yayını kullanıcıda (2FA).
+- **Cihaza gönderme (Adım 4):** son kullanıcı için mağaza üzerinden. Geliştirici için `device/play.sh` (SSH ile oyunu Library'ye koyup açıyor). `npm run push` henüz yok.
+- **Site:** https://pocketvibe.cobanov.dev gerçek launcher'ı tarayıcıda, oynanabilir bir konsol çiziminde çalıştırıyor; kurulum ve oyun yapma adımları orada.
+- **Denetim:** uygulama, mağaza, CLI ve site incelendi; önemli bulgular düzeltildi (yerel API'nin oyunlara kapatılması, mağazada kimlik sahipliği ve zip sınırları dahil). Kalanlar `docs/handoff.md`'de.
 
 Bilinen sorunlar:
 
-- Cog, kapatma sinyaliyle kapanırken çöküyor (SIGSEGV). Oyun sırasında sorun yok; core dosyası saklanmıyor.
-- WPE hâlâ Debian chroot'tan çalışıyor ve WebKit sandbox'ı bu yüzden kapalı (bubblewrap chroot içinde çalışamıyor). Adım 2'de çözülecek.
+- Cog 0.18'in Wayland kodu kapanırken çöküyor; uygulama bu yüzden Cog'u SIGKILL ile kapatıyor (kayıtlar etkilenmiyor).
+- Oyun kayıtları runtime klasörünün içinde (`runtime/root/.local/share/wpe`). Runtime güncellerken bunların taşınması gerekecek; runtime güncelleme yolu henüz yok.
+- Bazı oyunlar cihazda yer yer 48 fps'e düşüyor (Turbo Circuit başlangıç çizgisi, Star Defender).
 - Çizim çağrısı bütçesi (100) henüz ölçülmedi; 60 bin üçgen doğrulandı.
 
 ## Ne yapıyoruz
