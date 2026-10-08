@@ -1,3 +1,2 @@
 node_modules/
-.cf/
-.wrangler/
+.cloudflare/
