@@ -977,6 +977,11 @@ async function play(game) {
   try {
     const { url } = await api(`/api/launch/${game.id}`, 'POST');
     save();
+    try {
+      localStorage.setItem('played', JSON.stringify(game.id));
+    } catch {
+      // The focus may then land on another game; nothing else is lost.
+    }
     location.href = url;
   } catch (e) {
     toast(t('cannotStart', { error: e.message }));
@@ -1278,6 +1283,17 @@ async function unlockAudio() {
   requestAnimationFrame(poll);
   refreshStore().then(() => !keyboard.active && render());
   await Promise.all([refreshLibrary(), refreshInfo()]);
+  // Back from a game: keep it selected, wherever the sort order moved it.
+  const played = load('played', null);
+  if (played) {
+    try {
+      localStorage.removeItem('played');
+    } catch {
+      // It is only a hint.
+    }
+    const index = state.tab === 'library' ? items().findIndex((g) => g.id === played) : -1;
+    if (index >= 0) state.focus.library = index;
+  }
   render();
   const { notice } = await api('/api/notice').catch(() => ({}));
   if (notice === 'restored') toast(t('restored'));

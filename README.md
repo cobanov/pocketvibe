@@ -48,9 +48,9 @@ On your handheld:
 2. Unzip it into `roms/ports` on the handheld's SD card.
 3. Restart the handheld and open **Ports**, then **PocketVibe**. The first start downloads the game engine, about 150 MB, over Wi-Fi.
 
-On an Android handheld, download the APK from the
-[Android release](https://github.com/cobanov/pocketvibe/releases/tag/android-v0.6.0) and open
-it; allow your browser or file manager to install apps when Android asks.
+On an Android handheld, download the newest APK from
+[pocketvibe.cobanov.dev/download/android](https://pocketvibe.cobanov.dev/download/android) and
+open it; allow your browser or file manager to install apps when Android asks.
 
 To make your own game, run `npm create pocketvibe@latest my-game` and follow
 [Get started](docs/getting-started.md). [Making games that run well](docs/performance.md)

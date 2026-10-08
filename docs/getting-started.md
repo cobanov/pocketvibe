@@ -28,8 +28,8 @@ PocketVibe is also an Android app, made for handhelds such as the Anbernic RG Ro
 Retroid Pocket. It needs Android 10 or newer and an up-to-date Android System WebView
 (version 94 or later; update it from the Play Store if games do not start).
 
-1. On the handheld, open the [Android release](https://github.com/cobanov/pocketvibe/releases/tag/android-v0.6.0)
-   in the browser and download `PocketVibe-0.6.0.apk`.
+1. On the handheld, open [pocketvibe.cobanov.dev/download/android](https://pocketvibe.cobanov.dev/download/android)
+   in the browser. It downloads the newest `PocketVibe-<version>.apk`.
 2. Open the download. When Android asks, allow the browser (or your file manager) to install
    apps, then tap **Install**.
 3. Start **PocketVibe** from the app list.
