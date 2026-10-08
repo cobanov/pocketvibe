@@ -243,12 +243,286 @@ main {
   color: var(--bad);
 }
 
-.bar.overlay {
+/* Download progress: a ring over the cover, or beside a label */
+
+.downloading {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  margin: 0;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 9, 14, 0.62);
+}
+
+.ring {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex: none;
+}
+
+.ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring circle {
+  fill: none;
+  stroke-width: 3.5;
+}
+
+.ring .track {
+  stroke: rgba(255, 255, 255, 0.16);
+}
+
+.ring .spin {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-linecap: round;
+}
+
+.ring .fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+
+.ring span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.state.progress {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--accent);
+}
+
+.state.progress .ring {
+  width: 40px;
+  height: 40px;
+}
+
+.state.progress .ring span {
+  font-size: 11px;
+}
+
+.detail-info .state.progress {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.detail-info .state.progress .ring {
+  width: 56px;
+  height: 56px;
+}
+
+.detail-info .state.progress .ring span {
+  font-size: 14px;
+}
+
+/* A finished download: the cover in the middle, a glow and fireworks */
+
+#celebrate {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 7, 11, 0.93);
+}
+
+#celebrate[hidden] {
+  display: none;
+}
+
+#celebrate canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.celebrate-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.celebrate-card .glow {
+  position: absolute;
+  top: -70px;
+  left: 50%;
+  width: 460px;
+  height: 320px;
+  margin-left: -230px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 200, 61, 0.34), rgba(255, 200, 61, 0));
+  animation: glow 2.4s ease-in-out infinite alternate;
+}
+
+.celebrate-cover {
+  position: relative;
+  width: 320px;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 0 0 3px var(--accent), 0 14px 40px rgba(0, 0, 0, 0.7);
+}
+
+.celebrate-cover .shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%);
+  transform: translateX(-110%);
+}
+
+.celebrate-cover .check {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--good);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  color: #0b2414;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 36px;
+  text-align: center;
+  transform: scale(0);
+}
+
+.celebrate-heading {
+  position: relative;
+  margin-top: 18px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.celebrate-title {
+  position: relative;
+  margin-top: 2px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.celebrate-title small {
+  font-size: 17px;
+  color: var(--muted);
+}
+
+.celebrate-hints {
+  position: relative;
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.celebrate-hints span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.celebrate-hints span:first-child .hint {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#celebrate.play .celebrate-cover {
+  animation: pop-in 520ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+#celebrate.play .shine {
+  animation: shine 900ms ease-out 450ms both;
+}
+
+#celebrate.play .check {
+  animation: check-in 360ms cubic-bezier(0.2, 1.6, 0.4, 1) 650ms both;
+}
+
+#celebrate.play .celebrate-heading,
+#celebrate.play .celebrate-title,
+#celebrate.play .celebrate-hints {
+  animation: rise-in 420ms ease-out both;
+}
+
+#celebrate.play .celebrate-heading {
+  animation-delay: 250ms;
+}
+
+#celebrate.play .celebrate-title {
+  animation-delay: 330ms;
+}
+
+#celebrate.play .celebrate-hints {
+  animation-delay: 700ms;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shine {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(110%);
+  }
+}
+
+@keyframes check-in {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glow {
+  from {
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.06);
+  }
 }
 
 /* Store: a list of rows */
@@ -681,4 +955,8 @@ footer b {
   width: 90px;
   margin: 0 0 0 8px;
   vertical-align: middle;
+}
+
+.row .state.progress {
+  width: 170px;
 }

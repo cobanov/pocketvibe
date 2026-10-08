@@ -21,6 +21,7 @@ import shutil
 import socket
 import struct
 import subprocess
+import sys
 import threading
 import time
 import urllib.parse
@@ -56,12 +57,11 @@ DEFAULT_SETTINGS = {
 }
 LAUNCHER_URL = f'http://127.0.0.1:{PORT}/'
 GAME_ID = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
-CHROOT = HOME.parent / 'debian'
-SESSION_BUS = 'unix:path=/run/0-runtime-dir/bus'
+RUNTIME = HOME / 'runtime'  # the Debian root with WPE WebKit; runtime.py runs things in it
 QUIT_FLAG = Path('/tmp/pocketvibe-quit')  # tells PocketVibe.sh not to restart the browser
 RESTART_FLAG = Path('/tmp/pocketvibe-restart')  # tells PocketVibe.sh to start again (after an update)
 BUSY_FLAG = Path('/tmp/pocketvibe-busy')  # PocketVibe.sh waits for it to go before reopening the browser
-WEB_DATA = CHROOT / 'root' / '.local' / 'share' / 'wpe'  # WebKit's data; storage/ holds every game's saves
+WEB_DATA = RUNTIME / 'root' / '.local' / 'share' / 'wpe'  # WebKit's data; storage/ holds every game's saves
 BACKUPS = HOME / 'backups'
 BACKUP_NAME = re.compile(r'saves-\d{8}-\d{6}\.zip')
 AUDIO_CACHE = CACHE / 'audio'  # audio the launcher rendered once (menu music)
@@ -81,6 +81,12 @@ lock = threading.Lock()
 launcher_server = None
 in_game = False
 notice = None  # a message for the launcher to show the next time it loads
+
+
+def open_url(url, timeout=10):
+    """GET a URL as PocketVibe. Cloudflare turns away Python's default User-Agent."""
+    request = urllib.request.Request(url, headers={'User-Agent': f'PocketVibe/{VERSION}'})
+    return urllib.request.urlopen(request, timeout=timeout)
 
 
 def load_settings():
@@ -163,7 +169,7 @@ def fetch_catalog(url):
     """One store's catalog, falling back to the last copy when offline."""
     cached = CACHE / f'catalog-{hashlib.sha1(url.encode()).hexdigest()[:12]}.json'
     try:
-        with urllib.request.urlopen(url, timeout=10) as r:
+        with open_url(url) as r:
             data = json.loads(r.read())
         CACHE.mkdir(parents=True, exist_ok=True)
         cached.write_text(json.dumps(data))
@@ -231,7 +237,7 @@ def install(entry):
     try:
         set_job(gid, state='downloading', progress=0, error=None)
         digest = hashlib.sha256()
-        with urllib.request.urlopen(entry['download'], timeout=30) as r, open(download, 'wb') as out:
+        with open_url(entry['download'], timeout=30) as r, open(download, 'wb') as out:
             total = int(r.headers.get('Content-Length') or entry.get('size') or 0)
             done = 0
             while chunk := r.read(1 << 16):
@@ -377,7 +383,7 @@ def cover_path(gid):
     if not entry or not entry.get('cover'):
         return None
     try:
-        with urllib.request.urlopen(entry['cover'], timeout=10) as r:
+        with open_url(entry['cover']) as r:
             data = r.read()
     except OSError:
         return None
@@ -416,10 +422,17 @@ def check_update(force=False):
             'Accept': 'application/vnd.github+json', 'User-Agent': f'PocketVibe/{VERSION}'})
         with urllib.request.urlopen(request, timeout=10) as r:
             data = json.loads(r.read())
-        asset = next((a for a in data.get('assets', [])
-                      if a.get('name', '').startswith('pocketvibe-app-') and a['name'].endswith('.zip')), None)
-        if not asset:
-            raise ValueError('the latest release has no app package')
+        # GitHub lists releases newest first; app releases are tagged v1.2.3
+        # (others, like the runtime, are skipped). A single release works too.
+        def app_asset(release):
+            return next((a for a in release.get('assets', [])
+                         if a.get('name', '').startswith('pocketvibe-app-') and a['name'].endswith('.zip')), None)
+        releases = data if isinstance(data, list) else [data]
+        data = next((r for r in releases if str(r.get('tag_name', '')).startswith('v')
+                     and not r.get('draft') and not r.get('prerelease') and app_asset(r)), None)
+        if not data:
+            raise ValueError('no app release yet')
+        asset = app_asset(data)
         # The checksum comes from GitHub's asset digest, or a "sha256: ..." line in the notes.
         digest = (asset.get('digest') or '').removeprefix('sha256:')
         noted = re.search(r'sha256:\s*([0-9a-f]{64})', data.get('body') or '')
@@ -447,7 +460,7 @@ def install_update():
         set_job('__app__', state='downloading', progress=0, error=None)
         package = HOME / '.app-update.zip'
         digest = hashlib.sha256()
-        with urllib.request.urlopen(release['url'], timeout=30) as r, open(package, 'wb') as out:
+        with open_url(release['url'], timeout=30) as r, open(package, 'wb') as out:
             total = int(r.headers.get('Content-Length') or release['size'] or 0)
             done = 0
             while chunk := r.read(1 << 16):
@@ -473,8 +486,6 @@ def install_update():
         shutil.rmtree(HOME / 'app.old', ignore_errors=True)
         (HOME / 'app').rename(HOME / 'app.old')
         (staging / 'app').rename(HOME / 'app')
-        if (staging / 'debian-chroot.sh').exists():
-            shutil.copy(staging / 'debian-chroot.sh', HOME / 'debian-chroot.sh')
         ports = Path('/storage/roms/ports')
         if (staging / 'PocketVibe.sh').exists() and ports.is_dir():
             shutil.copy(staging / 'PocketVibe.sh', ports / 'PocketVibe.sh')
@@ -566,8 +577,7 @@ def go_home():
     try:
         # Ask the running browser to open the launcher (fast, keeps it running).
         done = subprocess.run(
-            ['chroot', str(CHROOT), '/usr/bin/env', f'DBUS_SESSION_BUS_ADDRESS={SESSION_BUS}',
-             'cogctl', 'open', LAUNCHER_URL],
+            [sys.executable, str(APP / 'runtime.py'), '--root', str(RUNTIME), '--', 'cogctl', 'open', LAUNCHER_URL],
             capture_output=True, timeout=3,
         ).returncode == 0
     except (OSError, subprocess.TimeoutExpired):

@@ -7,7 +7,29 @@
 
 HOME_DIR=/storage/pocketvibe
 APP="$HOME_DIR/app"
+RUNTIME="$HOME_DIR/runtime"
 QUIT_FLAG=/tmp/pocketvibe-quit
+# The install zip puts the app next to this script; on the first run it moves
+# to its home, where updates also go.
+SEED="$(cd "$(dirname "$0")" && pwd)/pocketvibe"
+
+if [ -f "$SEED/pocketvibed.py" ]; then
+  mkdir -p "$HOME_DIR"
+  rm -rf "$APP"
+  mv "$SEED" "$APP"
+  python3 "$APP/add-to-gamelist.py" >/dev/null 2>&1
+fi
+
+# Early test setups kept the runtime in /storage/debian.
+if [ ! -d "$RUNTIME" ] && [ -x /storage/debian/usr/bin/cog ]; then
+  mv /storage/debian "$RUNTIME"
+fi
+
+# The browser runtime is downloaded on the first run.
+if [ ! -x "$RUNTIME/usr/bin/cog" ]; then
+  foot --fullscreen --term=xterm-256color sh "$APP/setup.sh"
+  [ -x "$RUNTIME/usr/bin/cog" ] || exit 1
+fi
 
 python3 "$APP/pocketvibed.py" >/tmp/pocketvibed.log 2>&1 &
 DAEMON=$!
@@ -26,11 +48,10 @@ done
 quick=0
 while :; do
   started=$(date +%s)
-  sh "$HOME_DIR/debian-chroot.sh" run sh -c "
-    export WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 COG_PLATFORM_WL_VIEW_FULLSCREEN=1
-    exec cog -P wl --gamepad=manette --enable-write-console-messages-to-stdout=true \
-      --media-playback-requires-user-gesture=false --bg-color=black http://127.0.0.1:8730/
-  " >>/tmp/pocketvibe-cog.log 2>&1
+  COG_PLATFORM_WL_VIEW_FULLSCREEN=1 python3 "$APP/runtime.py" --root "$RUNTIME" -- \
+    cog -P wl --gamepad=manette --enable-write-console-messages-to-stdout=true \
+    --media-playback-requires-user-gesture=false --bg-color=black http://127.0.0.1:8730/ \
+    >>/tmp/pocketvibe-cog.log 2>&1
   if [ -e /tmp/pocketvibe-restart ]; then
     # pocketvibed installed a new version: start again with the new files.
     rm -f /tmp/pocketvibe-restart

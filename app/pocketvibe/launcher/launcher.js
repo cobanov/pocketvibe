@@ -4,6 +4,7 @@
 import { LANGUAGES, getLanguage, setLanguage, t } from './i18n.js';
 import { LauncherAudio } from './audio.js';
 import { Keyboard } from './keyboard.js';
+import { Celebration } from './celebrate.js';
 
 const PADMAP = { 0: 'B', 1: 'A', 2: 'X', 3: 'Y', 4: 'L', 5: 'R', 8: 'SELECT', 9: 'START', 12: 'UP', 13: 'DOWN', 14: 'LEFT', 15: 'RIGHT' };
 const KEYMAP = {
@@ -20,6 +21,10 @@ const VIEWS = {
   store: ['latest', 'popular', 'az', 'categories'],
 };
 const COLUMNS = 3; // cards per row in the card layout
+// A download's ring fills smoothly and takes at least this long, so even a
+// small game that downloads in a blink shows its progress.
+const MIN_DOWNLOAD_MS = 1600;
+const RING = 2 * Math.PI * 17; // circumference of the progress ring
 const CREDITS = 'Mert Cobanov · cobanov.dev\nmertcobanov@gmail.com · github.com/cobanov · x.com/mertcobanov';
 
 const ui = {
@@ -38,9 +43,11 @@ const ui = {
 
 const audio = new LauncherAudio();
 const keyboard = new Keyboard(document.getElementById('keyboard'), t);
+const celebration = new Celebration(document.getElementById('celebrate'));
+const celebrations = []; // games waiting for their celebration
 
 const state = {
-  tab: load('tab', 'library'),
+  tab: 'library', // the launcher always opens on the Library
   focus: load('focus', { library: 0, store: 0, settings: 0 }),
   layout: load('layout2', { library: 'grid', store: 'grid' }),
   view: load('view', { library: 'recent', store: 'latest' }),
@@ -59,7 +66,6 @@ const state = {
   settingRows: [], // the focusable rows of the settings tab, in order
   scroll: 0, // how far the current tab is scrolled, in px
 };
-if (!TABS.includes(state.tab)) state.tab = 'library';
 state.focus.settings ??= 0;
 
 function load(key, fallback) {
@@ -73,7 +79,6 @@ function load(key, fallback) {
 
 function save() {
   try {
-    localStorage.setItem('tab', JSON.stringify(state.tab));
     localStorage.setItem('focus', JSON.stringify(state.focus));
     localStorage.setItem('layout2', JSON.stringify(state.layout));
     localStorage.setItem('view', JSON.stringify(state.view));
@@ -199,12 +204,100 @@ function sizeText(bytes) {
   return bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.ceil(bytes / 1e3)} KB`;
 }
 
-function stateHtml(game) {
-  const job = state.jobs[game.id];
-  if (job && ACTIVE_JOB.includes(job.state)) {
-    const label = job.state === 'installing' ? t('installing') : t('downloading');
-    return `<div class="state">${label}<div class="bar"><span style="width:${Math.round(job.progress * 100)}%"></span></div></div>`;
+// ---------- Downloads ----------
+
+// Downloads started here, as shown on screen: game id -> { started, shown }.
+const downloads = new Map();
+
+function downloading(id) {
+  return downloads.has(id) || ACTIVE_JOB.includes(state.jobs[id]?.state);
+}
+
+// How full the ring should be now: the real progress, but never faster than
+// MIN_DOWNLOAD_MS. Unpacking shows as the last few percent.
+function downloadTarget(id, now) {
+  const job = state.jobs[id];
+  const real = { downloading: (job?.progress ?? 0) * 0.92, installing: 0.96, done: 1 }[job?.state] ?? 0;
+  const started = downloads.get(id)?.started ?? now - MIN_DOWNLOAD_MS;
+  return Math.min(real, (now - started) / MIN_DOWNLOAD_MS);
+}
+
+function shownProgress(id) {
+  return downloads.get(id)?.shown ?? (state.jobs[id]?.progress ?? 0) * 0.92;
+}
+
+// A circular progress ring with the percentage in the middle.
+function ringHtml(id) {
+  const shown = shownProgress(id);
+  const spin = (performance.now() * 0.3) % 360;
+  return `
+    <div class="ring" data-ring="${id}">
+      <svg viewBox="0 0 40 40">
+        <circle class="track" cx="20" cy="20" r="17" />
+        <circle class="spin" cx="20" cy="20" r="17" stroke-dasharray="10 ${RING}" transform="rotate(${spin} 20 20)" />
+        <circle class="fill" cx="20" cy="20" r="17" stroke-dasharray="${RING}" stroke-dashoffset="${RING * (1 - shown)}" />
+      </svg>
+      <span>${Math.round(shown * 100)}%</span>
+    </div>`;
+}
+
+function downloadLabel(id) {
+  return state.jobs[id]?.state === 'installing' || shownProgress(id) > 0.95 ? t('installing') : t('downloading');
+}
+
+// Runs every frame: moves the rings toward their target and starts the
+// celebration once a finished download's ring is full.
+function tickDownloads(now) {
+  if (!downloads.size) return;
+  for (const [id, d] of downloads) {
+    const job = state.jobs[id];
+    if (job?.state === 'error') {
+      downloads.delete(id);
+      render();
+      continue;
+    }
+    const target = downloadTarget(id, now);
+    d.shown += (target - d.shown) * 0.12;
+    if (target - d.shown < 0.002) d.shown = target;
+    for (const el of document.querySelectorAll(`[data-ring="${id}"]`)) {
+      el.querySelector('.fill').setAttribute('stroke-dashoffset', RING * (1 - d.shown));
+      el.querySelector('.spin').setAttribute('transform', `rotate(${(now * 0.3) % 360} 20 20)`);
+      el.querySelector('span').textContent = `${Math.round(d.shown * 100)}%`;
+    }
+    for (const el of document.querySelectorAll(`[data-ring-label="${id}"]`)) el.textContent = downloadLabel(id);
+    if (job?.state === 'done' && d.shown >= 1) {
+      downloads.delete(id);
+      celebrations.push({ id, update: d.update });
+      if (!celebration.active) celebrateNext();
+    }
   }
+}
+
+function celebrateNext() {
+  const next = celebrations.shift();
+  if (!next) return;
+  const game = state.library.find((g) => g.id === next.id) ?? state.store.games.find((g) => g.id === next.id);
+  if (!game) return celebrateNext();
+  const cover = covers.get(game.id) === 'ok'
+    ? `<div class="cover" style="background-image: url(/api/cover/${game.id})"></div>`
+    : `<div class="cover" style="${placeholder(game).style}"><span>${escapeHtml(placeholder(game).initials)}</span></div>`;
+  const hint = (button, text) => `<span><b class="hint">${button}</b>${text}</span>`;
+  celebration.show(
+    `<div class="glow"></div>
+     <div class="celebrate-cover">${cover}<div class="shine"></div><div class="check">✓</div></div>
+     <div class="celebrate-heading">${t(next.update ? 'updatedHeading' : 'readyHeading')}</div>
+     <div class="celebrate-title">${escapeHtml(game.title)}${next.update && game.version ? ` <small>v${escapeHtml(game.version)}</small>` : ''}</div>
+     <div class="celebrate-hints">${hint('A', t('playNow'))}${hint('B', t('later'))}</div>`,
+    game,
+  );
+  audio.sound('ready');
+}
+
+function stateHtml(game) {
+  if (downloading(game.id)) {
+    return `<div class="state progress">${ringHtml(game.id)}<span data-ring-label="${game.id}">${downloadLabel(game.id)}</span></div>`;
+  }
+  const job = state.jobs[game.id];
   if (job?.state === 'error') return `<div class="state error">${t('failed')}</div>`;
   if (game.update) return `<div class="state update">${t('update')}</div>`;
   if (game.installed) return `<div class="state installed">${t('installed')}</div>`;
@@ -213,10 +306,8 @@ function stateHtml(game) {
 
 // Small label over a store card's cover: download progress or install state.
 function badgeHtml(game) {
+  if (downloading(game.id)) return `<div class="downloading">${ringHtml(game.id)}</div>`;
   const job = state.jobs[game.id];
-  if (job && ACTIVE_JOB.includes(job.state)) {
-    return `<div class="bar overlay"><span style="width:${Math.round(job.progress * 100)}%"></span></div>`;
-  }
   if (job?.state === 'error') return `<div class="badge error">${t('failed')}</div>`;
   if (game.update) return `<div class="badge update">${t('update')}</div>`;
   if (game.installed) return `<div class="badge installed">${t('installed')}</div>`;
@@ -255,8 +346,7 @@ function detailGame() {
 }
 
 function detailStateHtml(game, installed) {
-  const job = state.jobs[game.id];
-  if (job && [...ACTIVE_JOB, 'error'].includes(job.state)) return stateHtml(game);
+  if (downloading(game.id) || state.jobs[game.id]?.state === 'error') return stateHtml(game);
   if (game.update) return `<div class="state update">${t('updateAvailable')}</div>`;
   if (installed) return `<div class="state installed">${t('installed')}</div>`;
   return '';
@@ -623,7 +713,7 @@ function renderHints() {
   } else if (state.detail) {
     const g = detailGame();
     const installed = state.library.some((l) => l.id === g?.id);
-    if (g) parts.push(hint('A', g.update ? t('update') : installed ? t('play') : t('download')));
+    if (g && !downloading(g.id)) parts.push(hint('A', g.update ? t('update') : installed ? t('play') : t('download')));
     if (installed) parts.push(hint('Y', t('remove')));
     parts.push(hint('B', t('back')));
   } else if (state.tab === 'settings') {
@@ -732,7 +822,7 @@ async function pollJobs() {
       if (before[id]?.state !== job.state && job.state === 'done') {
         await Promise.all([refreshLibrary(), refreshStore()]);
         const game = state.store.games.find((g) => g.id === id);
-        toast(t('readyToPlay', { title: game?.title ?? id }));
+        if (!downloads.has(id)) toast(t('readyToPlay', { title: game?.title ?? id }));
       }
       if (before[id]?.state !== job.state && job.state === 'error') toast(t('downloadFailed', { error: job.error }));
     }
@@ -757,10 +847,18 @@ async function play(game) {
 }
 
 async function install(game) {
+  if (downloading(game.id)) return;
+  // Show the ring right away, before the service answers.
+  downloads.set(game.id, { started: performance.now(), shown: 0, update: Boolean(game.update) });
+  state.jobs = { ...state.jobs, [game.id]: { state: 'queued', progress: 0, error: null } };
+  render();
   try {
     await api(`/api/install/${game.id}`, 'POST');
     pollJobs();
   } catch (e) {
+    downloads.delete(game.id);
+    delete state.jobs[game.id];
+    render();
     toast(t('cannotDownload', { error: e.message }));
   }
 }
@@ -813,6 +911,21 @@ function onButton(button) {
     return;
   }
 
+  if (celebration.active) {
+    if (button === 'A') {
+      audio.sound('select');
+      const game = celebration.hide();
+      state.detail = null;
+      play(game);
+    } else if (button === 'B') {
+      audio.sound('back');
+      celebration.hide();
+      render();
+      celebrateNext();
+    }
+    return;
+  }
+
   if (state.dialog) {
     if (button === 'A') {
       const { onYes } = state.dialog;
@@ -855,6 +968,7 @@ function onButton(button) {
       render();
     } else if (button === 'A' && g) {
       audio.sound('select');
+      if (downloading(g.id)) return;
       if (!installed || g.update) install(g);
       else play(g);
     } else if (button === 'Y' && g && installed) {
@@ -961,6 +1075,7 @@ const repeatAt = new Map(); // button -> time of the next repeat
 const readyAt = performance.now() + 500;
 
 function poll(now) {
+  tickDownloads(now);
   const down = new Set(keys);
   for (const pad of navigator.getGamepads?.() ?? []) {
     if (!pad) continue;

@@ -41,6 +41,8 @@ const SOUNDS = {
   tab: [[740, 0, 0.05]],
   select: [[660, 0, 0.06], [990, 0.06, 0.06]],
   back: [[660, 0, 0.06], [440, 0.06, 0.06]],
+  // A game finished downloading: a rising major arpeggio.
+  ready: [[523, 0, 0.14], [659, 0.09, 0.14], [784, 0.18, 0.14], [1047, 0.27, 0.5]],
 };
 
 const midiToHz = (note) => 440 * 2 ** ((note - 69) / 12);
@@ -270,7 +272,7 @@ export class LauncherAudio {
     source.stop(this.ctx.currentTime + 1);
   }
 
-  // Short button sounds: 'move', 'select', 'back', 'tab'. Only one plays at a
+  // Short sounds: 'move', 'select', 'back', 'tab', 'ready'. Only one plays at a
   // time: a new one cuts the previous, so fast presses do not stack up.
   sound(kind) {
     const buffer = this.sounds[kind];
