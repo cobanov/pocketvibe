@@ -51,6 +51,7 @@ const state = {
   focus: load('focus', { library: 0, store: 0, settings: 0 }),
   layout: load('layout2', { library: 'grid', store: 'grid' }),
   view: load('view', { library: 'recent', store: 'latest' }),
+  hideInstalled: load('hideInstalled', false), // the store lists only games to get
   library: [],
   store: { online: true, games: [], stores: [] },
   storeLoaded: false,
@@ -82,6 +83,7 @@ function save() {
     localStorage.setItem('focus', JSON.stringify(state.focus));
     localStorage.setItem('layout2', JSON.stringify(state.layout));
     localStorage.setItem('view', JSON.stringify(state.view));
+    localStorage.setItem('hideInstalled', JSON.stringify(state.hideInstalled));
   } catch {
     // Not important if it fails.
   }
@@ -147,8 +149,10 @@ function sections(games, tab = state.tab) {
 
 function tabGames(tab = state.tab) {
   if (tab === 'library') return state.library;
-  if (tab === 'store') return state.store.games;
-  return [];
+  if (tab !== 'store') return [];
+  if (!state.hideInstalled) return state.store.games;
+  // Updates still need getting, and a download stays until its ring is full.
+  return state.store.games.filter((g) => !g.installed || g.update || downloading(g.id));
 }
 
 function items() {
@@ -646,7 +650,7 @@ function render() {
     ui.content.innerHTML =
       state.tab === 'library'
         ? `<div class="empty">${t('noGames')}</div>`
-        : `<div class="empty">${state.store.online ? t('storeEmpty') : t('storeOffline')}</div>`;
+        : `<div class="empty">${!state.store.online ? t('storeOffline') : state.store.games.length ? t('allInstalled') : t('storeEmpty')}</div>`;
   } else {
     const grid = state.layout[state.tab] === 'grid';
     const perRow = grid ? COLUMNS : 1;
@@ -754,7 +758,7 @@ function renderHints() {
     const game = items()[state.focus[state.tab]];
     if (game) parts.push(hint('A', state.tab === 'library' ? t('play') : t('open')));
     if (game && state.tab === 'library') parts.push(hint('X', t('info')));
-    if (state.tab === 'store') parts.push(hint('X', t('refresh')));
+    if (state.tab === 'store') parts.push(hint('X', t(state.hideInstalled ? 'showInstalled' : 'hideInstalled')));
     if (game) parts.push(hint('Y', t(state.view[state.tab])));
     if (game) parts.push(hint('Sel', state.layout[state.tab] === 'grid' ? t('list') : t('cards')));
     parts.push(hint('B', t('quit')));
@@ -1060,9 +1064,13 @@ function onButton(button) {
         audio.sound('select');
         render();
       } else if (state.tab === 'store') {
-        state.storeLoaded = false;
+        // The store refreshes itself whenever the tab opens, so X filters it.
+        state.hideInstalled = !state.hideInstalled;
+        state.focus.store = 0;
+        state.scroll = 0;
+        save();
+        audio.sound('tab');
         render();
-        refreshStore().then(render);
       }
       break;
     case 'Y': {

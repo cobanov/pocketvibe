@@ -12,7 +12,8 @@ const STRINGS = {
   open: { en: 'Open', tr: 'Aç' },
   info: { en: 'Info', tr: 'Bilgi' },
   remove: { en: 'Remove', tr: 'Sil' },
-  refresh: { en: 'Refresh', tr: 'Yenile' },
+  hideInstalled: { en: 'Hide installed', tr: 'Yüklüleri gizle' },
+  showInstalled: { en: 'Show installed', tr: 'Yüklüleri göster' },
   quit: { en: 'Quit', tr: 'Çık' },
   back: { en: 'Back', tr: 'Geri' },
   yes: { en: 'Yes', tr: 'Evet' },
@@ -34,6 +35,7 @@ const STRINGS = {
   noGames: { en: 'No games yet.<br>Press R to open the Store.', tr: 'Henüz oyun yok.<br>Mağazayı açmak için R tuşuna bas.' },
   loadingStore: { en: 'Loading the store...', tr: 'Mağaza yükleniyor...' },
   storeEmpty: { en: 'The store is empty.', tr: 'Mağaza boş.' },
+  allInstalled: { en: 'You have every game in the store.<br>Press X to show them.', tr: 'Mağazadaki bütün oyunlar yüklü.<br>Göstermek için X tuşuna bas.' },
   storeOffline: { en: 'Cannot reach the store.<br>Check the Wi-Fi connection.', tr: 'Mağazaya ulaşılamıyor.<br>Wi-Fi bağlantısını kontrol et.' },
   noWifi: { en: 'No Wi-Fi', tr: 'Wi-Fi yok' },
 
