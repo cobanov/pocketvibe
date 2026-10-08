@@ -1,42 +1,28 @@
-# PocketVibe: devir notu (2026-10-08 gece, sürüm 0.5.0)
+# PocketVibe: devir notu (2026-10-08 akşam, sürüm 0.6.6)
 
-Bu dosyayı baştan sona oku, sonra "Kalan işler"den devam et. Önce `docs/plan.md`, `docs/development.md` ve memory'deki `pocketvibe-project.md`, `readme-style.md` dosyalarına bak.
+Bu dosyayı baştan sona oku, sonra "Sıradaki işler"den devam et. Önce `docs/plan.md`, `docs/development.md` ve memory'deki `pocketvibe-project.md`, `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` dosyalarına bak. Aşağıdaki eski bölümler tarih için duruyor; çelişirse bu bölüm geçerli.
 
-## Durum
+## Durum (en günceli bu)
 
-- **Sürüm 0.5.0 yayında:** GitHub release `v0.5.0` (`PocketVibe.zip` kurulum, `pocketvibe-app-0.5.0.zip` güncelleme). Cihaz 0.4.0'dan OTA ile 0.5.0'a güncellendi ve test edildi.
-- **Site:** https://pocketvibe.cobanov.dev (`site/`, Cloudflare static assets, `cd site && npm run deploy`). Gerçek launcher bir service worker (`site/public/sw.js`) ile tarayıcıda çalışıyor; mağazadaki oyunlar `scripts/prepare.mjs` ile açılıp `public/play/` altında oynanıyor. pocketvibed'in API yanıtları değişirse `sw.js` de güncellenmeli.
-- **Mağaza:** Worker güncel ve yayında (`store/worker`, `cf deploy`). 21 oyun.
-- **Belgeler:** README'ler İngilizce, herdrchat düzeninde. `docs/getting-started.md` ve `docs/development.md` var.
-- **Cihaz:** Anbernic RG34XX SP, `ssh root@192.168.8.197`. Tercihleri test öncesine döndürüldü (Library: Recently played, kartlar; Store: Most downloaded, kartlar).
+- **Sürüm 0.6.6 yayında** (GitHub `v0.6.6`). Kullanıcı bu akşam insanlarla paylaşacak. SP (RG34XX SP) 0.6.6'da, OTA ile güncellendi; RG DS 0.6.3'te kaldı.
+- **Kurulum (0.6.4 ve 0.6.5):** `setup.sh` boş alanı (indirme + açılmış ~690 MB) ve interneti baştan denetliyor; indirme kaldığı yerden devam ediyor (Range), 5 deneme; önce `pocketvibe.cobanov.dev/download/runtime-1`, olmazsa doğrudan GitHub. İndirme ekranı MB, hız ve kalan süre; açma adımı ayrı ilerleme çubuğuyla (tar'a python besliyor, başarıyı `.unpacked` işareti söylüyor). SP'de sıfırdan kurulum ölçüldü: zip 5 MB, Ports'tan launcher'a 100 s, 5 hazır oyun ve karşılama mesajı.
+- **İndirme adresleri:** `site/scripts/prepare.mjs` `_redirects` yazıyor: `/download/rocknix` (en son `PocketVibe.zip`), `/download/runtime-1`, `/download/android` (en yeni `android-v*` APK). Her şey GitHub Releases'ta; mağaza oyunları R2'de.
+- **libmali:** GPU sürücüsü libmali ise launcher bir kez Panfrost'a geçmeyi soruyor (`POST /api/gpu/panfrost`, `set_setting gpu.driver panfrost` ve yeniden başlatma); Settings'te satırı var.
+- **Çökme (0.6.6):** 16:31'de launcher'da WPEWebProcess SIGTRAP ile düştü (OOM yok, cgroup sınırı yok, coredump yok; sebep kesin değil). İki önlem: (1) `pocketvibed.watch_browser` Cog günlüğünde `> Crash!: ` görünce Cog'u kapatıyor, `PocketVibe.sh` onu launcher'da yeniden açıyor, launcher `crashed`/`crashed:game` notunu gösteriyor (cihazda `kill -TRAP` ile denendi, ~5 s). (2) `go_home` sayfa süreci 250 MB'ı geçtiyse ya da boş bellek 160 MB'ın altındaysa Cog'u yeniden başlatıyor (`browser_worn`); normal dönüş ~1 s, yeniden başlatmalı ~4 s (3,5 s siyah ekran). Ölçüm: oyun-launcher gidiş-dönüşlerinde sayfa süreci 95 MB'tan 250-360 MB'a çıkıp orada dolaşıyor, boş bellek 100-150 MB'a iniyor; 20 tur boyunca çökme tekrar etmedi.
+- **İki ekran:** Turbo Circuit 1.2.0 mağazada (RG DS'de üstte yarış, altta harita ve sıralama).
+- **Belgeler:** README, `docs/getting-started.md` ve site kurulum metni güncel boyut ve sürelerle (5 MB zip, ~150 MB indirme, ~1 GB boş alan, ~1,5 dk).
+- **Cihazlar:** SP `root@100.86.26.111` (Tailscale), RG DS `root@100.94.150.106`. SP'de kullanıcının eski kayıtları ve 17 oyunluk listesi `/storage/pv-backup-20261008`'de (sıfırdan kurulum testinden önce alındı; kullanıcı isterse geri yüklenecek: `saves/runtime1-storage` -> `runtime/root/.local/share/wpe/storage`, `games.txt`'teki oyunlar mağazadan).
 
-## Bu gece yapılanlar (özet)
+## Sıradaki işler
 
-- Launcher hizalaması (tek 24 px kenar, ortada sekmeler, kesik satır yok), Store'da X ile yüklüleri gizleme, yeni detay ekranı.
-- Sıfırdan kurulum hiç çalışmıyordu (dialog için terminfo yoktu); düzeltildi ve uygulamanın renklerine çevrildi.
-- Cog kapanış çökmesi: Cog artık SIGKILL ile kapanıyor, kayıtların korunduğu test edildi.
-- Denetim (iki alt ajan) ve düzeltmeler: yerel API artık `X-PocketVibe` başlığı, Origin ve Host denetimi istiyor; güncelleme açılmazsa `app.old`'a dönüş; daemon ölürse tarayıcıyı kapatan gözcü; kalıcı port kaydı (`ports.json`); dosyaların atomik yazılması; mağazada kimlik sahipliği, zip bombası, sürüm geri alma ve manifest doğrulaması; CLI'ın Windows'ta çalışması.
-- Cihazda tam test: her ekran, 11 oyunun hepsi, güncelleme, yedekleme ve geri yükleme, gözcü, geri dönüş, sıfırdan kurulum.
+1. SP'de yedeği geri yüklemek (kullanıcı isterse).
+2. Çökmenin asıl sebebi: coredump kaydedilmiyor (`systemd-coredump` "without generating a coredump"); Debian dbgsym ile sembollü yığın almak gerekir. Launcher her yüklemede müziği yeniden çözüyor (~38 MB); bunu küçültmek sayfa belleğini düşürür.
+3. Güncelleme denetimi 6 saatte bir (`UPDATE_CHECK_EVERY`); bugün kuranlar 0.6.6'yı Settings'te elle denetleyince görür.
+4. Turbo Circuit'in işlemci yükü; `create-pocketvibe` 0.1.1 (kullanıcı onayıyla); Android işleri (güncelleme denetimi, kayıt yedeği, 5 hazır oyun, yeni APK); runtime-v2 ek yükü; iPhone Safari site testi (kullanıcı).
+5. Launcher ilk açılışta birkaç saniye boş üst çubukla görünüyor (sekme adları ve içerik sonra geliyor); küçük cila.
+6. Cihaz temizliği yapıldı (SP'de `pv-runtime-m25/m26`, `pv-*.sh`, test araçları silindi; `runtime-2`, `profile`, `app.v2dev` de sıfırdan kurulumla gitti).
 
-## Güncel iş listesi (2026-10-08 akşam, en günceli bu)
-
-Bitenler (bugün): npm paketleri; dokuz yeni oyun; cihaz sınırları raporu ve `docs/performance.md`; Tailscale; site (Android adımları, `/download/android`, demo 21 oyun); pil göstergesi; `screens` ve `android` dalları main'de; 0.6.0 ve 0.6.1 (yeni kurulum 5 oyunla) yayında; responsive altyapısı ve 20 oyunun hepsi responsive + performans geçişi, 1.1.0 olarak mağazada; template'te kısa basışlar ve CSS düzeltildi.
-
-Sürenler:
-1. Ses efektleri ve menü müziği: alt ajan ayrı worktree'de, `audio` dalı (`scratchpad/audio-brief.md`). Efektler WAV, müzik OGG (cihazda ölçüldü). Bitince birleştirme ve cihazda dinleme testi (kullanıcıyla).
-2. Runtime 2: `runtime-v2` dalında, yayınlanmadı (bkz. `bench/results/2026-10-08-limits.md`, "Runtime 2 denemesi"). GPU'da 5 kat kazanç, ama kare başına 2-3 ms işlemci kaybı; Turbo Circuit daha kötü. Kare senkronu ek yükü araştırılmalı. Gamepad yok (`padkeys.py` köprüsü), sandbox kapalı. Release `runtime-v2` (pre-release) GitHub'da duruyor, main'in `config.json`'u onu kullanmıyor. Cihazda `/storage/pocketvibe/runtime-2`, `/storage/pocketvibe/profile`, `/storage/pocketvibe/app.v2dev` duruyor; cihaz gerçek 0.6.1'de.
-
-Bekleyenler:
-3. Turbo Circuit'in işlemci yükü (araba dururken çekirdeğin %81'i; gerçek yarışta 48-60 fps): oyunu profille ve hafiflet. Her iki runtime'a yarar.
-4. `create-pocketvibe` 0.1.1 (template değişti; kullanıcı onayıyla).
-5. Android: uygulama içi güncelleme kontrolü, kayıt yedekleme, 5 hazır oyun, yeni APK; RP3+ testi.
-6. RG DS: A/B ters (cihaz açık olmalı). Runtime 1'de libmanette eşlemesiyle çözülmeli (bkz. önceki devir notu, `gamecontrollerdb`).
-7. Site: iPhone Safari testi (kullanıcı).
-8. Küçükler: oyunlar arası bellek birikmesi, güncellemeden sonra "Restarting..." metni, `run-game.sh` ilk istekte uygulama yeni açılmışsa beklesin (runtime-v2 dalında).
-9. Eski denetim maddeleri: bekleyen yüklemeyi inceleme, yükleme kotası, sayısal GitHub kimliği, OAuth device flow, demo oyunları ayrı origin.
-10. Cihaz temizliği: `/storage/pv-runtime-m25`, `/storage/pv-runtime-m26`, `/storage/pv-*.sh`, `/tmp/handheld-pad.py`, `/storage/pocketvibe/app.v2dev`; runtime 2 kararına göre `runtime-2` ve `profile`.
-
-## Yarım kalan: cihazın sınırları (2026-10-08 öğlen)
+## Eski: cihazın sınırları (2026-10-08 öğlen)
 
 Kullanıcı oyun optimizasyonu için yeni bir ajan başlatmadan önce cihazın gerçek sınırlarını istedi. Yapılanlar:
 
@@ -54,7 +40,7 @@ Sıradakiler:
 6. Sürücü bulgusu (`bench/results/2026-10-08-limits.md`, "Sürücü" bölümü): Mesa 25.2+ geometride 10-18 kat hızlı ama Cog 0.18/WPEBackend-fdo ile çalışmıyor. Cihazda iki test kopyası var: `/storage/pv-runtime-m25` (Mesa 25.1.7, glmark2, mesa-utils) ve `/storage/pv-runtime-m26` (Mesa 26.1.6, fdo 1.16.1, Cog 0.18.5, forky kaynağı). `/storage/pv-swap.sh <dizin>` bir kopyayı uygulamanın altına koyar, `/storage/pv-swap.sh back` geri alır. Runtime-v2 kararı kullanıcıda.
 7. Geliştiriciler için rehber: `docs/performance.md` (README, template README ve getting-started bağlantı veriyor). `create-pocketvibe` 0.1.1 yayını bekliyor (template değişti).
 
-## Kalan işler (sırayla)
+## Eski: kalan işler (2026-10-08 gece)
 
 1. **Yeni oyunlar yayında:** maze-chase, tank-brigade, tower-stack, pulse-dash, cloud-climber, snow-slalom, mini-golf, tile-merge, crate-pusher 1.0.0 olarak mağazada (2026-10-08), site de onlarla yeniden yayınlandı. Commit'lemek oyun ajanının işi (`games/`, `docs/upcoming-games.md`). Cihazda henüz denenmediler.
 2. **npm paketleri yayında:** `create-pocketvibe` ve `pocketvibe` 0.1.0 (2026-10-08). npm hesabında 2FA güvenlik anahtarıyla açık. Yeni sürüm için `script -q /dev/null npm publish --access public --browser=false` arka planda çalıştırılıp çıkan `npmjs.com/auth/cli/...` bağlantısı kullanıcıya verilir; onaydan sonra birkaç dakika ikinci yayın onay istemez.
