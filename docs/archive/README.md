@@ -1,5 +1,11 @@
-# Arşiv
+<h1 align="center">Archive</h1>
 
-Projenin önceki tasarım denemeleri: Raspberry Pi 4 üzerinde bare-metal bir sistem, kendi oyun motoru ve sanal GPU, ardından kendi JavaScript runtime'ı. Güncel plan bunların yerini aldı: [docs/plan.md](../plan.md).
+<p align="center">
+  <strong>Earlier designs for PocketVibe, kept for their history.</strong>
+</p>
 
-Bu klasördeki belgeler yalnızca tarihçe için duruyor; güncel kararları yansıtmıyor.
+Before PocketVibe ran web games in WPE WebKit on ROCKNIX handhelds, the project tried a
+bare-metal system on a Raspberry Pi 4 with its own game engine and virtual GPU, and then its own
+JavaScript runtime. The documents here describe those attempts. They do not reflect current
+decisions; see the [README](../../README.md) and [docs/plan.md](../plan.md) for what PocketVibe is
+now.

@@ -1,17 +1,34 @@
-# My handheld game
+<h1 align="center">My handheld game</h1>
 
-A three.js game for handheld consoles running ROCKNIX (first target: Anbernic RG SP).
+<p align="center">
+  <strong>A three.js game for ROCKNIX handhelds, made with PocketVibe.</strong><br>
+  Describe it to your AI tool, play it in the browser, publish it to the store.
+</p>
 
-## Start
+<p align="center">
+  <a href="https://pocketvibe.cobanov.dev"><strong>PocketVibe</strong></a> ·
+  <a href="https://github.com/cobanov/pocketvibe/blob/main/docs/getting-started.md">Get started</a> ·
+  <a href="AGENTS.md">Rules for AI tools</a>
+</p>
+
+This project is ready for a game on a handheld's 720×480 screen and buttons. It starts as
+Coin Rush, a small example game; tell your AI coding tool what to make instead.
+
+## Make it yours
+
+- **Describe your game.** `AGENTS.md`, also read through `CLAUDE.md`, tells AI tools the screen, the buttons and the rules that keep the game at 60 fps on the handheld.
+- **Use the handheld layer.** `src/handheld.js` gives you the screen, the buttons, the game loop, saving and a performance overlay. Your game goes in `src/main.js` and beside it.
+- **Fill in the listing.** `pocketvibe.json` is the game's page in the store, and `cover.png` (480×270) its picture.
+
+## Try it
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open the address it prints. The game shows in a 720×480 frame, the size of the handheld's screen.
-
-## Controls in the browser
+Open the address it prints. The game shows at the handheld's size, and the keyboard stands in
+for its buttons:
 
 | Handheld | Keyboard |
 |---|---|
@@ -24,12 +41,17 @@ Open the address it prints. The game shows in a 720×480 frame, the size of the 
 | Start | Enter |
 | Select | Shift |
 
-`P` toggles the performance overlay (fps, draw calls, triangles). It turns red when the game is too heavy for the handheld.
+**P** shows the performance overlay: frame rate, draw calls and triangles. It turns red when the
+game is too heavy for the handheld.
 
-## Making your game with AI
+## Put it on the handheld
 
-`AGENTS.md` (also read through `CLAUDE.md`) tells AI coding tools how to write code for the handheld: the screen, the buttons and the performance rules. Describe your game to your AI tool and it will follow those rules.
+Give the game its own `id` and a `version` in `pocketvibe.json`, then:
 
-## Putting it on the handheld
+```sh
+npx pocketvibe publish
+```
 
-Coming soon.
+You sign in with GitHub. Once the game is reviewed, it is in the PocketVibe store and you can
+download it on any handheld with PocketVibe. For a new version, raise `version` and publish
+again.

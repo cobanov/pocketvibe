@@ -1,6 +1,6 @@
 # Handheld game rules
 
-This project is a three.js game for a handheld game console (Anbernic RG SP, running ROCKNIX). The game runs full screen in an embedded browser engine (WPE WebKit) on low-end hardware: 4× Cortex-A53 CPU, Mali-G31 MP2 GPU, 1 GB RAM (the browser engine uses most of it, so keep the game's own assets well under 150 MB), 720×480 screen. There is no mouse, no touch screen and no keyboard; only the buttons below.
+This project is a three.js game for a handheld game console (Anbernic RG34XX SP, running ROCKNIX). The game runs full screen in an embedded browser engine (WPE WebKit) on low-end hardware: 4× Cortex-A53 CPU, Mali-G31 MP2 GPU, 1 GB RAM (the browser engine uses most of it, so keep the game's own assets well under 150 MB), 720×480 screen. There is no mouse, no touch screen and no keyboard; only the buttons below.
 
 Follow these rules whenever you write or change code here. They are what keeps the game smooth on the device. Measured on the real handheld: typical three.js code (one mesh per object, `MeshStandardMaterial`, shadows, point lights, antialias) ran at 3 to 6 fps, while the same scenes written with these rules ran at a steady 60 fps.
 
@@ -34,7 +34,7 @@ Follow these rules whenever you write or change code here. They are what keeps t
   - `input.released('A')`: released this frame.
   - `input.dpad.x`, `input.dpad.y`: -1, 0 or 1 (`y` is -1 for UP).
 - Never use mouse, pointer, touch or keyboard events, and never show "click" or "press Space" in text. Refer to the button names above.
-- Conventions: `A` confirm or jump, `B` back or cancel, `START` pause menu. `START` + `SELECT` together quits to the console menu, so never use that combination in the game.
+- Conventions: `A` confirm or jump, `B` back or cancel, `START` pause menu. Holding `START` + `SELECT` together leaves the game for the PocketVibe launcher, so never use that combination in the game, and do not add a quit option: the system handles it.
 
 ## UI
 

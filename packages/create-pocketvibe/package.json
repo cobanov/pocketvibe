@@ -30,5 +30,5 @@
     "url": "git+https://github.com/cobanov/pocketvibe.git",
     "directory": "packages/create-pocketvibe"
   },
-  "homepage": "https://github.com/cobanov/pocketvibe"
+  "homepage": "https://pocketvibe.cobanov.dev"
 }

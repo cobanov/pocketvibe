@@ -24,6 +24,8 @@ const pkgPath = resolve(target, 'package.json');
 const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
 pkg.name = id;
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+const readmePath = resolve(target, 'README.md');
+writeFileSync(readmePath, readFileSync(readmePath, 'utf8').replace('My handheld game', title));
 writeFileSync(
   resolve(target, 'pocketvibe.json'),
   JSON.stringify({ id, title, author: '', version: '0.1.0', description: '' }, null, 2) + '\n',
