@@ -9,7 +9,8 @@
 | `app/pocketvibe/runtime.py` | Runs Cog inside the runtime (a Debian root with WPE WebKit) in its own mount namespace, so WebKit's sandbox works. |
 | `app/pocketvibe/setup.sh` | The first-run download of the runtime, drawn with `dialog`. |
 | `app/pocketvibe/launcher/` | The launcher: plain HTML, CSS and JavaScript, no build step. `play.html` is the game shell (see below). |
-| `android/` | PocketVibe for Android handhelds: the same launcher in a WebView, with a Kotlin version of the local service. |
+| `android/` | PocketVibe for Android handhelds and phones: the same launcher in a WebView, with a Kotlin version of the local service. |
+| `ios/` | PocketVibe for the iPhone: the same launcher in a WKWebView, with a Swift version of the local service. |
 | `app/pocketvibe/screens.py` | The handheld's screens, read from Sway: turns a second screen on while PocketVibe runs and spreads the browser's window over both. |
 | `template/` | The starter project. `packages/create-pocketvibe` copies it; `packages/pocketvibe` is the command line tool. |
 | `store/worker/` | The store: a Cloudflare Worker with D1 (catalog, uploads, download counts) and R2 (zips, covers). |
@@ -93,14 +94,17 @@ Two things to know:
 
 ## Android
 
-`android/` is PocketVibe for Android handhelds (Retroid Pocket 3+, Anbernic RG Rotate). It
+`android/` is PocketVibe for Android handhelds (Retroid Pocket 3+, Anbernic RG Rotate) and phones. It
 shows the same launcher and game shell, copied from `app/pocketvibe/launcher` at build time, in
 a full-screen WebView. `PocketVibe.kt` does pocketvibed's work: it serves the launcher and its
 `/api` on 127.0.0.1, each game on its own port, and talks to the stores. Other apps can reach
 127.0.0.1 too, so the API also wants a cookie that only the app's own page gets.
 `MainActivity.kt` turns the handheld's buttons into the keyboard keys the pages already read and
 watches Start + Select. Games always open in the shell; the launcher scales by the screen's
-real pixels, so it looks the same on a 1334×750 screen as on a 720×720 one.
+real pixels, so it looks the same on a 1334×750 screen as on a 720×720 one. A phone has no
+buttons, so `TouchPad.kt` draws them: upright the page sits at the top in 3:2 with the buttons
+below it, on its side the buttons sit either side of it. A connected gamepad (a handheld's own
+buttons are one) hides them.
 
 You need JDK 21 and the Android SDK (`brew install openjdk@21` and
 `brew install --cask android-commandlinetools android-platform-tools`, then
@@ -121,6 +125,36 @@ release key is `~/.config/pocketvibe/android-release.keystore`, its password in 
 Keychain as `pocketvibe-android-keystore`. Keep a copy of both somewhere safe: an APK signed
 with another key cannot update the installed app. A debug build is signed with another key, so
 it has to be removed before the release can be installed.
+
+## iPhone
+
+`ios/` is PocketVibe for the iPhone, built like the Android app: the launcher and game shell,
+copied from `app/pocketvibe/launcher` at build time (`scripts/copy-web.sh`), in a full-screen
+WKWebView. `Service.swift` is the Swift version of `PocketVibe.kt` (`Http.swift` the server,
+`Unzip.swift` the zips), `TouchPad.swift` the buttons on the screen, the same as on an Android
+phone. They reach the page as key events sent by script. A gamepad needs nothing from the app:
+the pages read it with the Gamepad API, and the buttons on the screen hide while one is
+connected. The iPhone app has no Quit, no app update (TestFlight and the App Store do that) and
+no save backups; the launcher leaves those out when `/api/info` says `"platform": "ios"`.
+
+The Xcode project is generated (`brew install xcodegen`); the version is the handheld app's and
+the build number the repository's commit count:
+
+```sh
+sh ios/scripts/generate.sh
+open ios/PocketVibe.xcodeproj
+```
+
+Its UI test plays a game with the screen's buttons in the simulator and leaves screenshots in
+`$TEST_RUNNER_SHOTS`. A debug build started with `POCKETVIBE_SILENT=1` stays silent (the
+simulator's sound comes out of the Mac) and with `POCKETVIBE_TOUCH=1` shows the buttons even
+though the simulator passes the Mac's gamepads on.
+
+`ios/scripts/testflight.sh` builds, signs and uploads to TestFlight with an App Store Connect API
+key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `APPLE_TEAM_ID`). `ios/scripts/asc.swift` registers the bundle
+id, makes the App Store profile, lists builds and adds the team as internal testers. The App
+Store Connect API cannot create the app record; it was made once in the web page. App Store
+Connect takes each build number once, so commit before uploading again.
 
 ## The store
 
