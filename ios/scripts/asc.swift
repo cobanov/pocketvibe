@@ -9,6 +9,7 @@
 //                                           review notes (AppStore/listing.json) and screenshots (*.png)
 //   swift scripts/asc.swift free-everywhere free, in every territory (and new ones as they come)
 //   swift scripts/asc.swift version <v> <n> the version being prepared becomes <v>, with build <n> (not submitted)
+//   swift scripts/asc.swift submit          sends the version being prepared to App Review
 //   swift scripts/asc.swift builds          the latest builds and their processing state
 //   swift scripts/asc.swift tester <email>  add a team member to the internal group that gets every build
 //
@@ -219,6 +220,10 @@ func listing(_ file: String, _ shots: String) {
         ])
         print("categories set")
     }
+    if let rights = page["contentRights"] as? String {
+        patch("apps", appID, attributes: ["contentRightsDeclaration": rights])
+        print("content rights set")
+    }
     if let rating = page["ageRating"] as? [String: Any] {
         let declaration = one("/v1/appInfos/\(infoID)/ageRatingDeclaration")
         if let id = declaration["id"] as? String {
@@ -354,6 +359,39 @@ func prepareVersion(_ versionString: String, _ buildNumber: String) {
     print("version \(versionString) with build \(buildNumber), ready to submit")
 }
 
+/// Sends the version being prepared to App Review, in the open submission if
+/// there is one. Apple names anything still missing (App Privacy answers, say).
+func submit() {
+    guard let appID = app()?["id"] as? String else { die("no app record") }
+    guard let version = list("/v1/apps/\(appID)/appStoreVersions?filter[platform]=IOS").first(where: {
+        ["PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED"].contains(attributes($0)["appStoreState"] as? String ?? "")
+    }), let versionID = version["id"] as? String else { die("no version being prepared") }
+    do {
+        var submission = list("/v1/reviewSubmissions?filter[app]=\(appID)&filter[platform]=IOS&filter[state]=READY_FOR_REVIEW").first
+        if submission == nil {
+            submission = try call("POST", "/v1/reviewSubmissions", ["data": [
+                "type": "reviewSubmissions", "attributes": ["platform": "IOS"],
+                "relationships": ["app": ["data": ["type": "apps", "id": appID]]],
+            ]])["data"] as? [String: Any]
+        }
+        guard let submissionID = submission?["id"] as? String else { die("no review submission") }
+        let items = list("/v1/reviewSubmissions/\(submissionID)/items?include=appStoreVersion")
+        if !items.contains(where: { (($0["relationships"] as? [String: Any])?["appStoreVersion"] as? [String: Any])?["data"] as? [String: Any] != nil }) {
+            try call("POST", "/v1/reviewSubmissionItems", ["data": [
+                "type": "reviewSubmissionItems",
+                "relationships": [
+                    "reviewSubmission": ["data": ["type": "reviewSubmissions", "id": submissionID]],
+                    "appStoreVersion": ["data": ["type": "appStoreVersions", "id": versionID]],
+                ],
+            ]])
+        }
+        patch("reviewSubmissions", submissionID, attributes: ["submitted": true])
+        print("version \(attributes(version)["versionString"] ?? "?") sent to App Review")
+    } catch let error as APIError {
+        die("not submitted (HTTP \(error.status)): \(error.body)")
+    } catch { die("not submitted: \(error)") }
+}
+
 func builds() {
     guard let id = app()?["id"] as? String else { die("no app record") }
     for build in list("/v1/builds?filter[app]=\(id)&sort=-uploadedDate&limit=5") {
@@ -412,6 +450,7 @@ case "free-everywhere": freeEverywhere()
 case "version":
     guard args.count == 3 else { die("usage: version <version string> <build number>") }
     prepareVersion(args[args.startIndex + 1], args[args.startIndex + 2])
+case "submit": submit()
 case "builds": builds()
 case "tester":
     guard args.count == 2 else { die("usage: tester <email>") }
