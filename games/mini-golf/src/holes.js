@@ -1,5 +1,5 @@
-// The nine holes. Each map is drawn as seen in the overview, the tee near
-// the bottom. One character per tile:
+// The two courses of nine holes. Each map is drawn as seen in the overview,
+// the tee near the bottom. One character per tile:
 //
 //   .  green          T  tee           O  cup          o  round bumper
 //   s  sand           ~  water         :  open drop    X  block
@@ -11,9 +11,11 @@
 // and drops have none. Terrain is a list of smooth ramps (along u or v,
 // optionally limited to a band of the other axis) and round hills, in map
 // coordinates. Movers are spinners (a bar turning around a post, speed in
-// radians per second) and sliders (a block gliding between two points).
+// radians per second), sliders (a block gliding between two points) and
+// windmills (over a tunnel tile between two blocks, the blades sweeping its
+// mouth on the tee side).
 
-export const HOLES = [
+const MEADOW = [
   {
     name: 'First Putt',
     par: 2,
@@ -208,4 +210,198 @@ export const HOLES = [
     terrain: [{ ramp: 'v', from: 10, to: 6, dh: 0.6 }],
     movers: [{ spin: [6.5, 2], len: 1.4, speed: -1.6 }],
   },
+];
+
+const HILLSIDE = [
+  {
+    name: 'Side Hill',
+    par: 2,
+    flag: 0x4fd0ff,
+    map: [
+      '1.....2',
+      '.......',
+      '...O...',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '...T...',
+      '.......',
+      '4.....3',
+    ],
+    terrain: [{ ramp: 'u', from: 7, to: 0, dh: 0.45 }],
+  },
+  {
+    name: 'Zig Zag',
+    par: 3,
+    flag: 0xff7a3d,
+    map: [
+      '1.....2',
+      '...O...',
+      '.......',
+      'XXXX...',
+      '.......',
+      '.......',
+      '...XXXX',
+      '.......',
+      '.......',
+      'XXXX...',
+      '.......',
+      '.......',
+      '...T...',
+      '4.....3',
+    ],
+  },
+  {
+    name: 'Windmill',
+    par: 3,
+    flag: 0xff4f5e,
+    map: [
+      '1.....2',
+      '.......',
+      '...O...',
+      '.......',
+      '.XX.XX.',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '...T...',
+      '4.....3',
+    ],
+    movers: [{ mill: [3.5, 4.5], speed: 1.1 }],
+  },
+  {
+    name: 'The Bowl',
+    par: 2,
+    flag: 0xb77bff,
+    map: [
+      ' 1.....2 ',
+      '1...O...2',
+      '.........',
+      '.........',
+      '.........',
+      '.........',
+      '.........',
+      '4.......3',
+      '   ...   ',
+      '   ...   ',
+      '   .T.   ',
+      '   4.3   ',
+    ],
+    terrain: [{ hill: [4.5, 4.5], r: 3.6, dh: -0.55 }],
+  },
+  {
+    name: 'Twin Spinners',
+    par: 3,
+    flag: 0x3fd28a,
+    map: [
+      '1.....2',
+      '..O....',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '.......',
+      '...T...',
+      '4.....3',
+    ],
+    movers: [
+      { spin: [3.5, 4.5], len: 1.9, speed: 1.4 },
+      { spin: [3.5, 9], len: 1.9, speed: -1.2, phase: 0.8 },
+    ],
+  },
+  {
+    name: 'Island Green',
+    par: 3,
+    flag: 0xffd84a,
+    map: [
+      '1........2',
+      '.~~~~~~~~.',
+      '.~~....~~.',
+      '.~~.O..~~.',
+      '.~~....~~.',
+      '.~~~..~~~.',
+      '.~~~..~~~.',
+      '..........',
+      '..........',
+      '....T.....',
+      '4........3',
+    ],
+  },
+  {
+    name: 'Pinball',
+    par: 3,
+    flag: 0xff5fb0,
+    map: [
+      ' 1.....2 ',
+      '1...O...2',
+      '.........',
+      '..o...o..',
+      '....X....',
+      '.o.....o.',
+      '...o.o...',
+      '.........',
+      '.........',
+      '....T....',
+      '4.......3',
+    ],
+  },
+  {
+    name: 'Cliff Walk',
+    par: 3,
+    flag: 0x4f8dff,
+    map: [
+      '1.....2',
+      '...O...',
+      '.......',
+      '::...::',
+      ':::..::',
+      '::..:::',
+      '::..:::',
+      ':::..::',
+      '::...::',
+      '.......',
+      '...T...',
+      '4.....3',
+    ],
+    terrain: [{ ramp: 'v', from: 8.5, to: 3.5, dh: 0.5 }],
+  },
+  {
+    name: 'Summit',
+    par: 4,
+    flag: 0xffc12e,
+    map: [
+      '::::::::::::',
+      ' 1........2 ',
+      ' ........O. ',
+      ' .......... ',
+      ' ....:::::: ',
+      ' ....       ',
+      ' ....       ',
+      ' ....       ',
+      ' ....       ',
+      ' ....       ',
+      ' ........2  ',
+      ' .........2 ',
+      ' ...o...... ',
+      ' ........T. ',
+      ' 4........3 ',
+    ],
+    terrain: [{ ramp: 'v', from: 9.8, to: 4.3, dh: 0.9 }],
+    movers: [{ slide: [2, 7.5, 4, 7.5], size: [1.6, 0.4], period: 3.4 }],
+  },
+];
+
+export const COURSES = [
+  { name: 'Meadow', holes: MEADOW },
+  { name: 'Hillside', holes: HILLSIDE },
 ];

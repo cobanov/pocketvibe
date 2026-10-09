@@ -1,9 +1,9 @@
-// Demo putts for the title screen, one list per hole, each shot as
-// [tick, x, z, angle, power]: at that simulation tick the ball is at (x, z)
-// and is putted at `angle` with `power`. Found offline by simulating shots,
-// so the same physics replays them exactly.
+// Demo putts for the title screen, one list per hole of each course, each
+// shot as [tick, x, z, angle, power]: at that simulation tick the ball is at
+// (x, z) and is putted at `angle` with `power`. Found offline by simulating
+// shots, so the same physics replays them exactly.
 
-export const DEMO = [
+const MEADOW = [
   [[360, 0, 4, 4.71239, 0.36]],
   [[360, 2.5, 4.5, 5.03527, 0.98]],
   [[360, 0, 5.5, 5.27089, 0.78]],
@@ -14,3 +14,17 @@ export const DEMO = [
   [[360, 0, 5, 4.71239, 0.44]],
   [[360, -4, 6.5, 4.24115, 1], [1562, -1.45515, -5.82477, 5.1749, 0.94], [2964, 6.13924, 1.48737, 1.0821, 0.22]],
 ];
+
+const HILLSIDE = [
+  [[360, 0, 3.5, 5.61996, 0.62]],
+  [[360, 0, 5.5, 5.79449, 0.68], [1355, -1.9202, -0.40493, 5.5676, 0.68]],
+  [[360, 0, 4.5, 4.69494, 0.68]],
+  [[360, 0, 4.5, 4.69494, 0.62]],
+  [[360, 0, 5.5, 4.13643, 0.62]],
+  [[360, -0.5, 4, 4.69494, 0.28]],
+  [[360, 0, 4, 3.92699, 0.82]],
+  [[360, 0, 4.5, 4.69494, 0.68]],
+  [[360, 3.5, 6, 3.42085, 0.75], [1321, -4.5204, -2.61829, 5.96903, 0.36]],
+];
+
+export const DEMO = [MEADOW, HILLSIDE];

@@ -27,8 +27,12 @@ export const BUMPER_R = 0.3;
 export const BAR_R = 0.11; // half the thickness of a spinner bar
 export const HUB_R = 0.2;
 
+export const MILL_HALF = 0.62; // half the width of a windmill's tunnel mouth
+export const MILL_DEPTH = 0.12; // half the depth of the zone its blades sweep
+
 export const SPINNER = 0;
 export const SLIDER = 1;
+export const WINDMILL = 2;
 
 const CHARS = {
   ' ': EMPTY,
@@ -272,9 +276,14 @@ export function buildCourse(def) {
   const cellSegs = new Int32Array(cellStart[lists.length]);
   lists.forEach((list, i) => cellSegs.set(list, cellStart[i]));
 
+  // A windmill stands over the tile at `mill` (a tunnel between two blocks,
+  // running along v) and its blades sweep the tunnel's mouth on the tee
+  // side, closing it while one of them is down.
   const movers = (def.movers || []).map((m) =>
     m.spin
       ? { type: SPINNER, x: m.spin[0] + ox, z: m.spin[1] + oz, len: m.len, speed: m.speed, phase: m.phase || 0 }
+      : m.mill
+      ? { type: WINDMILL, x: m.mill[0] + ox, z: m.mill[1] + oz + 0.5 + MILL_DEPTH, speed: m.speed, phase: m.phase || 0 }
       : {
           type: SLIDER,
           x0: m.slide[0] + ox,

@@ -4,7 +4,24 @@
 // downhill, borders bounce it, bumpers kick it, spinners and sliders push it,
 // and the cup takes it if it arrives slowly enough. No three.js in here.
 
-import { BAR_R, BUMPER_R, HUB_R, SAND, SPINNER, STONE, VOID, WALL_HALF, WATER, EMPTY, BLOCK } from './course.js';
+import {
+  BAR_R,
+  BLOCK,
+  BUMPER_R,
+  EMPTY,
+  GREEN,
+  HUB_R,
+  MILL_DEPTH,
+  MILL_HALF,
+  SAND,
+  SLIDER,
+  SPINNER,
+  STONE,
+  VOID,
+  WALL_HALF,
+  WATER,
+  WINDMILL,
+} from './course.js';
 
 export const BALL_R = 0.13;
 export const CUP_R = 0.28;
@@ -16,11 +33,14 @@ const FRICTION = 2.1; // rolling friction, units per second squared
 const SAND_FRICTION = 7;
 const DRAG = 0.06; // extra slowdown per unit of speed
 const SHOT_RANGE = 26; // flat distance of a full-power putt, before drag
-const STOP_SPEED = 0.05;
-const WALL_E = 0.66; // restitution of borders and blocks
+export const STOP_SPEED = 0.05;
+export const WALL_E = 0.66; // restitution of borders and blocks
 const MOVER_E = 0.6;
-const BUMPER_E = 0.85;
-const BUMPER_KICK = 1.6; // bumpers add a little speed on every hit
+export const BUMPER_E = 0.85;
+export const BUMPER_KICK = 1.6; // bumpers add a little speed on every hit
+// A windmill's mouth is shut while a blade is this close (radians) to
+// pointing straight down.
+const MILL_SHUT = 0.4;
 const CUP_PULL_R = 0.46; // the green dips slightly around the cup...
 const CUP_PULL = 2.4; // ...so a slow ball on the lip still drops in
 const CAPTURE_EDGE = 1.5; // fastest speed the cup takes at its rim
@@ -75,14 +95,37 @@ export function shoot(b, angle, power) {
   b.inCup = false;
 }
 
-// Pose and velocity of a moving obstacle at time t.
+// The speed a rolling ball has left after ds more of level ground: the same
+// friction and drag as a step, per distance instead of per time.
+export function slowDown(speed, ds, sand) {
+  const v2 = speed * speed - 2 * ((sand ? SAND_FRICTION : FRICTION) + DRAG * speed) * ds;
+  return v2 > 0 ? Math.sqrt(v2) : 0;
+}
+
+// The extra level distance a climb of dh costs a rolling ball.
+export function uphill(dh) {
+  return (G * dh) / FRICTION;
+}
+
+// Pose and velocity of a moving obstacle at time t. A windmill's angle is
+// its blades' turn; `shut` says whether one is down across the mouth.
 export function moverPose(m, t, out) {
+  out.shut = false;
   if (m.type === SPINNER) {
     out.x = m.x;
     out.z = m.z;
     out.angle = m.phase + m.speed * t;
     out.vx = 0;
     out.vz = 0;
+  } else if (m.type === WINDMILL) {
+    out.x = m.x;
+    out.z = m.z;
+    out.angle = m.phase + m.speed * t;
+    out.vx = 0;
+    out.vz = 0;
+    const quarter = Math.PI / 2;
+    const off = (((out.angle % quarter) + quarter) % quarter);
+    out.shut = off < MILL_SHUT || off > quarter - MILL_SHUT;
   } else {
     const w = (Math.PI * 2) / m.period;
     const a = w * t + m.phase;
@@ -98,7 +141,7 @@ export function moverPose(m, t, out) {
 }
 
 const grad = [0, 0];
-const pose = { x: 0, z: 0, angle: 0, vx: 0, vz: 0 };
+const pose = { x: 0, z: 0, angle: 0, vx: 0, vz: 0, shut: false };
 let contactX = 0; // normal of the last static contact in a step, for resting
 let contactZ = 0;
 
@@ -180,11 +223,15 @@ function collideMovers(b, c, t) {
         noteHit(b, HIT_MOVER, Math.max(v, 0.5), pose.x + px, pose.z + pz, i);
       }
     } else {
-      // An axis-aligned box: find the closest point of it to the ball.
-      const minX = pose.x - m.hw;
-      const maxX = pose.x + m.hw;
-      const minZ = pose.z - m.hd;
-      const maxZ = pose.z + m.hd;
+      // An axis-aligned box: a slider, or a windmill's mouth while a blade
+      // is down. Find the closest point of it to the ball.
+      if (m.type === WINDMILL && !pose.shut) continue;
+      const hw = m.type === WINDMILL ? MILL_HALF : m.hw;
+      const hd = m.type === WINDMILL ? MILL_DEPTH : m.hd;
+      const minX = pose.x - hw;
+      const maxX = pose.x + hw;
+      const minZ = pose.z - hd;
+      const maxZ = pose.z + hd;
       const qx = b.x < minX ? minX : b.x > maxX ? maxX : b.x;
       const qz = b.z < minZ ? minZ : b.z > maxZ ? maxZ : b.z;
       let dx = b.x - qx;
@@ -360,11 +407,13 @@ export function step(b, c, tick) {
 
 // Distance along a ray from (x, z) in direction (dx, dz) to the first border
 // or bumper a ball would touch, up to maxDist. The surface normal there is
-// written to out[0], out[1] (both 0 if nothing was hit).
+// written to out[0], out[1] (both 0 if nothing was hit), and out[2] is 1 for
+// a bumper, 0 for a border.
 export function castRay(c, x, z, dx, dz, maxDist, out) {
   let best = maxDist;
   out[0] = 0;
   out[1] = 0;
+  out[2] = 0;
   const segs = c.segs;
   const r = BALL_R + WALL_HALF;
   for (let i = 0; i < segs.length; i++) {
@@ -396,9 +445,71 @@ export function castRay(c, x, z, dx, dz, maxDist, out) {
   }
   const bumpers = c.bumpers;
   for (let i = 0; i < bumpers.length; i++) {
+    const before = best;
     best = rayCircle(x, z, dx, dz, bumpers[i].x, bumpers[i].z, BUMPER_R + BALL_R, best, out);
+    if (best < before) out[2] = 1;
   }
   return best;
+}
+
+// Whether a ball could rest at (x, z): on green or sand with room around
+// it, clear of borders, bumpers and the cup, out of every mover's reach and
+// on ground level enough to hold it.
+function restSpot(c, x, z) {
+  const m = BALL_R + 0.12;
+  for (let i = 0; i < 5; i++) {
+    const k = c.kindAt(x + (i === 1 ? m : i === 2 ? -m : 0), z + (i === 3 ? m : i === 4 ? -m : 0));
+    if (k !== GREEN && k !== SAND) return false;
+  }
+  const r = BALL_R + WALL_HALF + 0.08;
+  for (let i = 0; i < c.segs.length; i++) {
+    const s = c.segs[i];
+    const ex = s.bx - s.ax;
+    const ez = s.bz - s.az;
+    let k = ((x - s.ax) * ex + (z - s.az) * ez) / (ex * ex + ez * ez);
+    k = k < 0 ? 0 : k > 1 ? 1 : k;
+    if (Math.hypot(x - s.ax - ex * k, z - s.az - ez * k) < r) return false;
+  }
+  for (let i = 0; i < c.bumpers.length; i++) {
+    if (Math.hypot(x - c.bumpers[i].x, z - c.bumpers[i].z) < BUMPER_R + BALL_R + 0.12) return false;
+  }
+  if (Math.hypot(x - c.cup.x, z - c.cup.z) < CUP_PULL_R + 0.1) return false;
+  for (let i = 0; i < c.movers.length; i++) {
+    const mv = c.movers[i];
+    const pad = BALL_R + 0.2;
+    if (mv.type === SPINNER) {
+      if (Math.hypot(x - mv.x, z - mv.z) < mv.len + BAR_R + pad) return false;
+    } else if (mv.type === SLIDER) {
+      const hw = mv.hw + pad;
+      const hd = mv.hd + pad;
+      if (x > Math.min(mv.x0, mv.x1) - hw && x < Math.max(mv.x0, mv.x1) + hw && z > Math.min(mv.z0, mv.z1) - hd && z < Math.max(mv.z0, mv.z1) + hd) return false;
+    } else if (Math.abs(x - mv.x) < MILL_HALF + pad && Math.abs(z - mv.z) < MILL_DEPTH + pad) {
+      return false;
+    }
+  }
+  c.grad(x, z, grad);
+  return G * Math.hypot(grad[0], grad[1]) < FRICTION * 0.7;
+}
+
+// The nearest spot to (x, z) where a ball can rest safely (see restSpot),
+// written to out[0], out[1]. For a ball a mover knocked into trouble.
+export function safeSpot(c, x, z, out) {
+  out[0] = x;
+  out[1] = z;
+  for (let r = 0; r <= 6; r += 0.2) {
+    const n = r === 0 ? 1 : Math.ceil(r * 10);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const px = x + Math.cos(a) * r;
+      const pz = z + Math.sin(a) * r;
+      if (restSpot(c, px, pz)) {
+        out[0] = px;
+        out[1] = pz;
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function rayCircle(x, z, dx, dz, cx, cz, r, best, out) {

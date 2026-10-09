@@ -1,6 +1,7 @@
 // Pooled effects: one InstancedMesh of small boxes for wood chips, sparks,
-// splashes, dust and confetti (a ring of slots; a new particle takes the
-// oldest one), plus two expanding rings for splashes and the cup.
+// splashes, dust and confetti (a new particle takes the lowest free slot,
+// and only slots up to the highest live one are drawn), plus two expanding
+// rings for splashes and the cup.
 
 import * as THREE from 'three';
 
@@ -15,6 +16,7 @@ const CONFETTI = 1;
 export function createFx(scene) {
   const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ emissive: 0x303030 }), MAX);
   mesh.frustumCulled = false;
+  mesh.count = 0;
   scene.add(mesh);
 
   const px = new Float32Array(MAX);
@@ -51,13 +53,26 @@ export function createFx(scene) {
   }
   let nextRing = 0;
 
-  let cursor = 0;
+  let cursor = 0; // where the search for a free slot starts
+  let top = 0; // slots below this are drawn
   let live = 0;
   let colorsDirty = false;
 
   function spawn(k, x, y, z, sx, sy, sz, s, t, hex, ground) {
-    const i = cursor;
-    cursor = (cursor + 1) % MAX;
+    // The lowest free slot, or the next one round when all are taken.
+    let i = -1;
+    for (let j = cursor; j < MAX; j++) {
+      if (life[j] <= 0) {
+        i = j;
+        break;
+      }
+    }
+    if (i < 0) i = cursor % MAX;
+    cursor = i + 1;
+    if (i >= top) {
+      top = i + 1;
+      mesh.count = top;
+    }
     kind[i] = k;
     px[i] = x;
     py[i] = y;
@@ -124,6 +139,9 @@ export function createFx(scene) {
         mesh.setMatrixAt(i, ZERO);
       }
       live = 0;
+      cursor = 0;
+      top = 0;
+      mesh.count = 0;
       mesh.instanceMatrix.needsUpdate = true;
       for (let i = 0; i < RINGS; i++) rings[i].age = RING_TIME;
     },
@@ -141,7 +159,8 @@ export function createFx(scene) {
 
       if (live === 0) return;
       live = 0;
-      for (let i = 0; i < MAX; i++) {
+      let high = 0;
+      for (let i = 0; i < top; i++) {
         if (life[i] <= 0) continue;
         life[i] -= dt;
         if (life[i] <= 0) {
@@ -149,6 +168,7 @@ export function createFx(scene) {
           continue;
         }
         live++;
+        high = i + 1;
         if (kind[i] === CONFETTI) {
           // Paper: little gravity, lots of drag and a flutter.
           vy[i] = Math.max(vy[i] - GRAVITY * 0.35 * dt, -1.2);
@@ -177,6 +197,10 @@ export function createFx(scene) {
         dummy.updateMatrix();
         mesh.setMatrixAt(i, dummy.matrix);
       }
+      // Freed slots low down are taken first again.
+      top = high;
+      mesh.count = top;
+      cursor = 0;
       mesh.instanceMatrix.needsUpdate = true;
       if (colorsDirty) {
         mesh.instanceColor.needsUpdate = true;

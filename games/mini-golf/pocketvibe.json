@@ -2,15 +2,16 @@
   "id": "mini-golf",
   "title": "Mini Golf",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Nine hand-made minigolf holes with ramps, hills, bumpers, water and spinning obstacles: time the swinging power meter and sink every putt under par.",
+  "version": "1.2.0",
+  "description": "Two courses of nine hand-made minigolf holes with ramps, bowls, bumpers, water, spinners and a windmill: line up the putt with the preview, time the power meter and sink every hole under par.",
   "genre": "Sports",
   "controls": {
-    "D-pad": "Aim (LEFT / RIGHT turn, UP / DOWN fine-tune)",
-    "A": "Hold to charge, release to putt / start / next hole",
-    "B": "Cancel a charged putt / back to title (paused or final card)",
+    "D-pad": "Aim (LEFT / RIGHT turn, UP / DOWN fine-tune) / choose in menus",
+    "A": "Hold to charge, release to putt / select / skip the intro / next hole",
+    "B": "Cancel a charged putt / back",
+    "X": "Switch the power range: full or short putt",
     "Y": "Overview of the whole hole",
-    "START": "Pause / resume"
+    "START": "Pause menu"
   },
   "responsive": true
 }

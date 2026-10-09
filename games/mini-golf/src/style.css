@@ -181,6 +181,13 @@ body.handheld #legend {
   transform: none;
 }
 
+/* Shown empty while aiming, so the range and the last putt can be read
+   before A is held. */
+#power.idle {
+  opacity: 0.6;
+  transform: none;
+}
+
 #power .bar {
   position: relative;
   width: 26px;
@@ -223,6 +230,19 @@ body.handheld #legend {
   font-weight: 800;
   color: #fff;
   text-shadow: 0 2px 0 #12361a, 0 0 4px #000;
+}
+
+/* The short putting range: cool colours, so it never passes for full power. */
+#power.putt .fill {
+  background: linear-gradient(to top, #4fe0c0 0%, #4fc3ff 60%, #8a7bff 100%);
+}
+
+#power.putt .bar {
+  border-color: #bff0ff;
+}
+
+#power.putt .label {
+  color: #8fe6ff;
 }
 
 #hint {
@@ -406,6 +426,14 @@ body.handheld #legend {
   padding-top: 46px;
 }
 
+#message.dim {
+  background: rgba(8, 24, 12, 0.35);
+}
+
+#message.dim .panel {
+  background: rgba(14, 48, 26, 0.88);
+}
+
 .panel {
   display: flex;
   flex-direction: column;
@@ -445,6 +473,56 @@ body.handheld #legend {
 
 .panel .score b {
   color: #ffe14d;
+}
+
+.panel .blink {
+  animation: blink 1.1s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Title, options and pause menus. */
+.panel .menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  margin: 0 0 2px;
+}
+
+.panel .item {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 16px;
+  min-width: 240px;
+  padding: 1px 18px;
+  border-radius: 8px;
+  color: #e6f7e8;
+}
+
+.panel .item.course {
+  justify-content: space-between;
+  min-width: 380px;
+}
+
+.panel .item small {
+  font-size: 18px;
+  color: #ffe58a;
+}
+
+.panel .item.sel {
+  background: #ffe14d;
+  color: #1d3a12;
+  text-shadow: none;
+}
+
+.panel .item.sel small {
+  color: #6a4a08;
 }
 
 /* Scorecard */

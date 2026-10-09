@@ -11,12 +11,15 @@ import {
   BUMPER_R,
   GREEN,
   HUB_R,
+  MILL_DEPTH,
   SAND,
+  SLIDER,
   SPINNER,
   STONE,
   VOID,
   WALL_HALF,
   WATER,
+  WINDMILL,
   buildCourse,
   cutInside,
   isCut,
@@ -40,6 +43,15 @@ const BLOCK_COLORS = [0xff5a5f, 0xffc23d, 0x4d8dff, 0xa66bff, 0xff8a3d];
 const BUMPER_COLORS = [0xff4f7a, 0x4fc3ff, 0xffd23f, 0x8a6bff, 0x4fe08a];
 const MAX_BUMPERS = 8;
 const WATER_DROP = 0.2; // water sits this far below the green
+// Triangles for a hole's merged mesh, scenery included. With the ball, the
+// flag, bumpers, movers, the aim line and a burst of confetti on top, the
+// frame stays under the device's 10,000.
+const HOLE_TRIS = 6400;
+const MIN_SCENERY_TRIS = 2200;
+const MILL_WALL = 0xfff1dc;
+const MILL_ROOF = 0xd8453b;
+const MILL_HUB = 0.88; // the blades' hub above the green
+const MILL_BLADE = 0.74;
 
 const tmpColor = new THREE.Color();
 const tmpColor2 = new THREE.Color();
@@ -49,10 +61,26 @@ function playable(k) {
   return k === GREEN || k === SAND || isCut(k);
 }
 
+function tris(g) {
+  return (g.index ? g.index.count : g.attributes.position.count) / 3;
+}
+
+// Whether the height field is level all over tile (u, v).
+function levelTile(c, u, v) {
+  const x0 = c.ox + u;
+  const z0 = c.oz + v;
+  const h = c.height(x0, z0);
+  for (let j = 0; j <= 4; j++) {
+    for (let i = 0; i <= 4; i++) if (Math.abs(c.height(x0 + i / 4, z0 + j / 4) - h) > 1e-4) return false;
+  }
+  return true;
+}
+
 // The green surface: every tile is cut into n x n cells that follow the
-// height field. Cells on the diagonal of a cut tile become triangles.
+// height field, 4 x 4 on slopes and 2 x 2 on the level (whose edges are
+// level too, so no cracks open between the two). Cells on the diagonal of a
+// cut tile become triangles.
 function greenGeometry(c) {
-  const n = c.flat ? 2 : 4;
   const pos = [];
   const nor = [];
   const col = [];
@@ -77,6 +105,7 @@ function greenGeometry(c) {
       const k = c.tiles[v * c.cols + u];
       if (!playable(k)) continue;
       const hex = k === SAND ? SAND_COLOR : v % 2 ? GREEN_A : GREEN_B;
+      const n = c.flat || levelTile(c, u, v) ? 2 : 4;
       for (let j = 0; j < n; j++) {
         for (let i = 0; i < n; i++) {
           // Corners counter-clockwise seen from above: NW, SW, SE, NE.
@@ -158,15 +187,23 @@ function bordersAndPosts(c, parts, accent) {
     const len = Math.hypot(s.bx - s.ax, s.bz - s.az);
     const ux = (s.bx - s.ax) / len;
     const uz = (s.bz - s.az) / len;
-    // Short pieces so the top follows slopes; the ends reach a little
-    // further to close the corners.
-    const pieces = Math.max(1, Math.ceil(len / (c.flat ? 4 : 0.5)));
-    for (let i = 0; i < pieces; i++) {
-      const a = (i / pieces) * len - (i === 0 ? WALL_HALF : 0);
-      const b = ((i + 1) / pieces) * len + (i === pieces - 1 ? WALL_HALF : 0);
+    // Short pieces where the green slopes, so the top follows it, and up
+    // to 4 long on the level; the ends reach a little further to close the
+    // corners.
+    const steps = Math.max(1, Math.ceil(len / 0.5));
+    const at = (i) => c.height(s.ax + ux * (i / steps) * len, s.az + uz * (i / steps) * len);
+    let from = 0;
+    while (from < steps) {
+      const h = at(from);
+      let to = from + 1;
+      while (to < steps && (to + 1 - from) * (len / steps) <= 4 && Math.abs(at(to + 1) - h) < 1e-4 &&
+        Math.abs(at(to + 0.5) - h) < 1e-4 && Math.abs(at(to) - h) < 1e-4 && Math.abs(at(from + 0.5) - h) < 1e-4) to++;
+      const a = (from / steps) * len - (from === 0 ? WALL_HALF : 0);
+      const b = (to / steps) * len + (to === steps ? WALL_HALF : 0);
       parts.push(
         strip(c, s.ax + ux * a, s.az + uz * a, s.ax + ux * b, s.az + uz * b, WALL_HALF * 2, WALL_H, GROUND_Y, WOOD, WOOD_TOP, WOOD_DARK),
       );
+      from = to;
     }
     addPost(s.ax, s.az);
     addPost(s.bx, s.bz);
@@ -180,12 +217,24 @@ function bordersAndPosts(c, parts, accent) {
   }
 }
 
+// The tile a windmill's tunnel runs through, as [u, v].
+function millTile(c, m) {
+  return [Math.floor(m.x - c.ox), Math.floor(m.z - 0.5 - MILL_DEPTH - c.oz)];
+}
+
 function blocks(c, parts) {
-  // Neighbouring block tiles form one block of one color.
+  // Neighbouring block tiles form one block of one color. The two beside a
+  // windmill's tunnel are inside its house.
   const group = new Int16Array(c.cols * c.rows).fill(-1);
+  for (const m of c.movers) {
+    if (m.type !== WINDMILL) continue;
+    const [u, v] = millTile(c, m);
+    group[v * c.cols + u - 1] = -2;
+    group[v * c.cols + u + 1] = -2;
+  }
   let groups = 0;
   for (let i = 0; i < group.length; i++) {
-    if (c.tiles[i] !== BLOCK || group[i] >= 0) continue;
+    if (c.tiles[i] !== BLOCK || group[i] !== -1) continue;
     const stack = [i];
     group[i] = groups;
     while (stack.length) {
@@ -194,7 +243,7 @@ function blocks(c, parts) {
       const v = (j / c.cols) | 0;
       const near = [u > 0 ? j - 1 : -1, u < c.cols - 1 ? j + 1 : -1, v > 0 ? j - c.cols : -1, v < c.rows - 1 ? j + c.cols : -1];
       for (const q of near) {
-        if (q >= 0 && c.tiles[q] === BLOCK && group[q] < 0) {
+        if (q >= 0 && c.tiles[q] === BLOCK && group[q] === -1) {
           group[q] = groups;
           stack.push(q);
         }
@@ -293,9 +342,34 @@ function cupAndTee(c, parts, accent) {
   }
 }
 
+// A windmill's house: two whitewashed towers over the blocks beside the
+// tunnel, a lintel over it, a red roof and two windows.
+function millHouses(c, parts) {
+  for (const m of c.movers) {
+    if (m.type !== WINDMILL) continue;
+    const [u, v] = millTile(c, m);
+    const x = c.ox + u + 0.5;
+    const z = c.oz + v + 0.5;
+    const h = c.height(x, z);
+    const w = 1 + WALL_HALF * 2;
+    const open = 1 - WALL_HALF * 2;
+    for (let s = -1; s <= 1; s += 2) {
+      parts.push(box(w, 1.15, w, x + s, h + 0.575, z, MILL_WALL, 0xf3e2c6));
+      parts.push(box(0.3, 0.3, 0.02, x + s, h + 0.72, z + w / 2 + 0.01, 0x3a5a8a));
+    }
+    parts.push(box(open, 0.65, w, x, h + 0.825, z, MILL_WALL, 0xf3e2c6));
+    parts.push(box(open + 0.1, 0.08, 0.06, x, h + 0.52, z + w / 2, 0xb5651d)); // the tunnel's beam
+    const roof = new THREE.CylinderGeometry(0.85, 0.85, 3.5, 3, 1, false, Math.PI / 2);
+    roof.rotateZ(Math.PI / 2);
+    roof.scale(1, 0.6, 1);
+    roof.translate(x, h + 1.15 + 0.255, z);
+    parts.push(paint(roof, MILL_ROOF));
+  }
+}
+
 function sliderRails(c, parts) {
   for (const m of c.movers) {
-    if (m.type === SPINNER) continue;
+    if (m.type !== SLIDER) continue;
     const dx = m.x1 - m.x0;
     const dz = m.z1 - m.z0;
     const len = Math.hypot(dx, dz);
@@ -309,8 +383,10 @@ function sliderRails(c, parts) {
 }
 
 // Scenery on the meadow around the course: trees far enough out not to
-// block the camera, bushes, rocks and flowers closer in.
-function scenery(c, parts, rand) {
+// block the camera, bushes, rocks and flowers closer in. Each prop is a
+// handful of triangles, and a hole with a lot of course of its own gets a
+// thinner meadow, so every hole fits in `budget` triangles.
+function scenery(c, parts, rand, budget) {
   const land = [];
   for (let v = 0; v < c.rows; v++) {
     for (let u = 0; u < c.cols; u++) {
@@ -327,6 +403,7 @@ function scenery(c, parts, rand) {
     }
     return Math.sqrt(best);
   };
+  const props = []; // each a list of geometries
   const reachX = c.cols / 2 + 14;
   const reachZ = c.rows / 2 + 14;
   const y = GROUND_Y;
@@ -339,7 +416,8 @@ function scenery(c, parts, rand) {
     const s = 0.75 + rand() * 0.5;
     const rot = rand() * Math.PI;
     if (d > 6.5 && r < 0.55) {
-      const trunk = cylinder(0.14 * s, 0.2 * s, 0.9 * s, 5, x, y + 0.45 * s, z, 0x7a5232);
+      const trunk = new THREE.CylinderGeometry(0.14 * s, 0.2 * s, 0.9 * s, 4, 1, true);
+      trunk.translate(x, y + 0.45 * s, z);
       const low = new THREE.IcosahedronGeometry(0.95 * s, 0);
       low.rotateY(rot);
       low.translate(x, y + 1.35 * s, z);
@@ -347,28 +425,31 @@ function scenery(c, parts, rand) {
       high.rotateY(rot + 1);
       high.translate(x + 0.15 * s, y + 2.0 * s, z - 0.1 * s);
       const leaf = [0x3fae55, 0x4fbf5a, 0x2f9e4f][Math.floor(rand() * 3)];
-      parts.push(trunk, paint(low, leaf), paint(high, 0x63cf6a));
+      props.push([paint(trunk, 0x7a5232), paint(low, leaf), paint(high, 0x63cf6a)]);
     } else if (r < 0.45) {
       const g = new THREE.IcosahedronGeometry(0.5 * s, 0);
       g.scale(1.2, 0.75, 1);
       g.rotateY(rot);
       g.translate(x, y + 0.3 * s, z);
-      parts.push(paint(g, rand() < 0.5 ? 0x48b85a : 0x3aa64f));
+      props.push([paint(g, rand() < 0.5 ? 0x48b85a : 0x3aa64f)]);
     } else if (r < 0.6) {
       const g = new THREE.DodecahedronGeometry(0.32 * s, 0);
       g.scale(1.3, 0.7, 1);
       g.rotateY(rot);
       g.translate(x, y + 0.12 * s, z);
-      parts.push(paint(g, 0xb2bcc6));
+      props.push([paint(g, 0xb2bcc6)]);
     } else {
       // A little clump of flowers.
       const hex = [0xff6b8a, 0xffe14d, 0xffffff, 0xb784ff, 0xff9f45][Math.floor(rand() * 5)];
+      const clump = [];
       for (let k = 0; k < 3; k++) {
         const fx = x + (rand() - 0.5) * 0.7;
         const fz = z + (rand() - 0.5) * 0.7;
-        parts.push(box(0.05, 0.28, 0.05, fx, y + 0.14, fz, 0x3a8f3a));
-        parts.push(box(0.18, 0.08, 0.18, fx, y + 0.3, fz, hex, hex));
+        const stem = new THREE.CylinderGeometry(0.03, 0.03, 0.28, 3, 1, true);
+        stem.translate(fx, y + 0.14, fz);
+        clump.push(paint(stem, 0x3a8f3a), box(0.18, 0.08, 0.18, fx, y + 0.3, fz, hex, hex));
       }
+      props.push(clump);
     }
   }
   // Lily pads on the water.
@@ -378,8 +459,28 @@ function scenery(c, parts, rand) {
       const x = c.ox + u + 0.25 + rand() * 0.5;
       const z = c.oz + v + 0.25 + rand() * 0.5;
       const h = c.height(x, z) - WATER_DROP + 0.015;
-      parts.push(cylinder(0.24, 0.24, 0.025, 9, x, h, z, 0x3fa34a, 0x5cc15a));
-      if (rand() < 0.4) parts.push(box(0.1, 0.07, 0.1, x + 0.08, h + 0.04, z, 0xff8fc8, 0xffc2e2));
+      const lily = cylinder(0.24, 0.24, 0.025, 9, x, h, z, 0x3fa34a, 0x5cc15a);
+      parts.push(lily);
+      budget -= tris(lily);
+      if (rand() < 0.4) {
+        parts.push(box(0.1, 0.07, 0.1, x + 0.08, h + 0.04, z, 0xff8fc8, 0xffc2e2));
+        budget -= 12;
+      }
+    }
+  }
+  // Thin the meadow evenly down to the budget.
+  let total = 0;
+  for (const p of props) for (const g of p) total += tris(g);
+  const keep = Math.min(1, budget / total);
+  let spent = 0;
+  for (const p of props) {
+    let cost = 0;
+    for (const g of p) cost += tris(g);
+    if (rand() < keep && spent + cost <= budget) {
+      spent += cost;
+      parts.push(...p);
+    } else {
+      for (const g of p) g.dispose();
     }
   }
 }
@@ -409,6 +510,23 @@ function sliderGeometry(m) {
   return merge(parts);
 }
 
+// Four sails on spars around a hub, the first pointing down, facing the tee.
+function millGeometry() {
+  const parts = [];
+  for (let k = 0; k < 4; k++) {
+    const spar = box(0.06, MILL_BLADE, 0.04, 0, -MILL_BLADE / 2, 0, 0x8a5a32);
+    const sail = box(0.26, MILL_BLADE * 0.72, 0.025, 0.16, -MILL_BLADE * 0.58, -0.01, k % 2 ? 0xffffff : 0xff4f5e);
+    for (const g of [spar, sail]) {
+      g.rotateZ((k * Math.PI) / 2);
+      parts.push(g);
+    }
+  }
+  const hub = cylinder(0.08, 0.08, 0.12, 8, 0, 0, 0, 0x5a3a22, 0xffd23f);
+  hub.rotateX(Math.PI / 2);
+  parts.push(hub);
+  return merge(parts);
+}
+
 function buildHole(def, index, materials) {
   const c = buildCourse(def);
   const rand = seeded(101 + index * 37);
@@ -418,11 +536,14 @@ function buildHole(def, index, materials) {
   blocks(c, parts);
   banks(c, parts);
   cupAndTee(c, parts, def.flag);
+  millHouses(c, parts);
   sliderRails(c, parts);
-  scenery(c, parts, rand);
+  const waterGeo = waterGeometry(c);
+  let used = waterGeo ? tris(waterGeo) : 0;
+  for (const g of parts) used += tris(g);
+  scenery(c, parts, rand, Math.max(MIN_SCENERY_TRIS, HOLE_TRIS - used));
   group.add(new THREE.Mesh(merge(parts), materials.solid));
 
-  const waterGeo = waterGeometry(c);
   let water = null;
   if (waterGeo) {
     water = new THREE.Mesh(waterGeo, materials.water);
@@ -430,7 +551,8 @@ function buildHole(def, index, materials) {
   }
 
   const movers = c.movers.map((m) => {
-    const mesh = new THREE.Mesh(m.type === SPINNER ? spinnerGeometry(m) : sliderGeometry(m), materials.solid);
+    const geometry = m.type === SPINNER ? spinnerGeometry(m) : m.type === WINDMILL ? millGeometry() : sliderGeometry(m);
+    const mesh = new THREE.Mesh(geometry, materials.solid);
     group.add(mesh);
     return mesh;
   });
@@ -442,9 +564,9 @@ function buildHole(def, index, materials) {
 function bumperGeometry() {
   // The body takes the instance color; the rubber ring stays dark.
   return merge([
-    cylinder(BUMPER_R * 0.92, BUMPER_R, 0.24, 14, 0, 0.12, 0, 0xffffff, 0xffffff),
-    cylinder(BUMPER_R + 0.03, BUMPER_R + 0.03, 0.08, 14, 0, 0.14, 0, 0x2a2a35, 0x2a2a35),
-    cylinder(BUMPER_R * 0.55, BUMPER_R * 0.7, 0.1, 12, 0, 0.29, 0, 0xffffff, 0xffffff),
+    cylinder(BUMPER_R * 0.92, BUMPER_R, 0.24, 12, 0, 0.12, 0, 0xffffff, 0xffffff),
+    cylinder(BUMPER_R + 0.03, BUMPER_R + 0.03, 0.08, 12, 0, 0.14, 0, 0x2a2a35, 0x2a2a35),
+    cylinder(BUMPER_R * 0.55, BUMPER_R * 0.7, 0.1, 10, 0, 0.29, 0, 0xffffff, 0xffffff),
   ]);
 }
 
@@ -586,13 +708,20 @@ export function createBumpers(scene) {
   };
 }
 
-// Poses the spinner and slider meshes of a hole for simulation time t.
-const pose = { x: 0, z: 0, angle: 0, vx: 0, vz: 0 };
+// Poses the spinner, slider and windmill meshes of a hole for simulation
+// time t.
+const pose = { x: 0, z: 0, angle: 0, vx: 0, vz: 0, shut: false };
 export function poseMovers(hole, t) {
   const movers = hole.course.movers;
   for (let i = 0; i < movers.length; i++) {
     moverPose(movers[i], t, pose);
     const mesh = hole.movers[i];
+    if (movers[i].type === WINDMILL) {
+      // The blades turn in front of the house, over the sweep zone.
+      mesh.position.set(pose.x, hole.course.height(pose.x, pose.z - 0.6) + MILL_HUB, pose.z + 0.08);
+      mesh.rotation.z = pose.angle;
+      continue;
+    }
     mesh.position.set(pose.x, hole.course.height(pose.x, pose.z), pose.z);
     mesh.rotation.y = -pose.angle;
   }
