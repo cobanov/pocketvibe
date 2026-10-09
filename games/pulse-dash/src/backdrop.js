@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAM_Z, box } from './shared.js';
+import { CAM_Z, quad } from './shared.js';
 
 const FRAMES = 14;
 const FRAME_SPACING = 9; // world units between frames
@@ -14,18 +14,19 @@ const BAR_SPACING = 1.6;
 const BAR_DRIFT = 0.12;
 const BAR_Z = -46;
 
-// A square outline of unit size, or a diamond when turned 45 degrees.
+// A square outline of unit size, or a diamond when turned 45 degrees. It
+// only turns in its own plane, facing the camera, so flat quads will do.
 function frameGeometry() {
   const t = 0.07;
   return mergeGeometries([
-    box(1, t, t, 0, 0.5, 0, 0xffffff),
-    box(1, t, t, 0, -0.5, 0, 0xffffff),
-    box(t, 1 + t, t, -0.5, 0, 0, 0xffffff),
-    box(t, 1 + t, t, 0.5, 0, 0, 0xffffff),
-    box(0.62, t * 0.7, t, 0, 0.31, 0, 0x707070), // a smaller square inside
-    box(0.62, t * 0.7, t, 0, -0.31, 0, 0x707070),
-    box(t * 0.7, 0.62, t, -0.31, 0, 0, 0x707070),
-    box(t * 0.7, 0.62, t, 0.31, 0, 0, 0x707070),
+    quad(1, t, 0, 0.5, 0, 0xffffff),
+    quad(1, t, 0, -0.5, 0, 0xffffff),
+    quad(t, 1 + t, -0.5, 0, 0, 0xffffff),
+    quad(t, 1 + t, 0.5, 0, 0, 0xffffff),
+    quad(0.62, t * 0.7, 0, 0.31, 0, 0x707070), // a smaller square inside
+    quad(0.62, t * 0.7, 0, -0.31, 0, 0x707070),
+    quad(t * 0.7, 0.62, -0.31, 0, 0, 0x707070),
+    quad(t * 0.7, 0.62, 0.31, 0, 0, 0x707070),
   ]);
 }
 

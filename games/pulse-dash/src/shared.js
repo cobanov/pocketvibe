@@ -9,6 +9,7 @@ import * as THREE from 'three';
 export const CUBE_COLOR = 0xc6ff3a;
 export const PAD_COLOR = 0xffe14a;
 export const RING_COLOR = 0xffe14a;
+export const CHECK_COLOR = 0x3dff8a;
 
 // Camera: a side view from a little above, the cube in the left third.
 export const CAM_AHEAD = 4.2; // the camera looks this far ahead of the cube

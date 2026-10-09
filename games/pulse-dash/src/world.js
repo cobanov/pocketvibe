@@ -1,12 +1,12 @@
-// The track: the glowing grid floor (with gaps), the obstacles and the
-// finish gate. Every kind of thing is one InstancedMesh, and each frame only
+// The track: the glowing grid floor (with gaps), the obstacles, practice
+// checkpoints and the finish gate. Every kind of thing is one InstancedMesh, and each frame only
 // the things near the camera are written into it. Shapes are baked in grey
 // vertex colours; the level's neon colour comes from the material, so a new
 // level is only a colour change, and the beat pulse a brightness change.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAM_Z, PAD_COLOR, RING_COLOR, VIEW_AHEAD, VIEW_BACK, box, glowTexture, paint, quad } from './shared.js';
+import { CAM_Z, CHECK_COLOR, PAD_COLOR, RING_COLOR, VIEW_AHEAD, VIEW_BACK, box, glowTexture, paint, quad } from './shared.js';
 
 const FLOOR_DEPTH = 22; // the grid runs back this far
 const FLOOR_FRONT = 1.3; // and comes this far towards the camera
@@ -17,6 +17,9 @@ const MAX_SPIKES = 70;
 const MAX_PADS = 10;
 const MAX_RINGS = 12;
 const MAX_LEVEL_ITEMS = 128; // rings or pads in one whole level, for their flash timers
+const MAX_CHECKS = 64; // practice checkpoints in one level (at most one per bar)
+const SHOWN_CHECKS = 6;
+const CHECK_RISE = 1.6; // a checkpoint's diamond floats this far over the cube's base
 const DIM = 0x3c3c3c;
 
 function floorGeometry() {
@@ -38,23 +41,25 @@ function floorGeometry() {
   return mergeGeometries(parts);
 }
 
-// A dark cube with a bright frame on its front face and lit top edges.
+// A dark cube with a bright frame on its front face and lit top edges. The
+// thin parts only ever show one face, so they are flat quads (a third of
+// the triangles of thin boxes, which matters on a wall of blocks).
 function blockGeometry() {
   const t = 0.08;
-  const f = 0.52; // the frame stands a little proud of the face
+  const f = 0.54; // the frame stands a little proud of the face
   return mergeGeometries([
     box(0.98, 0.98, 0.98, 0, 0, 0, 0x1c1c1c),
-    box(1, t, 0.04, 0, 0.5 - t / 2, f, 0xffffff),
-    box(1, t, 0.04, 0, -0.5 + t / 2, f, 0xffffff),
-    box(t, 1, 0.04, -0.5 + t / 2, 0, f, 0xffffff),
-    box(t, 1, 0.04, 0.5 - t / 2, 0, f, 0xffffff),
-    box(0.5, 0.05, 0.03, 0, 0.25, f, DIM), // a small inner square
-    box(0.5, 0.05, 0.03, 0, -0.25, f, DIM),
-    box(0.05, 0.5, 0.03, -0.25, 0, f, DIM),
-    box(0.05, 0.5, 0.03, 0.25, 0, f, DIM),
-    box(0.06, 0.06, 1, -0.5, 0.5, 0, 0xb0b0b0), // top edges, seen from above
-    box(0.06, 0.06, 1, 0.5, 0.5, 0, 0xb0b0b0),
-    box(1, 0.06, 0.06, 0, 0.5, -0.5, 0x6a6a6a),
+    quad(1, t, 0, 0.5 - t / 2, f, 0xffffff),
+    quad(1, t, 0, -0.5 + t / 2, f, 0xffffff),
+    quad(t, 1, -0.5 + t / 2, 0, f, 0xffffff),
+    quad(t, 1, 0.5 - t / 2, 0, f, 0xffffff),
+    quad(0.5, 0.05, 0, 0.25, f - 0.01, DIM), // a small inner square
+    quad(0.5, 0.05, 0, -0.25, f - 0.01, DIM),
+    quad(0.05, 0.5, -0.25, 0, f - 0.01, DIM),
+    quad(0.05, 0.5, 0.25, 0, f - 0.01, DIM),
+    quad(0.06, 1, -0.5, 0.53, 0, 0xb0b0b0, true), // top edges, seen from above
+    quad(0.06, 1, 0.5, 0.53, 0, 0xb0b0b0, true),
+    quad(1, 0.06, 0, 0.53, -0.5, 0x6a6a6a, true),
   ]);
 }
 
@@ -63,9 +68,9 @@ function pillarGeometry() {
   const f = 0.52;
   return mergeGeometries([
     box(0.94, 1, 0.94, 0, 0, 0, 0x1a1a1a),
-    box(0.1, 1, 0.04, -0.45, 0, f, 0xffffff),
-    box(0.1, 1, 0.04, 0.45, 0, f, 0xffffff),
-    box(0.8, 0.05, 0.03, 0, 0, f, 0x505050),
+    quad(0.1, 1, -0.45, 0, f + 0.02, 0xffffff),
+    quad(0.1, 1, 0.45, 0, f + 0.02, 0xffffff),
+    quad(0.8, 0.05, 0, 0, f + 0.01, 0x505050),
     box(0.06, 1, 0.06, -0.47, 0, -0.47, 0x6a6a6a),
     box(0.06, 1, 0.06, 0.47, 0, -0.47, 0x6a6a6a),
   ]);
@@ -110,6 +115,19 @@ function padGeometry() {
   dome.scale(1, 0.5, 1);
   dome.translate(0, -0.46, 0);
   return mergeGeometries([paint(dome, PAD_COLOR), box(0.9, 0.08, 0.9, 0, -0.46, 0, 0xb89a1f)]);
+}
+
+// A practice checkpoint: a diamond, lighter on top.
+function checkGeometry() {
+  const top = new THREE.ConeGeometry(0.26, 0.34, 4, 1);
+  top.deleteAttribute('uv');
+  top.translate(0, 0.17, 0);
+  const bottom = new THREE.ConeGeometry(0.26, 0.34, 4, 1);
+  bottom.deleteAttribute('uv');
+  bottom.rotateX(Math.PI);
+  bottom.translate(0, -0.17, 0);
+  const dark = new THREE.Color(CHECK_COLOR).multiplyScalar(0.55).getHex();
+  return mergeGeometries([paint(top, CHECK_COLOR), paint(bottom, dark)]);
 }
 
 function ringGeometry() {
@@ -170,6 +188,7 @@ export function createWorld(scene, halfTan) {
   const pads = instanced(scene, padGeometry(), yellowMat, MAX_PADS);
   const rings = instanced(scene, ringGeometry(), yellowMat, MAX_RINGS);
   const glows = instanced(scene, new THREE.PlaneGeometry(1, 1), glowMat, MAX_RINGS + MAX_PADS);
+  const checks = instanced(scene, checkGeometry(), yellowMat, SHOWN_CHECKS);
 
   const gateMat = new THREE.MeshBasicMaterial({ vertexColors: true });
   const gate = new THREE.Mesh(gateGeometry(), gateMat);
@@ -187,6 +206,10 @@ export function createWorld(scene, halfTan) {
   let L = null;
   const ringFlash = new Float32Array(MAX_LEVEL_ITEMS);
   const padFlash = new Float32Array(MAX_LEVEL_ITEMS);
+  const checkX = new Float32Array(MAX_CHECKS);
+  const checkY = new Float32Array(MAX_CHECKS);
+  let checkCount = 0;
+  let checkFlash = 0;
   let time = 0;
 
   // Writes the instance at (x, y, 0) with a uniform scale and a z rotation.
@@ -222,6 +245,18 @@ export function createWorld(scene, halfTan) {
     clearFlashes() {
       ringFlash.fill(0);
       padFlash.fill(0);
+    },
+
+    // Practice checkpoints, where the cube's base was.
+    addCheckpoint(x, y) {
+      if (checkCount >= MAX_CHECKS) return;
+      checkX[checkCount] = x;
+      checkY[checkCount] = y;
+      checkCount++;
+      checkFlash = 1;
+    },
+    clearCheckpoints() {
+      checkCount = 0;
     },
 
     // camX: the camera's x; pulse: the beat, 0 to 1.
@@ -300,6 +335,22 @@ export function createWorld(scene, halfTan) {
       rings.instanceMatrix.needsUpdate = true;
       glows.count = ng;
       glows.instanceMatrix.needsUpdate = true;
+
+      // Checkpoints in view spin slowly; the newest one pops when set.
+      checkFlash = Math.max(0, checkFlash - dt * 3);
+      n = 0;
+      for (let i = checkCount - 1; i >= 0 && n < SHOWN_CHECKS; i--) {
+        if (checkX[i] < camX - VIEW_BACK) break;
+        if (checkX[i] > camX + VIEW_AHEAD) continue;
+        const pop = i === checkCount - 1 ? checkFlash : 0;
+        dummy.position.set(checkX[i], checkY[i] + CHECK_RISE, -0.4);
+        dummy.rotation.set(0, time * 1.5 + i, 0);
+        dummy.scale.setScalar(1 + 0.12 * pulse + 0.8 * pop);
+        dummy.updateMatrix();
+        checks.setMatrixAt(n++, dummy.matrix);
+      }
+      checks.count = n;
+      checks.instanceMatrix.needsUpdate = true;
 
       const gateNear = Math.abs(L.endX - camX) < 16;
       gate.visible = gateNear;

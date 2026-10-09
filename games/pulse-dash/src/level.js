@@ -36,6 +36,7 @@ export function buildLevel(def) {
         bass: section.bass || '',
         arp: !!section.arp,
         pad: !!section.pad,
+        lead: !!section.lead,
         crash: !!section.crash && k === 0,
         riser: !!section.riser && k === names.length - 2, // a riser spans the last two bars
         fill: section.drums === 'full' && k % 4 === 3 && k !== names.length - 1,
