@@ -38,6 +38,20 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
         };
         """
 
+    // In a game: an element that plays a CSS animation keeps its own layer
+    // afterwards. Otherwise WebKit makes a layer when the animation starts and
+    // drops it (repainting what was under it) when it ends, and on the iPhone
+    // that churn jolted the picture while the game kept 60 fps: every coin in
+    // Jet Rush bumps the coin counter. Android's WebView does not jolt.
+    private static let layerScript = """
+        if (location.search.includes('handheld')) {
+          addEventListener('animationstart', (e) => {
+            const el = e.target;
+            if (el.style && !el.style.willChange) el.style.willChange = 'transform, opacity';
+          }, true);
+        }
+        """
+
     // Every page's sound, so a press can start it (above).
     private static let audioScript = """
         for (const name of ['AudioContext', 'webkitAudioContext']) {
@@ -175,6 +189,7 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
         #endif
         config.userContentController.addUserScript(WKUserScript(source: Self.keyScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController.addUserScript(WKUserScript(source: Self.audioScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        config.userContentController.addUserScript(WKUserScript(source: Self.layerScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.addUserScript(WKUserScript(source: Self.consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.add(WeakHandler(self), name: "console")
         #if DEBUG
