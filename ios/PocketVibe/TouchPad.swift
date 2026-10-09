@@ -33,11 +33,12 @@ enum Key: CaseIterable {
 
 let background = UIColor(red: 0x0F / 255, green: 0x10 / 255, blue: 0x16 / 255, alpha: 1) // --bg in launcher.css
 private let side: CGFloat = 124 // pt: the least room beside the page for each side's buttons
+private let below: CGFloat = 330 // pt: the room the buttons take below the page when upright
 
 /// The iPhone's screen, which has no buttons: the page (the launcher or a
-/// game, both made for a 720x480 screen) in a 3:2 box, and the handheld's
-/// buttons drawn around it, below it when the phone is upright and either side
-/// of it when it lies on its side. Without the buttons (a gamepad is
+/// game, both made for a 720x480 screen, and the games for any shape from 2:1
+/// to 1:1), and the handheld's buttons drawn around it: below it when the
+/// phone is upright and either side of it when it lies on its side. Without the buttons (a gamepad is
 /// connected) the page has the whole screen, as on a handheld.
 final class PadLayout: UIView {
     let pad: TouchPad
@@ -77,8 +78,11 @@ final class PadLayout: UIView {
         if !padShown {
             game = bounds.inset(by: UIEdgeInsets(top: h > w ? safe.top : 0, left: safe.left, bottom: h > w ? safe.bottom : 0, right: safe.right))
         } else if h > w {
-            // Upright: the page across the top, under the camera; the buttons below.
-            game = CGRect(x: 0, y: safe.top, width: w, height: (w * 2 / 3).rounded())
+            // Upright: the page across the top, under the camera, and square (as
+            // on the RG Rotate) when the buttons still fit below it; on a short
+            // screen shorter, down to 3:2.
+            let height = min(max(h - safe.top - safe.bottom - below, (w * 2 / 3).rounded()), w).rounded()
+            game = CGRect(x: 0, y: safe.top, width: w, height: height)
             pad.arrangeUpright(size: bounds.size, game: game, safe: safe)
         } else {
             // On its side: the page in the middle, as tall as it can be with
@@ -147,7 +151,8 @@ final class TouchPad: UIView {
     func arrangeUpright(size: CGSize, game: CGRect, safe: UIEdgeInsets) {
         let w = size.width
         let bottom = size.height - safe.bottom
-        let r = min(min(w / 4 - 12, 84), (bottom - game.maxY) * 0.2)
+        // The buttons take 158 pt and the d-pad twice its reach (see below).
+        let r = min(min(w / 4 - 12, 84), (bottom - game.maxY - 158) / 2)
         let menuY = bottom - 40
         let y = menuY - 44 - r
         place(dpad: CGPoint(x: w / 4, y: y), abxy: CGPoint(x: 3 * w / 4, y: y), radius: r)

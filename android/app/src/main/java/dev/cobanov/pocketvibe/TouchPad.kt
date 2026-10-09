@@ -18,12 +18,13 @@ import kotlin.math.roundToInt
 
 private const val BACKGROUND = 0xFF0F1016.toInt() // --bg in launcher.css
 private const val SIDE = 128f // dp: the least room beside the page for each side's buttons
+private const val BELOW = 330f // dp: the room the buttons take below the page when upright
 
 /**
  * A phone's screen, which has no buttons: the page (the launcher or a game,
- * both made for a 720x480 screen) in a 3:2 box, and the handheld's buttons
- * drawn around it, below it when the phone is upright and either side of it
- * when it lies on its side. Without the buttons (a gamepad is connected) the
+ * both made for a 720x480 screen, and the games for any shape from 2:1 to
+ * 1:1), and the handheld's buttons drawn around it: below it when the phone
+ * is upright and either side of it when it lies on its side. Without the buttons (a gamepad is connected) the
  * page has the whole screen, as on a handheld.
  */
 class PadLayout(context: Context, onKey: (Key, Boolean) -> Unit) : ViewGroup(context) {
@@ -79,8 +80,11 @@ class PadLayout(context: Context, onKey: (Key, Boolean) -> Unit) : ViewGroup(con
         if (!padShown) {
             game.set(0, 0, w, h)
         } else if (h > w) {
-            // Upright: the page across the top, under the camera; the buttons below.
-            game.set(0, cutout.top, w, cutout.top + w * 2 / 3)
+            // Upright: the page across the top, under the camera, and square (as
+            // on the RG Rotate) when the buttons still fit below it; on a short
+            // screen shorter, down to 3:2.
+            val height = (h - cutout.top - cutout.bottom - (BELOW * dp).roundToInt()).coerceIn(w * 2 / 3, w)
+            game.set(0, cutout.top, w, cutout.top + height)
             pad.arrangeUpright(w, h, game, cutout)
         } else {
             // On its side: the page in the middle, as tall as it can be with
@@ -142,7 +146,8 @@ private class TouchPad(context: Context, private val onKey: (Key, Boolean) -> Un
 
     fun arrangeUpright(w: Int, h: Int, game: Rect, cutout: Rect) {
         val bottom = h - cutout.bottom
-        val r = min(min(w / 4f - 12 * dp, 84 * dp), (bottom - game.bottom) * 0.2f)
+        // The buttons take 162 dp and the d-pad twice its reach (see BELOW).
+        val r = min(min(w / 4f - 12 * dp, 84 * dp), (bottom - game.bottom - 162 * dp) / 2)
         val menuY = bottom - 48 * dp
         val y = menuY - 44 * dp - r
         place(w / 4f, y, 3 * w / 4f, y, r)
