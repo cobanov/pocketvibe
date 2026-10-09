@@ -44,7 +44,10 @@ export function box(w, h, d, x, y, z, hex) {
 
 // Merges painted parts into one geometry. Boxes and cylinders are indexed and
 // icosahedrons are not, so everything is converted to non-indexed first.
-export function merge(parts) {
+// hideInside drops the triangles that lie inside another part (where a
+// cloud's balls overlap): they can never be seen. Every part must then be a
+// closed convex shape (a ball, a cone, a box).
+export function merge(parts, hideInside = false) {
   for (let i = 0; i < parts.length; i++) {
     if (parts[i].index) {
       const flat = parts[i].toNonIndexed();
@@ -52,9 +55,100 @@ export function merge(parts) {
       parts[i] = flat;
     }
   }
+  if (hideInside) dropInside(parts);
   const merged = mergeGeometries(parts);
   for (let i = 0; i < parts.length; i++) parts[i].dispose();
   return merged;
+}
+
+// A new non-indexed geometry with only the triangles whose numbers are in keep.
+function keepTriangles(geometry, keep) {
+  const out = new THREE.BufferGeometry();
+  for (const name in geometry.attributes) {
+    const attr = geometry.attributes[name];
+    const size = attr.itemSize;
+    const src = attr.array;
+    const dst = new Float32Array(keep.length * 3 * size);
+    for (let k = 0; k < keep.length; k++) {
+      const from = keep[k] * 3 * size;
+      for (let j = 0; j < 3 * size; j++) dst[k * 3 * size + j] = src[from + j];
+    }
+    out.setAttribute(name, new THREE.BufferAttribute(dst, size));
+  }
+  return out;
+}
+
+const va = new THREE.Vector3();
+const vb = new THREE.Vector3();
+const vc = new THREE.Vector3();
+const vn = new THREE.Vector3();
+const ve = new THREE.Vector3();
+
+// The outward normal of triangle t of a non-indexed position array into vn,
+// its first corner into va.
+function faceOf(pos, t) {
+  va.fromArray(pos, t * 9);
+  vb.fromArray(pos, t * 9 + 3);
+  vc.fromArray(pos, t * 9 + 6);
+  vn.subVectors(vb, va).cross(ve.subVectors(vc, va)).normalize();
+}
+
+// Replaces each part with a copy that leaves out its triangles lying wholly
+// inside another part (see merge).
+function dropInside(parts) {
+  // Each convex part as a list of planes: normal x, y, z and offset.
+  const planes = parts.map((g) => {
+    const pos = g.attributes.position.array;
+    const n = pos.length / 9;
+    const list = new Float32Array(n * 4);
+    for (let t = 0; t < n; t++) {
+      faceOf(pos, t);
+      list.set([vn.x, vn.y, vn.z, vn.dot(va)], t * 4);
+    }
+    return list;
+  });
+  const inside = (list, pos, i) => {
+    for (let p = 0; p < list.length; p += 4) {
+      if (list[p] * pos[i] + list[p + 1] * pos[i + 1] + list[p + 2] * pos[i + 2] - list[p + 3] > -1e-4) return false;
+    }
+    return true;
+  };
+  for (let i = 0; i < parts.length; i++) {
+    const pos = parts[i].attributes.position.array;
+    const keep = [];
+    for (let t = 0; t < pos.length / 9; t++) {
+      let hidden = false;
+      for (let j = 0; j < parts.length && !hidden; j++) {
+        if (j === i) continue;
+        hidden =
+          inside(planes[j], pos, t * 9) && inside(planes[j], pos, t * 9 + 3) && inside(planes[j], pos, t * 9 + 6);
+      }
+      if (!hidden) keep.push(t);
+    }
+    const trimmed = keepTriangles(parts[i], keep);
+    parts[i].dispose();
+    parts[i] = trimmed;
+  }
+}
+
+// A copy of a non-indexed geometry with only the triangles that face at least
+// one of the eyes (camera positions in the geometry's own space). The others
+// are never drawn, but would still cost vertex work and count towards the
+// triangle budget.
+export function keepFacing(geometry, eyes) {
+  const pos = geometry.attributes.position.array;
+  const keep = [];
+  for (let t = 0; t < pos.length / 9; t++) {
+    faceOf(pos, t);
+    for (let e = 0; e < eyes.length; e++) {
+      // A little slack, as the eyes are only samples of where the camera can be.
+      if (ve.subVectors(eyes[e], va).normalize().dot(vn) > -0.04) {
+        keep.push(t);
+        break;
+      }
+    }
+  }
+  return keepTriangles(geometry, keep);
 }
 
 // Flat-shaded vertex-color material: the faceted low-poly look.

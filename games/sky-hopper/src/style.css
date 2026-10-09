@@ -183,6 +183,15 @@ body.handheld #legend {
 #toast.bronze { color: #ffb878; }
 #toast.silver { color: #e4ebf2; }
 #toast.gold { color: var(--gold); }
+#toast.platinum { color: #b8f4ff; }
+#toast.best { color: #ff9a5c; }
+#toast.warn { color: #ffffff; }
+
+/* While paused the toast stops where it is and hides under the menu. */
+#hud.paused #toast {
+  animation-play-state: paused;
+  visibility: hidden;
+}
 
 #flash {
   position: absolute;
@@ -222,11 +231,19 @@ body.handheld #legend {
   display: none;
 }
 
-/* Title and get-ready: text at the top and bottom, the bird in between. */
-#message.split {
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 34px 0 30px;
+/* Title and get-ready: the big word at the top, the panel at the bottom and
+   the bird in between. */
+#banner {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+#message.bottom {
+  align-items: flex-end;
+  padding-bottom: 26px;
 }
 
 .logo {
@@ -237,7 +254,7 @@ body.handheld #legend {
   animation: drop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
 
-.logo.ready {
+#banner.ready .logo {
   font-size: 54px;
   color: #ff9a3c;
 }
@@ -290,6 +307,46 @@ body.handheld #legend {
 .panel .best {
   font-size: 22px;
   color: var(--gold);
+}
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 4px;
+}
+
+.menu .item {
+  min-width: 190px;
+  padding: 1px 18px;
+  border-radius: 12px;
+  font-size: 26px;
+  color: #c9daf0;
+}
+
+.menu .item.sel {
+  background: rgba(255, 210, 63, 0.2);
+  box-shadow: inset 0 0 0 2px rgba(255, 210, 63, 0.8);
+  color: var(--gold);
+}
+
+.foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* A small medal in front of the best score on the title. */
+.pip {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border-radius: 50%;
+  border: 2px solid;
+  vertical-align: -2px;
 }
 
 /* The A button, drawn like the one on the handheld. */
@@ -369,6 +426,17 @@ body.handheld #legend {
   color: #fff6c0;
 }
 
+.medal.platinum {
+  background: radial-gradient(circle at 35% 30%, #ffffff, #b8f0fa 55%, #6fb8cc);
+  border-color: #3f7f94;
+  color: #ffffff;
+}
+
+.pip.bronze { background: #d88a4a; border-color: #7a3f16; }
+.pip.silver { background: #c9d2dc; border-color: #6b7580; }
+.pip.gold { background: #ffcc1f; border-color: #a86f00; }
+.pip.platinum { background: #b8f0fa; border-color: #3f7f94; }
+
 .medal-name {
   font-size: 24px;
   letter-spacing: 1px;
@@ -377,6 +445,7 @@ body.handheld #legend {
 .medal-name.bronze { color: #ffb878; }
 .medal-name.silver { color: #e4ebf2; }
 .medal-name.gold { color: var(--gold); }
+.medal-name.platinum { color: #b8f4ff; }
 
 /* The score sits top center, so the perf overlay goes bottom right. */
 #perf {

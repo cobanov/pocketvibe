@@ -2,15 +2,21 @@
 // drifting clouds and the grassy ledge at the bottom. Each background layer is
 // one InstancedMesh whose pieces wrap around when they leave the left edge;
 // layers further back scroll slower (parallax).
+//
+// The camera only ever sees the scenery from the front, so every piece keeps
+// only the triangles that can face it (see keepFacing in shared.js), and the
+// clouds also lose the insides of their overlapping balls: the same look with
+// about half the triangles.
 
 import * as THREE from 'three';
-import { HORIZON, SKY_MID, SKY_TOP, box, lowPoly, merge, part } from './shared.js';
+import { HORIZON, SKY_MID, SKY_TOP, box, keepFacing, lowPoly, merge, part } from './shared.js';
 
 const LEDGE_FROM = -20; // the ledge mesh spans x = -20 .. 28, wide enough for 16:9 screens
 const LEDGE_LEN = 48;
 const LEDGE_PERIOD = 8; // its pattern repeats every 8 units, so it can wrap
 const LEDGE_BACK = -6;
 const LEDGE_FRONT = 1.7; // close enough that the lip and the dirt show at the bottom
+const SHAKE = 0.3; // how far the screen shake can move the camera
 
 // Big vertical plane far behind everything, colored by height: hazy at the
 // horizon (the camera's eye level), deep blue at the top. Tall enough for the
@@ -45,39 +51,48 @@ function peakGeometry() {
   ]);
 }
 
-// A puffy cloud made of a few low-poly balls.
+// A puffy cloud made of a few low-poly balls (without their hidden insides).
 function cloudGeometry() {
-  return merge([
-    part(new THREE.IcosahedronGeometry(1, 1), 0, 0, 0, 0xffffff),
-    part(new THREE.IcosahedronGeometry(0.75, 1), -1.1, -0.2, 0.1, 0xf2f8ff),
-    part(new THREE.IcosahedronGeometry(0.8, 1), 1.1, -0.25, 0.1, 0xf2f8ff),
-    part(new THREE.IcosahedronGeometry(0.72, 1), 0.5, 0.45, -0.2, 0xffffff),
-    part(new THREE.IcosahedronGeometry(0.6, 1), -0.55, 0.35, -0.1, 0xffffff),
-  ]);
+  return merge(
+    [
+      part(new THREE.IcosahedronGeometry(1, 1), 0, 0, 0, 0xffffff),
+      part(new THREE.IcosahedronGeometry(0.75, 1), -1.1, -0.2, 0.1, 0xf2f8ff),
+      part(new THREE.IcosahedronGeometry(0.8, 1), 1.1, -0.25, 0.1, 0xf2f8ff),
+      part(new THREE.IcosahedronGeometry(0.72, 1), 0.5, 0.45, -0.2, 0xffffff),
+      part(new THREE.IcosahedronGeometry(0.6, 1), -0.55, 0.35, -0.1, 0xffffff),
+    ],
+    true,
+  );
 }
 
 // A floating island: grass on top, a rock hanging below, a little tree.
 function islandGeometry() {
   const rock = new THREE.ConeGeometry(1, 1.7, 6);
   rock.rotateX(Math.PI);
-  return merge([
-    part(rock, 0, -1.0, 0, 0xb07a4a),
-    part(new THREE.CylinderGeometry(1.0, 1.0, 0.25, 6), 0, -0.22, 0, 0x8a5a36),
-    part(new THREE.CylinderGeometry(1.1, 1.02, 0.28, 6), 0, 0, 0, 0x86d65c),
-    part(new THREE.CylinderGeometry(0.07, 0.1, 0.5, 5), 0.35, 0.38, 0, 0x7a5232),
-    part(new THREE.IcosahedronGeometry(0.42, 0), 0.35, 0.85, 0, 0x3fae55),
-    part(new THREE.IcosahedronGeometry(0.28, 0), -0.4, 0.3, 0.3, 0x5cc66a),
-  ]);
+  return merge(
+    [
+      part(rock, 0, -1.0, 0, 0xb07a4a),
+      part(new THREE.CylinderGeometry(1.0, 1.0, 0.25, 6), 0, -0.22, 0, 0x8a5a36),
+      part(new THREE.CylinderGeometry(1.1, 1.02, 0.28, 6), 0, 0, 0, 0x86d65c),
+      part(new THREE.CylinderGeometry(0.07, 0.1, 0.5, 5), 0.35, 0.38, 0, 0x7a5232),
+      part(new THREE.IcosahedronGeometry(0.42, 0), 0.35, 0.85, 0, 0x3fae55),
+      part(new THREE.IcosahedronGeometry(0.28, 0), -0.4, 0.3, 0.3, 0x5cc66a),
+    ],
+    true,
+  );
 }
 
 // The ground the pipes stand on: striped grass with a darker lip, tufts and
-// flowers. Its pattern repeats every LEDGE_PERIOD units.
+// flowers. Its pattern repeats every LEDGE_PERIOD units. Of each grass stripe
+// only the top shows (the lip hides its front), so it is just that.
 function ledgeGeometry() {
   const depth = LEDGE_FRONT - LEDGE_BACK;
   const midZ = (LEDGE_FRONT + LEDGE_BACK) / 2;
   const parts = [];
   for (let i = 0; i < LEDGE_LEN; i++) {
-    parts.push(box(1, 0.3, depth, LEDGE_FROM + i + 0.5, -0.15, midZ, i % 2 === 0 ? 0x7fd957 : 0x6ccb4a));
+    const top = new THREE.PlaneGeometry(1, depth);
+    top.rotateX(-Math.PI / 2);
+    parts.push(part(top, LEDGE_FROM + i + 0.5, 0, midZ, i % 2 === 0 ? 0x7fd957 : 0x6ccb4a));
   }
   const center = LEDGE_FROM + LEDGE_LEN / 2;
   parts.push(box(LEDGE_LEN, 0.4, 0.36, center, -0.14, LEDGE_FRONT, 0x4aa338)); // lip
@@ -104,10 +119,46 @@ function ledgeGeometry() {
   return merge(parts);
 }
 
-// One InstancedMesh of `count` pieces spread over `span` units around x = 0.
-// place(item) picks a new y, z, scale and turn for a piece when it wraps.
-function createLayer(scene, geometry, material, count, span, factor, place) {
-  const mesh = new THREE.InstancedMesh(geometry, material, count);
+function rand(range) {
+  return range[0] + Math.random() * (range[1] - range[0]);
+}
+
+// Where the camera can be in the own space of a layer's piece, for a piece
+// anywhere in the layer: the corners of its ranges (a position enters
+// linearly, so corners cover everything between; the camera's shake just
+// widens them) at several turns. A face that faces none of them can be
+// dropped.
+function layerEyes(layer, span, eye) {
+  const xs = [-span / 2 - SHAKE, span / 2 + SHAKE];
+  const ys = [layer.y[0] - SHAKE, layer.y[1] + SHAKE];
+  const eyes = [];
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const at = new THREE.Vector3();
+  const size = new THREE.Vector3();
+  const up = new THREE.Vector3(0, 1, 0);
+  const turns = layer.turn[1] - layer.turn[0] > 1 ? 24 : 8;
+  for (let k = 0; k <= turns; k++) {
+    q.setFromAxisAngle(up, layer.turn[0] + ((layer.turn[1] - layer.turn[0]) * k) / turns);
+    for (let c = 0; c < 8 * 4; c++) {
+      // Corner c: x from bit 0, y from bit 1, z from bit 2, size from bits 3 and 4.
+      at.set(xs[c & 1], ys[(c >> 1) & 1], layer.z[(c >> 2) & 1]);
+      size.fromArray(layer.scale((c >> 3) & 1, c >> 4));
+      m.compose(at, q, size).invert();
+      eyes.push(eye.clone().applyMatrix4(m));
+    }
+  }
+  return eyes;
+}
+
+// One InstancedMesh of layer.count pieces spread over layer.span units around
+// x = 0, both times widen. A piece that wraps gets a new height (layer.y),
+// depth (layer.z), turn and size: layer.scale(a, b) gives its x, y and z
+// scale for two random numbers from 0 to 1.
+function createLayer(scene, geometry, material, layer, widen, eye) {
+  const count = Math.round(layer.count * widen);
+  const span = layer.span * widen;
+  const mesh = new THREE.InstancedMesh(keepFacing(geometry, layerEyes(layer, span, eye)), material, count);
   mesh.frustumCulled = false; // instances move, so the cached bounds would be wrong
   scene.add(mesh);
 
@@ -118,17 +169,16 @@ function createLayer(scene, geometry, material, count, span, factor, place) {
   const sy = new Float32Array(count);
   const sz = new Float32Array(count);
   const turn = new Float32Array(count);
-  const item = { y: 0, z: 0, sx: 1, sy: 1, sz: 1, turn: 0 };
   const dummy = new THREE.Object3D();
 
   function respawn(i) {
-    place(item);
-    y[i] = item.y;
-    z[i] = item.z;
-    sx[i] = item.sx;
-    sy[i] = item.sy;
-    sz[i] = item.sz;
-    turn[i] = item.turn;
+    const size = layer.scale(Math.random(), Math.random());
+    y[i] = rand(layer.y);
+    z[i] = rand(layer.z);
+    sx[i] = size[0];
+    sy[i] = size[1];
+    sz[i] = size[2];
+    turn[i] = rand(layer.turn);
   }
 
   function write() {
@@ -151,7 +201,7 @@ function createLayer(scene, geometry, material, count, span, factor, place) {
   return {
     update(move) {
       if (move === 0) return;
-      const m = move * factor;
+      const m = move * layer.factor;
       for (let i = 0; i < count; i++) {
         x[i] -= m;
         if (x[i] < -span / 2) {
@@ -164,16 +214,58 @@ function createLayer(scene, geometry, material, count, span, factor, place) {
   };
 }
 
-function rand(a, b) {
-  return a + Math.random() * (b - a);
-}
+const lerp = (a, b, k) => a + (b - a) * k;
+
+const PEAKS = {
+  count: 7,
+  span: 136,
+  factor: 0.08,
+  y: [-10, -10],
+  z: [-66, -58],
+  turn: [0, 1],
+  scale: (a, b) => [lerp(9, 14, a), lerp(13, 21, b), lerp(9, 14, a)],
+};
+
+// The sea of clouds around the horizon.
+const BANK = {
+  count: 12,
+  span: 124,
+  factor: 0.2,
+  y: [-5, -2.5],
+  z: [-48, -40],
+  turn: [-0.3, 0.3],
+  scale: (a, b) => [lerp(5, 8, a), lerp(2.6, 3.6, b), 4],
+};
+
+const ISLANDS = {
+  count: 5,
+  span: 66,
+  factor: 0.9,
+  y: [-1.5, 4.5],
+  z: [-26, -18],
+  turn: [0, Math.PI],
+  scale: (a) => [lerp(0.8, 1.4, a), lerp(0.8, 1.4, a), lerp(0.8, 1.4, a)],
+};
+
+const CLOUDS = {
+  count: 7,
+  span: 78,
+  factor: 0.45,
+  y: [10, 17],
+  z: [-30, -16],
+  turn: [-0.4, 0.4],
+  scale: (a) => [lerp(1.8, 3, a), lerp(1.8, 3, a) * 0.72, lerp(1.8, 3, a) * 0.8],
+};
 
 // widen: how much wider the view is than on the 3:2 screen (1 or more). Each
 // layer of scenery is that much wider, with as many more pieces, so wide
 // screens show the same density of scenery and nothing wraps in view.
-export function createWorld(scene, widen = 1) {
+// eye: where the camera stands (it only shakes a little around it).
+export function createWorld(scene, widen, eye) {
   const sky = new THREE.Mesh(skyGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
   sky.position.z = -78; // inside the camera's far distance even at the top corners
+  // Drawn after the rest of the scenery, so the sky behind it is skipped.
+  sky.renderOrder = 1;
   scene.add(sky);
 
   const material = lowPoly();
@@ -181,48 +273,26 @@ export function createWorld(scene, widen = 1) {
   const cloudMaterial = lowPoly();
   cloudMaterial.emissive.setHex(0x5d6a80);
   const cloud = cloudGeometry();
+  const peak = peakGeometry();
+  const island = islandGeometry();
 
-  const peaks = createLayer(scene, peakGeometry(), material, Math.round(7 * widen), 136 * widen, 0.08, (p) => {
-    const r = rand(9, 14);
-    p.y = -10;
-    p.z = rand(-66, -58);
-    p.sx = r;
-    p.sy = rand(13, 21);
-    p.sz = r;
-    p.turn = rand(0, 1);
-  });
+  const peaks = createLayer(scene, peak, material, PEAKS, widen, eye);
+  const bank = createLayer(scene, cloud, cloudMaterial, BANK, widen, eye);
+  const islands = createLayer(scene, island, material, ISLANDS, widen, eye);
+  const clouds = createLayer(scene, cloud, cloudMaterial, CLOUDS, widen, eye);
+  cloud.dispose();
+  peak.dispose();
+  island.dispose();
 
-  // The sea of clouds around the horizon.
-  const bank = createLayer(scene, cloud, cloudMaterial, Math.round(12 * widen), 124 * widen, 0.2, (p) => {
-    p.y = rand(-5, -2.5);
-    p.z = rand(-48, -40);
-    p.sx = rand(5, 8);
-    p.sy = rand(2.6, 3.6);
-    p.sz = 4;
-    p.turn = rand(-0.3, 0.3);
-  });
-
-  const islands = createLayer(scene, islandGeometry(), material, Math.round(5 * widen), 66 * widen, 0.9, (p) => {
-    const s = rand(0.8, 1.4);
-    p.y = rand(-1.5, 4.5);
-    p.z = rand(-26, -18);
-    p.sx = s;
-    p.sy = s;
-    p.sz = s;
-    p.turn = rand(0, Math.PI);
-  });
-
-  const clouds = createLayer(scene, cloud, cloudMaterial, Math.round(7 * widen), 78 * widen, 0.45, (p) => {
-    const s = rand(1.8, 3);
-    p.y = rand(10, 17);
-    p.z = rand(-30, -16);
-    p.sx = s;
-    p.sy = s * 0.72;
-    p.sz = s * 0.8;
-    p.turn = rand(-0.4, 0.4);
-  });
-
-  const ledge = new THREE.Mesh(ledgeGeometry(), material);
+  // The ledge only moves left by up to one pattern, so the camera sees it
+  // from x = 0 to LEDGE_PERIOD in its own space.
+  const ledgeEyes = [];
+  for (const dx of [-SHAKE, LEDGE_PERIOD + SHAKE]) {
+    for (const dy of [-SHAKE, SHAKE]) ledgeEyes.push(new THREE.Vector3(eye.x + dx, eye.y + dy, eye.z));
+  }
+  const full = ledgeGeometry();
+  const ledge = new THREE.Mesh(keepFacing(full, ledgeEyes), material);
+  full.dispose();
   scene.add(ledge);
   let scrolled = 0;
 

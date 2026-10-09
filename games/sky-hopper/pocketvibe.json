@@ -2,14 +2,14 @@
   "id": "sky-hopper",
   "title": "Sky Hopper",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Flap a low-poly bird through endless gaps between pipes high above the clouds and chase the gold medal.",
+  "version": "1.2.0",
+  "description": "Flap a low-poly bird through endless gaps between pipes high above the clouds, past the pipes that start to move, and chase the gold and platinum medals.",
   "genre": "Arcade",
   "responsive": true,
   "controls": {
-    "A": "Flap / confirm",
-    "UP": "Flap",
-    "B": "Back to title",
-    "START": "Pause"
+    "A": "Flap; pick a menu entry; play again",
+    "D-pad": "UP flaps, like A; UP / DOWN choose in menus",
+    "B": "Back in menus, resume; title from get ready and game over",
+    "START": "Pause menu / resume"
   }
 }

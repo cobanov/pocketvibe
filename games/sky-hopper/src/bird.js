@@ -26,18 +26,23 @@ function bodyGeometry() {
   const crest2 = new THREE.ConeGeometry(0.08, 0.28, 4);
   crest2.rotateZ(0.95);
 
-  return merge([
-    part(body, 0, 0, 0, 0xffd53f),
-    part(belly, 0.2, -0.27, 0.2, 0xfff0c4),
-    part(new THREE.IcosahedronGeometry(0.24, 1), 0.33, 0.2, 0.37, 0xffffff), // eye
-    part(new THREE.IcosahedronGeometry(0.11, 0), 0.44, 0.21, 0.55, 0x1d1d2b), // pupil
-    part(new THREE.IcosahedronGeometry(0.1, 0), 0.5, -0.08, 0.4, 0xff8a7a), // cheek
-    part(beakTop, 0.8, 0.02, 0, 0xff8c1a),
-    part(beakLow, 0.72, -0.12, 0, 0xe2541a),
-    part(tail, -0.78, 0.14, 0, 0xf0921c),
-    part(crest, 0.02, 0.66, 0, 0xff5a36),
-    part(crest2, -0.16, 0.58, 0, 0xff5a36),
-  ]);
+  // Every part is a closed convex shape, so whatever lies inside another part
+  // (most of the belly, the back of the eye) can be left out.
+  return merge(
+    [
+      part(body, 0, 0, 0, 0xffd53f),
+      part(belly, 0.2, -0.27, 0.2, 0xfff0c4),
+      part(new THREE.IcosahedronGeometry(0.24, 1), 0.33, 0.2, 0.37, 0xffffff), // eye
+      part(new THREE.IcosahedronGeometry(0.11, 0), 0.44, 0.21, 0.55, 0x1d1d2b), // pupil
+      part(new THREE.IcosahedronGeometry(0.1, 0), 0.5, -0.08, 0.4, 0xff8a7a), // cheek
+      part(beakTop, 0.8, 0.02, 0, 0xff8c1a),
+      part(beakLow, 0.72, -0.12, 0, 0xe2541a),
+      part(tail, -0.78, 0.14, 0, 0xf0921c),
+      part(crest, 0.02, 0.66, 0, 0xff5a36),
+      part(crest2, -0.16, 0.58, 0, 0xff5a36),
+    ],
+    true,
+  );
 }
 
 // The wing's pivot (its shoulder) is at the origin and the tip points back, so
