@@ -345,7 +345,7 @@ async function shelf() {
   covers.replaceChildren(
     ...games.map((game) => {
       const img = el('img');
-      img.src = `/play/${game.id}/cover.png`;
+      img.src = `/play/${game.id}/${game.cover || 'cover.png'}`;
       img.alt = '';
       img.loading = 'lazy';
       const button = el('button', '', img, el('strong', '', game.title), el('span', '', game.genre || 'Game'));
