@@ -8,10 +8,16 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 - **iPhone 0.7.3** (TestFlight, build 136; App Store Connect'te "PocketVibe: Mini Games", app id
   6820965487, çünkü "PocketVibe" adı alınmış; ana ekranda adı PocketVibe): `ios/`, Android uygulamasının
-  Swift karşılığı (WKWebView, `Service.swift` yerel servis, `TouchPad.swift` aynı ekran tuşları). Gamepad'i
+  Swift karşılığı (WKWebView, `Service.swift` yerel servis, `TouchPad.swift` aynı ekran tuşları).
+  Kullanıcı build 141'de iPhone'da denedi, oyunlar sorunsuz çalışıyor. Bu noktaya gelmek için düzeltilenler:
+  pad her basışta tüm ekranı CPU'da yeniden çiziyordu, artık katmanlar kullanılıyor; pad tuşları ses
+  bağlamını başlatmıyordu, artık `evaluateJavaScript` kullanıcı hareketi sayıldığı için başlatıyor; OGG
+  müzik çözülemiyordu, stb_vorbis ile WAV'a çevriliyor; altın toplarken görüntü sarsılıyordu (HUD'daki CSS
+  animasyonları başlayıp bitince katman oluşturulup siliniyordu), artık animasyonlu öğeler kalıcı
+  `will-change` ile kendi katmanında tutuluyor. Aynı düzeltme handheld'de (WPE) de işe yarayabilir;
+  şablona eklemek için cihazda ölçmek gerekir. Gamepad'i
   sayfalar Gamepad API ile kendileri okuyor. Launcher iOS'ta Çık, uygulama güncellemesi ve kayıt yedeğini
-  gizliyor. Simülatörde UI testiyle oynandı; **gerçek iPhone'da henüz denenmedi** (ses sessiz mod anahtarına
-  uyuyor, arka plandan dönüş, WKWebView'de Gamepad API). Yükleme: `ios/scripts/testflight.sh` (ayrıntı
+  gizliyor. Henüz denenmeyenler: arka plandan dönüş ve WKWebView'de Gamepad API. Ses sessiz mod anahtarına uyuyor. Yükleme: `ios/scripts/testflight.sh` (ayrıntı
   `docs/development.md`, iPhone bölümü). İç test grubunda yalnız mertcobanov@icloud.com var; ilk denemede
   ekipteki 7 kişi de eklenip çıkarıldı, davet e-postası almış olabilirler.
 - **Android 0.7.3** (`android-v0.7.3`, latest değil): telefon dikeyken oyun alanı kare (RG Rotate gibi;
