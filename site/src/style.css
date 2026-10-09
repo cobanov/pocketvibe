@@ -1743,3 +1743,36 @@ h2 {
     animation: none !important;
   }
 }
+
+/* A game's page (/game/<id>/, made by scripts/prepare.mjs). */
+.game-cover {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.game-meta {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.game-controls {
+  border-collapse: collapse;
+}
+
+.game-controls td {
+  padding: 6px 18px 6px 0;
+  vertical-align: top;
+}
+
+.game-controls td:first-child {
+  color: var(--accent);
+  font-weight: 800;
+  white-space: nowrap;
+}

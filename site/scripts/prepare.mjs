@@ -3,6 +3,7 @@
 //   public/play/   every game in the store, unpacked so the demo can play it
 //   public/_redirects   /download/android to the newest Android release's APK
 //   public/releases.json   the newest version and size of each app, for the download buttons
+//   game/<id>/index.html   a page for every game in the store (a Vite page, see vite.config.js)
 // The demo's /api answers come from public/sw.js.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize } from 'node:path';
@@ -70,6 +71,52 @@ const shelf = games
   }));
 writeFileSync(join(play, 'catalog.json'), JSON.stringify(shelf));
 console.log(`demo ${version}, ${playable.length} playable games`);
+
+// A page for every game in the store, at /game/<id>/: what a link to a game
+// shows, and what opens the game in the iPhone app when it is installed
+// (its universal links: public/.well-known/apple-app-site-association). The
+// App Store asks an app with downloaded games for such a link to each one.
+// The header and footer are the "How it works" page's.
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const template = readFileSync(join(SITE, 'how', 'index.html'), 'utf8');
+const head = template.slice(0, template.indexOf('<main>')).replace(' aria-current="page"', '');
+const foot = template.slice(template.indexOf('<footer class="bar">'));
+const pages = join(SITE, 'game');
+rmSync(pages, { recursive: true, force: true });
+for (const game of games) {
+  const title = escapeHtml(game.title);
+  const description = escapeHtml(game.description || `${game.title} on PocketVibe`);
+  const url = `https://pocketvibe.dev/game/${game.id}/`;
+  const meta = [game.author, game.genre, Number.isInteger(game.age) && `${game.age}+`, `v${game.version}`].filter(Boolean).map(escapeHtml);
+  const controls = Object.entries(game.controls ?? {})
+    .map(([button, action]) => `<tr><td>${escapeHtml(button)}</td><td>${escapeHtml(action)}</td></tr>`)
+    .join('');
+  const top = head
+    .replace(/<title>.*?<\/title>/, `<title>${title} · PocketVibe</title>`)
+    .replace(/(<meta (?:name="description"|property="og:description"|name="twitter:description") content=")[^"]*"/g, `$1${description}"`)
+    .replace(/(<meta (?:property="og:title"|name="twitter:title") content=")[^"]*"/g, `$1${title} · PocketVibe"`)
+    .replace(/(<meta property="og:url" content=")[^"]*"/, `$1${url}"`)
+    .replace(/(<meta (?:property="og:image"|name="twitter:image") content=")[^"]*"/g, game.cover ? `$1${escapeHtml(game.cover)}"` : '$&');
+  const body = `<main>
+      <section class="page-intro game-page">
+        ${game.cover ? `<img class="game-cover" src="${escapeHtml(game.cover)}" alt="" width="480" height="270" />` : ''}
+        <h1>${title}</h1>
+        <p class="game-meta">${meta.join(' · ')}</p>
+        ${game.description ? `<p class="lede">${escapeHtml(game.description)}</p>` : ''}
+        <p class="actions">
+          <a class="button primary" href="/#install">Get PocketVibe</a>
+          ${playable.includes(game.id) ? '<a class="button" href="/#games">Play it in your browser</a>' : ''}
+        </p>
+        <p class="note">With PocketVibe on your iPhone, this link opens the game in the app. On a handheld or an Android phone, find it in the app's Store.</p>
+      </section>
+      ${controls ? `<section class="column"><h2>Controls</h2><table class="game-controls">${controls}</table></section>` : ''}
+    </main>
+
+    `;
+  mkdirSync(join(pages, game.id), { recursive: true });
+  writeFileSync(join(pages, game.id, 'index.html'), top + body + foot);
+}
+console.log(`game pages: ${games.length}`);
 
 // Download addresses on the site's own domain, so that where the files are
 // hosted can change without a new app or new links:

@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["6U58AKY6F8.dev.cobanov.pocketvibe"],
+        "components": [{ "/": "/game/*", "comment": "A game's page opens the game in PocketVibe on the iPhone" }]
+      }
+    ]
+  }
+}
