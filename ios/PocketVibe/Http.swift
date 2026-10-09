@@ -74,12 +74,39 @@ final class HttpServer {
         try start()
     }
 
-    /// iOS may take a suspended app's listening sockets away: listen again.
+    /// iOS may take a suspended app's listening sockets away, without always
+    /// saying so: if the server does not take a connection, listen again.
     func resume() {
         lock.lock()
         let alive = running
         lock.unlock()
-        if !alive { try? start() }
+        if alive && answers() { return }
+        stop()
+        try? start()
+    }
+
+    // Whether a connection to the port goes through within a moment.
+    private func answers() -> Bool {
+        let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = port.bigEndian
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let result = withUnsafePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        if result == 0 { return true }
+        guard errno == EINPROGRESS else { return false }
+        var poller = pollfd(fd: fd, events: Int16(POLLOUT), revents: 0)
+        guard poll(&poller, 1, 300) == 1 else { return false }
+        var error: Int32 = 0
+        var length = socklen_t(MemoryLayout<Int32>.size)
+        getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length)
+        return error == 0
     }
 
     func stop() {

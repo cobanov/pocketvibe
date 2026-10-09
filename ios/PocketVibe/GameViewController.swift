@@ -5,17 +5,17 @@ import WebKit
 /// PocketVibe full screen: one WebView showing the launcher, and the games it
 /// opens, from the local service (Service). The screen's buttons reach the
 /// page as the keyboard keys the launcher and every game already read, so
-/// nothing in them is iPhone-specific. A gamepad needs nothing from here: the
-/// pages read it themselves (the Gamepad API). Holding Start + Select leaves
-/// a game, as on the handheld.
+/// nothing in them is iPhone-specific. A gamepad's buttons go the same way,
+/// read here (the pages' own Gamepad API is turned off, so nothing arrives
+/// twice). Holding Start + Select leaves a game, as on the handheld.
 final class GameViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler {
     private let service = Service.shared
     private lazy var root = PadLayout { [weak self] key, down in self?.press(key, down) }
     private var web: WKWebView!
     private var combo = Set<Key>() // Start and Select, while held on the screen
-    private var gamepadCombo = false
     private var leaveTimer: Timer?
-    private var gamepadTimer: Timer?
+    private var gamepadLink: CADisplayLink?
+    private var gamepadHeld = Set<Key>()
 
     // The page's side of the screen's buttons: a key event where the page
     // listens. In the game shell that is the game's frame (same origin).
@@ -50,6 +50,12 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
             if (el.style && !el.style.willChange) el.style.willChange = 'transform, opacity';
           }, true);
         }
+        """
+
+    // The pages read gamepads themselves on a handheld; here the app does
+    // (see Gamepads), so theirs would only bring every button twice.
+    private static let noGamepadScript = """
+        Object.defineProperty(Navigator.prototype, 'getGamepads', { value: () => [], configurable: true });
         """
 
     // Every page's sound, so a press can start it (above).
@@ -140,6 +146,7 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        service.onGameStart = { [weak self] responsive in self?.root.startGame(responsive: responsive) }
         createWebView()
         openLauncher()
         NotificationCenter.default.addObserver(self, selector: #selector(gamepadsChanged), name: .GCControllerDidConnect, object: nil)
@@ -190,6 +197,7 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
         config.userContentController.addUserScript(WKUserScript(source: Self.keyScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         config.userContentController.addUserScript(WKUserScript(source: Self.audioScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.addUserScript(WKUserScript(source: Self.layerScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        config.userContentController.addUserScript(WKUserScript(source: Self.noGamepadScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.addUserScript(WKUserScript(source: Self.consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.add(WeakHandler(self), name: "console")
         #if DEBUG
@@ -216,6 +224,7 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
 
     private func openLauncher() {
         service.leftGame()
+        root.gameAspect = nil
         slowest.isHidden = true
         web.load(URLRequest(url: service.launcherUrl))
     }
@@ -256,8 +265,10 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
 
     // ---------- Gamepads ----------
 
-    // The screen's buttons only where there is no gamepad. Its own buttons
-    // are left to the pages; here they are only watched for Start + Select.
+    // The screen's buttons only where there is no gamepad. A gamepad is read
+    // every frame while one is connected (no value handlers: WebKit's own
+    // would be replaced), its buttons by position as on the handheld: the
+    // bottom one is B, the right one A.
     @objc private func gamepadsChanged() {
         var connected = GCController.controllers().contains { $0.extendedGamepad != nil }
         #if DEBUG
@@ -265,21 +276,43 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
         if ProcessInfo.processInfo.environment["POCKETVIBE_TOUCH"] == "1" { connected = false }
         #endif
         root.padShown = !connected
-        gamepadTimer?.invalidate()
-        gamepadTimer = nil
-        guard connected else { return }
-        gamepadTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in self?.watchGamepads() }
+        gamepadLink?.invalidate()
+        gamepadLink = nil
+        if connected {
+            let link = CADisplayLink(target: self, selector: #selector(readGamepads))
+            link.add(to: .main, forMode: .common)
+            gamepadLink = link
+        } else {
+            setGamepad([])
+        }
     }
 
-    private func watchGamepads() {
-        let held = GCController.controllers().contains { controller in
-            guard let pad = controller.extendedGamepad else { return false }
-            return pad.buttonMenu.isPressed && pad.buttonOptions?.isPressed == true
+    @objc private func readGamepads() {
+        var now = Set<Key>()
+        for controller in GCController.controllers() {
+            guard let pad = controller.extendedGamepad else { continue }
+            let stick = pad.leftThumbstick
+            if pad.dpad.up.isPressed || stick.yAxis.value > 0.5 { now.insert(.up) }
+            if pad.dpad.down.isPressed || stick.yAxis.value < -0.5 { now.insert(.down) }
+            if pad.dpad.left.isPressed || stick.xAxis.value < -0.5 { now.insert(.left) }
+            if pad.dpad.right.isPressed || stick.xAxis.value > 0.5 { now.insert(.right) }
+            if pad.buttonA.isPressed { now.insert(.b) }
+            if pad.buttonB.isPressed { now.insert(.a) }
+            if pad.buttonX.isPressed { now.insert(.x) }
+            if pad.buttonY.isPressed { now.insert(.y) }
+            if pad.leftShoulder.isPressed { now.insert(.l) }
+            if pad.rightShoulder.isPressed { now.insert(.r) }
+            if pad.buttonMenu.isPressed { now.insert(.start) }
+            if pad.buttonOptions?.isPressed == true { now.insert(.select) }
         }
-        if held != gamepadCombo {
-            gamepadCombo = held
-            holdToLeave(held)
-        }
+        setGamepad(now)
+    }
+
+    private func setGamepad(_ now: Set<Key>) {
+        guard now != gamepadHeld else { return }
+        for key in gamepadHeld.subtracting(now) { press(key, false) }
+        for key in now.subtracting(gamepadHeld) { press(key, true) }
+        gamepadHeld = now
     }
 }
 
