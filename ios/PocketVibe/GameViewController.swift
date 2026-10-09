@@ -8,7 +8,7 @@ import WebKit
 /// nothing in them is iPhone-specific. A gamepad needs nothing from here: the
 /// pages read it themselves (the Gamepad API). Holding Start + Select leaves
 /// a game, as on the handheld.
-final class GameViewController: UIViewController, WKNavigationDelegate {
+final class GameViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler {
     private let service = Service.shared
     private lazy var root = PadLayout { [weak self] key, down in self?.press(key, down) }
     private var web: WKWebView!
@@ -19,6 +19,10 @@ final class GameViewController: UIViewController, WKNavigationDelegate {
 
     // The page's side of the screen's buttons: a key event where the page
     // listens. In the game shell that is the game's frame (same origin).
+    //
+    // iOS starts a page's sound only during a user gesture, and the screen's
+    // buttons are not touches on the page. evaluateJavaScript does run as a
+    // user gesture, so each press also starts any sound that is waiting.
     private static let keyScript = """
         window.__pocketvibeKey = (type, code, key) => {
           let doc = document;
@@ -26,10 +30,97 @@ final class GameViewController: UIViewController, WKNavigationDelegate {
             try { doc = document.getElementById('frame').contentDocument || doc; } catch (e) {}
           }
           const view = doc.defaultView || window;
+          for (const audio of [...(window.__pocketvibeAudio || []), ...(view.__pocketvibeAudio || [])]) {
+            if (audio.state === 'suspended') audio.resume().catch(() => {});
+          }
           const target = doc.activeElement || doc.body || doc.documentElement;
           target.dispatchEvent(new view.KeyboardEvent(type, { code, key, bubbles: true, cancelable: true }));
         };
         """
+
+    // Every page's sound, so a press can start it (above).
+    private static let audioScript = """
+        for (const name of ['AudioContext', 'webkitAudioContext']) {
+          const Real = window[name];
+          if (!Real) continue;
+          window[name] = class extends Real {
+            constructor(...args) {
+              super(...args);
+              (window.__pocketvibeAudio ||= []).push(this);
+            }
+          };
+        }
+        """
+
+    // The pages' console in the app's log (Console.app, `log stream`), as
+    // Android's logcat has it: every frame, the games' PERF lines too.
+    private static let consoleScript = """
+        for (const level of ['log', 'warn', 'error']) {
+          const original = console[level];
+          console[level] = (...args) => {
+            try { window.webkit.messageHandlers.console.postMessage(level + ' ' + location.pathname + ': ' + args.join(' ')); } catch (e) {}
+            original.apply(console, args);
+          };
+        }
+        addEventListener('error', (e) => console.error(e.message, e.filename + ':' + e.lineno));
+        """
+
+    #if DEBUG
+    private static let frameLogScript = """
+        if (location.search.includes('handheld')) {
+          const counts = {};
+          const totals = {};
+          const contexts = [];
+          const RealContext = window.AudioContext;
+          if (RealContext) window.AudioContext = class extends RealContext { constructor(...args) { super(...args); contexts.push(this); } };
+          const count = (proto, names) => { for (const name of names) { const original = proto[name]; if (!original) continue; proto[name] = function (...args) { counts[name] = (counts[name] || 0) + 1; return original.apply(this, args); }; } };
+          for (const proto of [WebGLRenderingContext.prototype, WebGL2RenderingContext.prototype]) count(proto, ['compileShader', 'linkProgram', 'texImage2D', 'texSubImage2D', 'bufferData', 'createBuffer', 'createVertexArray']);
+          count(AudioBufferSourceNode.prototype, ['start']);
+          count(Document.prototype, ['createElement']);
+          let last = 0, frame = 0;
+          const tick = (now) => {
+            frame++;
+            const ms = now - last;
+            if (last && ms > 20) console.log('SLOW ' + JSON.stringify({ frame, ms: Math.round(ms), ...counts }));
+            for (const key in counts) { totals[key] = (totals[key] || 0) + counts[key]; delete counts[key]; }
+            if (frame % 600 === 0) console.log('TOTAL ' + JSON.stringify({ frame, audio: contexts.map((c) => c.state), ...totals }));
+            last = now;
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        }
+        """
+    #endif
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let text = message.body as? String else { return }
+        NSLog("PocketVibe page: %@", text)
+        if let at = text.range(of: "PERF {") { showSlowest(String(text[text.index(before: at.upperBound)...])) }
+    }
+
+    // The game's fps counter averages half a second, so one slow frame does
+    // not show in it; its PERF line (with Show FPS) has the slowest of the
+    // last two seconds, shown here at the game's top left.
+    private lazy var slowest: UILabel = {
+        let label = UILabel()
+        label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .bold)
+        label.textColor = .white
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        label.isUserInteractionEnabled = false
+        root.addSubview(label)
+        return label
+    }()
+
+    private func showSlowest(_ json: String) {
+        guard let data = json.data(using: .utf8),
+              let perf = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let worst = perf["worstMs"] as? Int, service.inGame else { return }
+        slowest.text = " slowest \(worst) ms "
+        slowest.textColor = worst > 25 ? UIColor(red: 1, green: 0.45, blue: 0.4, alpha: 1) : .white
+        slowest.sizeToFit()
+        slowest.frame.origin = CGPoint(x: web.frame.minX + 4, y: web.frame.minY + 4)
+        slowest.isHidden = false
+    }
 
     override func loadView() { view = root }
 
@@ -40,6 +131,17 @@ final class GameViewController: UIViewController, WKNavigationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(gamepadsChanged), name: .GCControllerDidConnect, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(gamepadsChanged), name: .GCControllerDidDisconnect, object: nil)
         gamepadsChanged()
+        #if DEBUG
+        // Frame timing tests: A pressed and let go as a thumb would, by the same path as a touch.
+        if let every = Double(ProcessInfo.processInfo.environment["POCKETVIBE_AUTOPRESS"] ?? "") {
+            var down = false
+            Timer.scheduledTimer(withTimeInterval: every, repeats: true) { [weak self] _ in
+                down.toggle()
+                self?.press(.a, down)
+                if ProcessInfo.processInfo.environment["POCKETVIBE_AUTOPRESS_PAINT"] == "1" { self?.root.pad.debugPaint(down) }
+            }
+        }
+        #endif
     }
 
     override var prefersStatusBarHidden: Bool { true }
@@ -55,8 +157,32 @@ final class GameViewController: UIViewController, WKNavigationDelegate {
         #if DEBUG
         // Tests in the simulator stay silent: its sound comes out of the Mac.
         if ProcessInfo.processInfo.environment["POCKETVIBE_SILENT"] == "1" { config.mediaTypesRequiringUserActionForPlayback = .all }
+        // Or the sound plays, every node of it, into a gain of zero: Web Audio's cost without the noise.
+        if ProcessInfo.processInfo.environment["POCKETVIBE_MUTED_AUDIO"] == "1" {
+            config.userContentController.addUserScript(WKUserScript(source: """
+                const Real = window.AudioContext;
+                if (Real) window.AudioContext = class extends Real {
+                  constructor(...args) {
+                    super(...args);
+                    const silent = super.createGain();
+                    silent.gain.value = 0;
+                    silent.connect(super.destination);
+                    Object.defineProperty(this, 'destination', { get: () => silent });
+                  }
+                };
+                """, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        }
         #endif
         config.userContentController.addUserScript(WKUserScript(source: Self.keyScript, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        config.userContentController.addUserScript(WKUserScript(source: Self.audioScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        config.userContentController.addUserScript(WKUserScript(source: Self.consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        config.userContentController.add(WeakHandler(self), name: "console")
+        #if DEBUG
+        // Frame timing tests: each slow frame in the game, with what WebGL and Web Audio did in it.
+        if ProcessInfo.processInfo.environment["POCKETVIBE_FRAMELOG"] == "1" {
+            config.userContentController.addUserScript(WKUserScript(source: Self.frameLogScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        }
+        #endif
         let view = WKWebView(frame: .zero, configuration: config)
         view.isOpaque = false
         view.backgroundColor = background
@@ -75,6 +201,7 @@ final class GameViewController: UIViewController, WKNavigationDelegate {
 
     private func openLauncher() {
         service.leftGame()
+        slowest.isHidden = true
         web.load(URLRequest(url: service.launcherUrl))
     }
 
@@ -138,5 +265,14 @@ final class GameViewController: UIViewController, WKNavigationDelegate {
             gamepadCombo = held
             holdToLeave(held)
         }
+    }
+}
+
+/// The content controller keeps its handlers; this keeps it from keeping the view controller.
+private final class WeakHandler: NSObject, WKScriptMessageHandler {
+    weak var target: WKScriptMessageHandler?
+    init(_ target: WKScriptMessageHandler) { self.target = target }
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        target?.userContentController(controller, didReceive: message)
     }
 }

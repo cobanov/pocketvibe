@@ -557,7 +557,14 @@ final class Service {
         let settings = loadSettings()
         let entry = (meta["entry"] as? String ?? "index.html").addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~/"))) ?? "index.html"
         let perf = settings["showFps"] as? Bool == true ? 1 : 0
-        return "http://127.0.0.1:\(server!.port)\(Self.shellPath)play.html?entry=\(entry)&perf=\(perf)&lang=\(settings["language"] as? String ?? "en")"
+        var url = "http://127.0.0.1:\(server!.port)\(Self.shellPath)play.html?entry=\(entry)&perf=\(perf)&lang=\(settings["language"] as? String ?? "en")"
+        // With Show FPS the game also logs its slowest frame every 2 s, which
+        // the app shows next to the game's own counter (GameViewController).
+        if perf == 1 { url += "&perflog" }
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["POCKETVIBE_PERFLOG"] == "1" && perf == 0 { url += "&perflog" }
+        #endif
+        return url
     }
 
     /// The shell's own files and the fonts, under shellPath on every port.

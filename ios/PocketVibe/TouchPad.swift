@@ -305,6 +305,13 @@ final class TouchPad: UIView {
         paint()
     }
 
+    #if DEBUG
+    func debugPaint(_ down: Bool) {
+        held = down ? [.a] : []
+        paint()
+    }
+    #endif
+
     func releaseAll() {
         owners.removeAll()
         update()
