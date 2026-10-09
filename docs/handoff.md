@@ -1,4 +1,4 @@
-# PocketVibe: devir notu (2026-10-09; handheld 0.7.1, Android 0.7.3, iPhone 0.7.3 TestFlight)
+# PocketVibe: devir notu (2026-10-09; handheld 0.7.1, Android 0.7.4, iPhone 0.7.4 TestFlight)
 
 Önce bunu, sonra `docs/plan.md` ve `docs/development.md`'yi oku; memory'de `pocketvibe-project.md`,
 `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` var. Eski devir notları git
@@ -6,6 +6,20 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Durum
 
+- **App Store hazırlığı (2026-10-09 akşam):** kural 4.7 için yapılanlar: mağazada oyun başına yaş
+  (`age`: pocketvibe-store `games/<id>.json`, D1 `games.age`, katalogda; DOOM 18, Pole Star 16, beş oyun
+  9, gerisi 4); iPhone yalnız 9+ ve altını listeliyor. Launcher'da oyun detayında X > Bildir (mağazanın
+  `POST /api/report`'una; yönetici `GET /api/admin/reports`) ve "bu yazarın oyunlarını gizle" (Ayarlar >
+  Mağazalar'da geri alınır). Universal link: `pocketvibe.dev/game/<id>/` (site her mağaza oyunu için sayfa
+  üretiyor, `/.well-known/apple-app-site-association`, iOS Associated Domains). Sitede `/privacy/` ve
+  `/support/`; `support@pocketvibe.dev` Cloudflare Email Routing ile mertcobanov@gmail.com'a gidiyor.
+  App Store Connect'te metinler, kategoriler (Casual, Action), yaş cevapları, 4 ekran görüntüsü, ücretsiz
+  ve 175 ülke API ile girildi (`ios/AppStore/listing.json`, `asc.swift listing`, `free-everywhere`).
+  **Eksik (sahibin işi):** inceleme iletişim telefonu (`REVIEW_PHONE=... asc.swift listing ...`), App
+  Privacy formu ("Veri toplanmıyor"), DSA "tacir değilim" beyanı, sürümü seçip incelemeye göndermek.
+- **Android 0.7.4 / iPhone 0.7.4:** oyun sırasında telefon çevrilince oyun şeklini koruyor (bant yok);
+  iPhone'da gamepad'i uygulama okuyor (sayfaların Gamepad API'si kapalı), arka plandan dönünce sunucu
+  cevap vermiyorsa yeniden başlıyor.
 - **iPhone 0.7.3** (TestFlight, build 136; App Store Connect'te "PocketVibe: Mini Games", app id
   6820965487, çünkü "PocketVibe" adı alınmış; ana ekranda adı PocketVibe): `ios/`, Android uygulamasının
   Swift karşılığı (WKWebView, `Service.swift` yerel servis, `TouchPad.swift` aynı ekran tuşları).
