@@ -169,7 +169,11 @@ cf dev       # local, with local D1 and R2
 cf deploy    # https://pocketvibe-store.mertcobanov.workers.dev
 ```
 
-The schema is in `migrations/0001_init.sql`. `GET /catalog.json` is what handhelds read.
+The schema is in `migrations/` (apply new ones with `cf d1 migrations apply <database id>`).
+`GET /catalog.json` is what handhelds read; a game's `age` (4, 9, 13, 16 or 18) comes from the
+pocketvibe-store repository, and the iPhone app lists only games rated for its own rating.
+`POST /api/report` takes a player's report of a game (no sign-in); the admin reads them with
+`GET /api/admin/reports` and marks them dealt with with `POST /api/admin/reports/resolve`.
 `POST /api/publish` takes a game zip from a signed-in GitHub user; uploads from anyone but the
 admin (`ADMIN_LOGIN`) wait in `pocketvibe pending` until `pocketvibe approve` or `reject`.
 

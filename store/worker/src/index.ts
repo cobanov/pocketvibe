@@ -9,6 +9,9 @@
 //   GET  /api/admin/pending         uploads waiting for review (admin)
 //   GET  /api/admin/files/<key>     an upload's zip or cover, to try it before review (admin)
 //   POST /api/admin/review          approve or reject an upload (admin)
+//   POST /api/report                a player's report of a game (anyone, no sign-in)
+//   GET  /api/admin/reports         reports not dealt with yet (admin)
+//   POST /api/admin/reports/resolve mark a report dealt with (admin)
 //
 // Developers sign in with a GitHub token; the store asks GitHub who it
 // belongs to and keeps nothing else. A game id belongs to whoever published it,
@@ -51,6 +54,7 @@ interface GameRow {
   zip_key: string;
   cover_key: string | null;
   downloads: number;
+  age: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,6 +66,9 @@ const MAX_COVER = 2 * 1024 * 1024;
 const MAX_MANIFEST = 64 * 1024;
 const MAX_UNPACKED = 200 * 1024 * 1024; // all files of a game, unpacked
 const ENTRY = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*\.html$/;
+const AGES = [4, 9, 13, 16, 18]; // the App Store's age ratings
+const REASONS = ['offensive', 'broken', 'copyright', 'other'];
+const MAX_REPORTS_PER_HOUR = 20; // per game, so one player cannot flood the list
 
 class HttpError extends Error {
   constructor(
@@ -126,9 +133,48 @@ function catalogEntry(game: GameRow, origin: string, env: Env) {
     ...(game.cover_key && { cover: `${origin}/files/${game.cover_key}` }),
     downloads: game.downloads,
     updated: game.updated_at,
+    ...(game.age !== null && game.age !== undefined && { age: game.age }),
     // Made by PocketVibe itself, not by the community.
     ...(game.owner === env.ADMIN_LOGIN && { official: true }),
   };
+}
+
+async function setAge(env: Env, id: string, age: number | null) {
+  if (age !== null) await env.DB.prepare('UPDATE games SET age = ? WHERE id = ?').bind(age, id).run();
+}
+
+// A player's report of a game: what is wrong, and a short note. Answered from
+// the admin's list (GET /api/admin/reports); the game can then be removed.
+async function report(request: Request, env: Env) {
+  const body = (await request.json().catch(() => null)) as { game?: unknown; reason?: unknown; note?: unknown; platform?: unknown } | null;
+  const game = typeof body?.game === 'string' ? body.game : '';
+  const reason = typeof body?.reason === 'string' ? body.reason : '';
+  if (!GAME_ID.test(game) || !REASONS.includes(reason)) throw new HttpError(400, `send {"game": <id>, "reason": one of ${REASONS.join(', ')}}`);
+  const exists = await env.DB.prepare('SELECT 1 FROM games WHERE id = ?').bind(game).first();
+  if (!exists) throw new HttpError(404, 'no such game in the store');
+  const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+  const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM reports WHERE game_id = ? AND created_at > ?').bind(game, hourAgo).first<{ n: number }>();
+  if ((recent?.n ?? 0) >= MAX_REPORTS_PER_HOUR) return json({ ok: true }); // already plenty to look at
+  const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : '';
+  const platform = typeof body?.platform === 'string' ? body.platform.slice(0, 20) : '';
+  await env.DB.prepare('INSERT INTO reports (game_id, reason, note, platform, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(game, reason, note, platform, new Date().toISOString())
+    .run();
+  return json({ ok: true });
+}
+
+async function reports(request: Request, env: Env) {
+  await requireAdmin(request, env);
+  const { results } = await env.DB.prepare('SELECT * FROM reports WHERE resolved_at IS NULL ORDER BY created_at DESC LIMIT 200').all();
+  return json({ reports: results });
+}
+
+async function resolveReport(request: Request, env: Env) {
+  await requireAdmin(request, env);
+  const body = (await request.json().catch(() => null)) as { id?: unknown } | null;
+  if (typeof body?.id !== 'number') throw new HttpError(400, 'send {"id": <report id>}');
+  await env.DB.prepare('UPDATE reports SET resolved_at = ? WHERE id = ?').bind(new Date().toISOString(), body.id).run();
+  return json({ ok: true });
 }
 
 async function catalog(env: Env, origin: string) {
@@ -346,7 +392,13 @@ async function ciPublish(request: Request, env: Env) {
   const upload = readGameZip(data);
   const { manifest } = upload;
   const published = await env.DB.prepare('SELECT version FROM games WHERE id = ?').bind(manifest.id).first<{ version: string }>();
+  // The age rating comes from the repository's games/<id>.json, like the owner.
+  const ageHeader = request.headers.get('X-PocketVibe-Age');
+  const age = ageHeader === null ? null : Number(ageHeader);
+  if (age !== null && !AGES.includes(age)) throw new HttpError(400, `X-PocketVibe-Age must be one of ${AGES.join(', ')}`);
   if (published && published.version === manifest.version) {
+    // A rating can change without a new version.
+    await setAge(env, manifest.id, age);
     return json({ status: 'unchanged', id: manifest.id, version: manifest.version, message: 'Already published.' });
   }
   const highest = await highestVersion(env, manifest.id);
@@ -354,6 +406,7 @@ async function ciPublish(request: Request, env: Env) {
     throw new HttpError(409, `version must be higher than ${highest}`);
   }
   await storeRelease(env, upload, data, owner, owner, 'published');
+  await setAge(env, manifest.id, age);
   return json({ status: 'published', id: manifest.id, version: manifest.version, message: 'Published.' });
 }
 
@@ -474,6 +527,9 @@ export default {
       if (request.method === 'GET' && pathname === '/api/admin/pending') return await pending(request, env);
       if (request.method === 'GET' && pathname.startsWith('/api/admin/files/')) return await adminFile(request, env, pathname.slice(17));
       if (request.method === 'POST' && pathname === '/api/admin/review') return await review(request, env);
+      if (request.method === 'POST' && pathname === '/api/report') return await report(request, env);
+      if (request.method === 'GET' && pathname === '/api/admin/reports') return await reports(request, env);
+      if (request.method === 'POST' && pathname === '/api/admin/reports/resolve') return await resolveReport(request, env);
       throw new HttpError(404, 'not found');
     } catch (e) {
       if (e instanceof HttpError) return json({ error: e.message }, e.status);
