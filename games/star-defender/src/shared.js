@@ -33,8 +33,26 @@ export function paint(geometry, hex) {
   return g;
 }
 
-export function box(w, h, d, x, y, z, hex, rotZ = 0) {
+const FACES = ['px', 'nx', 'py', 'ny', 'pz', 'nz']; // BoxGeometry's groups, in order
+
+// A box without the faces named in skip (e.g. 'py ny'): faces inside another
+// part or always turned away from the camera are never seen, but the
+// handheld still pays for every triangle it is sent.
+export function boxGeometry(w, h, d, skip = '') {
   const g = new THREE.BoxGeometry(w, h, d);
+  if (!skip) return g;
+  const index = [];
+  for (let f = 0; f < 6; f++) {
+    if (skip.includes(FACES[f])) continue;
+    for (let k = 0; k < 6; k++) index.push(g.index.getX(f * 6 + k));
+  }
+  g.setIndex(index);
+  g.clearGroups();
+  return g;
+}
+
+export function box(w, h, d, x, y, z, hex, rotZ = 0, skip = '') {
+  const g = boxGeometry(w, h, d, skip);
   if (rotZ) g.rotateZ(rotZ);
   g.translate(x, y, z);
   return paint(g, hex);
@@ -48,4 +66,59 @@ export function part(geometry, x, y, z, hex) {
 
 export function rand(min, max) {
   return min + Math.random() * (max - min);
+}
+
+const tmpN = new THREE.Vector3();
+const tmpC = new THREE.Vector3();
+const tmpA = new THREE.Vector3();
+const tmpB = new THREE.Vector3();
+const tmpNormal = new THREE.Matrix3();
+
+// Drops the triangles of a non-indexed geometry that can never face the
+// camera: they are culled anyway, but the handheld still pays for every
+// triangle it is sent. poses are the model's possible rotations and scales
+// (Matrix4, no translation); places a list of boxes ([min, max]) where the
+// model's origin can be, eye the box where the camera can be. Facing is
+// linear in both positions, so testing the corners of the boxes covers
+// everything inside them.
+export function prune(geometry, poses, places, eye, margin = 0.05) {
+  const pos = geometry.attributes.position;
+  const names = Object.keys(geometry.attributes);
+  const keep = [];
+  const n = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  for (let t = 0; t < pos.count; t += 3) {
+    tmpA.fromBufferAttribute(pos, t + 1).sub(tmpC.fromBufferAttribute(pos, t));
+    tmpB.fromBufferAttribute(pos, t + 2).sub(tmpC);
+    n.crossVectors(tmpA, tmpB).normalize();
+    c.copy(tmpC).add(tmpA.fromBufferAttribute(pos, t + 1)).add(tmpB.fromBufferAttribute(pos, t + 2)).divideScalar(3);
+    let seen = false;
+    for (let p = 0; p < poses.length && !seen; p++) {
+      tmpN.copy(n).applyMatrix3(tmpNormal.getNormalMatrix(poses[p])).normalize();
+      const cw = tmpC.copy(c).applyMatrix4(poses[p]);
+      for (let b = 0; b < places.length && !seen; b++) {
+        const at = places[b];
+        for (let k = 0; k < 32 && !seen; k++) {
+          const vx = eye[k & 1].x - at[(k >> 2) & 1].x - cw.x;
+          const vy = eye[(k >> 1) & 1].y - at[(k >> 3) & 1].y - cw.y;
+          const vz = eye[0].z - at[(k >> 4) & 1].z - cw.z;
+          const len = Math.hypot(vx, vy, vz);
+          if (tmpN.x * vx + tmpN.y * vy + tmpN.z * vz > -margin * len) seen = true;
+        }
+      }
+    }
+    if (seen) keep.push(t);
+  }
+  const out = new THREE.BufferGeometry();
+  for (const name of names) {
+    const src = geometry.attributes[name];
+    const size = src.itemSize;
+    const data = new Float32Array(keep.length * 3 * size);
+    for (let k = 0; k < keep.length; k++) {
+      data.set(src.array.subarray(keep[k] * size, (keep[k] + 3) * size), k * 3 * size);
+    }
+    out.setAttribute(name, new THREE.BufferAttribute(data, size));
+  }
+  geometry.dispose();
+  return out;
 }

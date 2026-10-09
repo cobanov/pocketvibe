@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { SAUCER_Z, part, rand } from './shared.js';
+import { SAUCER_Z, part, prune, rand } from './shared.js';
 
 const SPEED = 5.5;
 const START_X = 26; // off screen on both sides, also on the wide 16:9 screen
@@ -22,7 +22,17 @@ function saucerGeometry() {
     const light = new THREE.BoxGeometry(0.16, 0.12, 0.16);
     parts.push(part(light, Math.cos(a) * 0.9, 0.04, Math.sin(a) * 0.68, i % 2 ? 0xfff27a : 0xffffff));
   }
-  return mergeGeometries(parts);
+  const g = mergeGeometries(parts);
+  // Leave out what never faces the camera (the underside): the saucer leans
+  // towards the camera at every turn of its spin.
+  const poses = [];
+  const euler = new THREE.Euler();
+  for (let k = 0; k < 16; k++) {
+    for (const bank of [-0.12, 0.12]) poses.push(new THREE.Matrix4().makeRotationFromEuler(euler.set(0.35, (k / 16) * Math.PI * 2, bank)));
+  }
+  const at = [new THREE.Vector3(-START_X, Y - 0.15, SAUCER_Z), new THREE.Vector3(START_X, Y + 0.15, SAUCER_Z)];
+  const eye = [new THREE.Vector3(-1.5, 23, 13.5), new THREE.Vector3(1.5, 24, 13.5)];
+  return prune(g, poses, [at], eye);
 }
 
 export function createSaucer(scene) {

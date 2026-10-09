@@ -1,5 +1,6 @@
 // Player bullets (at most two at a time) and alien bombs, each a fixed pool
-// drawn with one InstancedMesh. Also resolves what every shot runs into.
+// drawn with one InstancedMesh. Also resolves what every shot runs into and
+// tells main.js through the events it was given (for score and sound).
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -12,6 +13,8 @@ const MAX_BOMBS = 10;
 const BULLET_SPEED = 30;
 const SHOT_Y = ALIEN_Y;
 const CROSS = 0.38; // how close a bullet and a bomb must pass to cancel out
+const ZIG_AMP = 0.55; // zigzag bombs swing this far to each side
+const ZIG_RATE = 7; // and this fast (radians per second)
 
 function bombGeometry() {
   const outer = new THREE.OctahedronGeometry(0.26, 0);
@@ -21,7 +24,9 @@ function bombGeometry() {
   return mergeGeometries([part(outer, 0, 0, 0, 0xff3d5e), part(core, 0, 0.06, 0, 0xffe066)]);
 }
 
-export function createShots(scene, { aliens, shields, saucer, fx }) {
+// events: kill(slot, points, x, diving), armor(slot, x), chip(x, bomb), cancel(x),
+// saucer(bonus, x); each is called when it happens.
+export function createShots(scene, { aliens, shields, saucer, fx, events }) {
   const bulletGeometry = new THREE.BoxGeometry(0.14, 0.14, 0.9);
   const bulletMesh = new THREE.InstancedMesh(
     bulletGeometry,
@@ -49,6 +54,8 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
   const mPrev = new Float32Array(MAX_BOMBS);
   const mv = new Float32Array(MAX_BOMBS);
   const mOn = new Uint8Array(MAX_BOMBS);
+  const mBase = new Float32Array(MAX_BOMBS); // zigzag bombs swing around this x
+  const mZig = new Float32Array(MAX_BOMBS); // their phase; -1 for a straight bomb
   const matrix = new THREE.Matrix4();
   const dummy = new THREE.Object3D();
   let spin = 0;
@@ -58,8 +65,6 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
     points: 0,
     kills: 0,
     shipHit: false,
-    bonus: 0, // saucer bonus scored this frame
-    bonusX: 0,
 
     bullets() {
       let n = 0;
@@ -84,13 +89,15 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
       return false;
     },
 
-    drop(x, z, speed) {
+    // zigzag bombs swing from side to side on their way down.
+    drop(x, z, speed, zigzag = false) {
       for (let i = 0; i < MAX_BOMBS; i++) {
         if (mOn[i]) continue;
         mOn[i] = 1;
-        mx[i] = x;
+        mx[i] = mBase[i] = x;
         mz[i] = mPrev[i] = z;
         mv[i] = speed;
+        mZig[i] = zigzag ? Math.random() * 6 : -1;
         return true;
       }
       return false;
@@ -111,7 +118,6 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
       shots.points = 0;
       shots.kills = 0;
       shots.shipHit = false;
-      shots.bonus = 0;
       spin += dt * 14;
 
       for (let i = 0; i < MAX_BOMBS; i++) {
@@ -119,9 +125,14 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
         const z0 = mz[i];
         mPrev[i] = z0;
         mz[i] += mv[i] * dt;
+        if (mZig[i] >= 0) {
+          mZig[i] += ZIG_RATE * dt;
+          mx[i] = mBase[i] + Math.sin(mZig[i]) * ZIG_AMP;
+        }
         if (shields.hit(mx[i], z0, mz[i], true)) {
           mOn[i] = 0;
           fx.burst(shields.hitX, SHOT_Y, shields.hitZ, 0x7cf05a, 7, 5, 0.14);
+          events.chip(shields.hitX, true);
           continue;
         }
         if (
@@ -151,6 +162,7 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
         if (shields.hit(x, z0, z1, false)) {
           bOn[i] = 0;
           fx.burst(shields.hitX, SHOT_Y, shields.hitZ, 0x7cf05a, 5, 4, 0.12);
+          events.chip(shields.hitX, false);
           continue;
         }
 
@@ -162,6 +174,7 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
           mOn[k] = 0;
           cancelled = true;
           fx.burst(x, SHOT_Y, mz[k], 0xffe066, 8, 6, 0.13);
+          events.cancel(x);
           break;
         }
         if (cancelled) {
@@ -172,9 +185,17 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
         const a = aliens.hit(x, z0, z1);
         if (a >= 0) {
           bOn[i] = 0;
-          shots.points += aliens.kill(a);
-          shots.kills++;
-          fx.burst(aliens.ax[a], SHOT_Y, aliens.az[a], aliens.colorOf(a), 18, 11, 0.24);
+          const diving = aliens.isDiving(a);
+          const points = aliens.strike(a);
+          if (points > 0) {
+            shots.points += points;
+            shots.kills++;
+            fx.burst(aliens.ax[a], SHOT_Y, aliens.az[a], aliens.colorOf(a), 18, 11, 0.24);
+            events.kill(a, points, aliens.ax[a], diving);
+          } else {
+            fx.burst(aliens.ax[a], SHOT_Y, aliens.az[a] + 0.4, 0xdfe6ff, 6, 6, 0.12);
+            events.armor(a, aliens.ax[a]);
+          }
           continue;
         }
 
@@ -182,10 +203,9 @@ export function createShots(scene, { aliens, shields, saucer, fx }) {
         if (bonus > 0) {
           bOn[i] = 0;
           shots.points += bonus;
-          shots.bonus = bonus;
-          shots.bonusX = saucer.x;
           fx.burst(saucer.x, 0.9, saucer.z, 0xff4466, 26, 12, 0.26);
           fx.burst(saucer.x, 0.9, saucer.z, 0x7ff6ff, 10, 8, 0.2);
+          events.saucer(bonus, saucer.x);
           continue;
         }
 

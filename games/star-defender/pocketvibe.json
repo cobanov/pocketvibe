@@ -2,14 +2,14 @@
   "id": "star-defender",
   "title": "Star Defender",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Hold the line against a marching alien formation: dodge their bombs, hide behind crumbling bunkers and shoot down the mystery saucer.",
+  "version": "1.2.0",
+  "description": "Hold the line against marching alien formations: dodge their bombs and divers, crack the silver armor, hide behind crumbling bunkers and shoot down the mystery saucer.",
   "genre": "Shooter",
   "controls": {
-    "D-pad": "Move left / right",
-    "A": "Fire (hold for auto fire)",
-    "START": "Pause / resume",
-    "B": "Back to title (paused or game over)"
+    "D-pad": "Move left / right (menus: choose)",
+    "A": "Fire (hold for auto fire) / select",
+    "START": "Pause menu",
+    "B": "Resume (paused) / back to title (game over)"
   },
   "responsive": true
 }

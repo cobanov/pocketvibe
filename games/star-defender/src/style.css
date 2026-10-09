@@ -126,6 +126,16 @@ body.handheld #legend {
   letter-spacing: 3px;
 }
 
+.hud-row .best {
+  display: block;
+  font-size: 18px;
+  color: #d6dcf5;
+}
+
+.hud-row .best small {
+  font-size: 15px;
+}
+
 .hud-row[hidden] {
   display: none;
 }
@@ -176,6 +186,112 @@ body.handheld #legend {
   color: #d6dcf5;
 }
 
+.panel.title-panel {
+  gap: 6px;
+  padding: 12px 30px 10px;
+}
+
+.panel.title-panel .title {
+  font-size: 44px;
+}
+
+.panel.title-panel .menu {
+  gap: 2px;
+}
+
+/* Menu rows: the chosen one is lit and marked with arrows at both ends. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 2px;
+}
+
+.menu .item {
+  padding: 2px 14px;
+  border-radius: 8px;
+  font-size: 22px;
+  letter-spacing: 1px;
+  color: #b9b4ff;
+}
+
+.menu .item b {
+  display: inline-block;
+  min-width: 44px;
+  color: #6ff3ff;
+}
+
+.menu .item.sel {
+  background: rgba(150, 120, 255, 0.3);
+  color: #fff;
+}
+
+.menu .item.sel::before {
+  content: '▶ ';
+  color: #ffd84a;
+}
+
+.menu .item.sel::after {
+  content: ' ◀';
+  color: #ffd84a;
+}
+
+.key {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #7d5cff;
+  color: #fff;
+  font-size: 0.85em;
+  line-height: 1.35;
+}
+
+.panel .keys {
+  font-size: 20px;
+}
+
+.panel .small.keys {
+  font-size: 18px;
+}
+
+/* Game over */
+.panel .big-score {
+  font-size: 52px;
+  line-height: 1;
+  color: #fff;
+}
+
+.panel .stats {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-size: 20px;
+  color: #d6dcf5;
+}
+
+.panel .stats b {
+  color: #6ff3ff;
+}
+
+.panel.record {
+  border-color: #ffd84a;
+  box-shadow: 0 0 24px rgba(255, 216, 74, 0.4);
+}
+
+.panel.record .title {
+  animation: record 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes record {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
 .panel .dot {
   display: inline-block;
   width: 14px;
@@ -192,16 +308,31 @@ body.handheld #legend {
   right: 0;
   top: calc(50% - 4px); /* a little below the middle, between the aliens and the bunkers */
   text-align: center;
+  opacity: 0;
+}
+
+#banner .big {
   font-size: 48px;
   font-weight: 800;
   letter-spacing: 4px;
   color: #fff;
   text-shadow: 0 3px 0 #3a1f8f, 0 0 16px rgba(120, 200, 255, 0.8);
-  opacity: 0;
+}
+
+#banner .sub {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #ffd84a;
+  text-shadow: 0 2px 0 #000, 0 0 6px #000;
+}
+
+#banner .sub:empty {
+  display: none;
 }
 
 #banner.show {
-  animation: banner 1.5s ease-out forwards;
+  animation: banner 1.8s ease-out forwards;
 }
 
 @keyframes banner {
@@ -234,6 +365,24 @@ body.handheld #legend {
   color: #6ff3ff;
 }
 
+.pop.record {
+  transform: none;
+  font-size: 22px;
+  color: #ffd84a;
+}
+
+.pop.record.show {
+  animation: best 1.8s ease-out forwards;
+}
+
+@keyframes best {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.2); }
+  25% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 0) scale(1); }
+}
+
 @keyframes pop {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
   15% { opacity: 1; transform: translate(-50%, -70%) scale(1.25); }
@@ -253,6 +402,10 @@ body.handheld #legend {
 
 #flash.clear {
   background: #ffffff;
+}
+
+#flash.warn {
+  background: #ff9a3c;
 }
 
 #flash.show {

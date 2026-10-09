@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { FIELD_HALF, GROUND_Z, box, rand } from './shared.js';
+import { FIELD_HALF, GROUND_Z, SPACE, box, rand } from './shared.js';
 
 const STAR_COUNT = 260;
 const STAR_NEAR_Z = 18; // stars past this line wrap back to the far end
@@ -14,20 +14,49 @@ const STAR_COLORS = [0xffffff, 0xffffff, 0xcfe3ff, 0xfff1c4, 0xffc4ef, 0xa8f0ff]
 const GRID_FAR_Z = -24;
 const GRID_NEAR_Z = GROUND_Z + 0.6;
 const RAIL_X = FIELD_HALF + 1.0;
+const CAMERA_Y = 23.5; // where main.js puts the camera, for the grid's line widths
+const CAMERA_Z = 13.5;
 
-function gridTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgba(150, 120, 255, 0.5)';
-  ctx.fillRect(0, 0, 64, 2);
-  ctx.fillRect(0, 0, 2, 64);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  return texture;
+// The playfield grid: purple lines every 1.6 units that fade out towards the
+// far end. It used to be a transparent textured plane over most of the
+// screen; drawn as opaque lines it looks the same and paints only the lines.
+// Each line takes the color the old half-transparent line made over the
+// background, fainter where it was thinner than a pixel.
+function gridGeometry() {
+  const line = new THREE.Color(0x9678ff).convertLinearToSRGB();
+  const space = new THREE.Color(SPACE).convertLinearToSRGB();
+  const c = new THREE.Color();
+  const depth = GRID_NEAR_Z - GRID_FAR_Z;
+  const positions = [];
+  const colors = [];
+  function vertex(x, z) {
+    const fade = Math.min(1, ((z - GRID_FAR_Z) / depth) * 1.8);
+    // The old lines were 0.05 wide, about 30 / d pixels at distance d, and
+    // the texture's filtering blurred them more where the floor is seen at
+    // a flat angle.
+    const d = Math.hypot(x, CAMERA_Y, CAMERA_Z - z);
+    const width = (30 / d) * (CAMERA_Y / d);
+    const a = 0.5 * fade * Math.min(1, width);
+    c.setRGB(space.r + (line.r - space.r) * a, space.g + (line.g - space.g) * a, space.b + (line.b - space.b) * a).convertSRGBToLinear();
+    positions.push(x, 0, z);
+    colors.push(c.r, c.g, c.b);
+  }
+  // Lengthwise lines, in pieces so the fade follows the distance.
+  for (let x = -RAIL_X + 0.025; x < RAIL_X; x += 1.6) {
+    for (let k = 0; k < 6; k++) {
+      vertex(x, GRID_FAR_Z + (depth * k) / 6);
+      vertex(x, GRID_FAR_Z + (depth * (k + 1)) / 6);
+    }
+  }
+  // Crosswise lines.
+  for (let z = GRID_NEAR_Z - 1.6 + 0.025; z > GRID_FAR_Z; z -= 1.6) {
+    vertex(-RAIL_X, z);
+    vertex(RAIL_X, z);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  return g;
 }
 
 // A low-poly gas giant with stripes: one flat color per triangle, picked by
@@ -84,28 +113,8 @@ export function createBackground(scene) {
   planet.scale.setScalar(1.6);
   scene.add(planet);
 
-  // The playfield grid fades out towards the far end through vertex alpha.
-  const gridW = RAIL_X * 2;
-  const gridD = GRID_NEAR_Z - GRID_FAR_Z;
-  const gridGeometry = new THREE.PlaneGeometry(gridW, gridD, 1, 4);
-  gridGeometry.rotateX(-Math.PI / 2);
-  const gp = gridGeometry.attributes.position;
-  const gridColors = new Float32Array(gp.count * 4);
-  for (let i = 0; i < gp.count; i++) {
-    const t = (gp.getZ(i) + gridD / 2) / gridD; // 0 at the far end, 1 at the near end
-    gridColors[i * 4] = 1;
-    gridColors[i * 4 + 1] = 1;
-    gridColors[i * 4 + 2] = 1;
-    gridColors[i * 4 + 3] = Math.min(1, t * 1.8);
-  }
-  gridGeometry.setAttribute('color', new THREE.BufferAttribute(gridColors, 4));
-  const gridMap = gridTexture();
-  gridMap.repeat.set(gridW / 1.6, gridD / 1.6);
-  const grid = new THREE.Mesh(
-    gridGeometry,
-    new THREE.MeshBasicMaterial({ map: gridMap, vertexColors: true, transparent: true, depthWrite: false }),
-  );
-  grid.position.set(0, -0.02, (GRID_NEAR_Z + GRID_FAR_Z) / 2);
+  const grid = new THREE.LineSegments(gridGeometry(), new THREE.LineBasicMaterial({ vertexColors: true }));
+  grid.position.y = -0.02;
   scene.add(grid);
 
   // Neon rails on both sides and the line the ship defends, merged into one
@@ -136,9 +145,6 @@ export function createBackground(scene) {
   let spin = 0;
 
   return {
-    // Textures to upload while the game loads.
-    textures: [gridMap],
-
     // Brightens the rails for a moment (called on every formation step).
     pulse(amount) {
       pulse = Math.max(pulse, amount);

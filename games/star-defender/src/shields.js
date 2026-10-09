@@ -2,7 +2,7 @@
 // InstancedMesh; the instance data is rebuilt only when a block changes.
 
 import * as THREE from 'three';
-import { SHIELD_Z } from './shared.js';
+import { SHIELD_Z, boxGeometry } from './shared.js';
 
 const BS = 0.3; // block size
 const COLS = 10;
@@ -26,7 +26,8 @@ const TOP_COLOR = new THREE.Color(0xa6ff5c);
 const BOTTOM_COLOR = new THREE.Color(0x2fd39a);
 
 export function createShields(scene) {
-  const geometry = new THREE.BoxGeometry(BS * 0.94, 0.5, BS * 0.94);
+  // No bottom (on the floor) and no back (always turned away from the camera).
+  const geometry = boxGeometry(BS * 0.94, 0.5, BS * 0.94, 'ny nz');
   geometry.translate(0, 0.25, 0);
   const mesh = new THREE.InstancedMesh(geometry, new THREE.MeshLambertMaterial(), COUNT);
   mesh.setColorAt(0, TOP_COLOR); // creates the color buffer
