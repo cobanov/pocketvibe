@@ -1,29 +1,31 @@
-// The mountain: snow chunks recycled as the skier goes down, the forested
+// The mountain: snow chunks recycled as the camera goes down, the forested
 // banks on both sides of the piste, piste markers and the far mountains.
 // Chunks rewrite their own vertices when they move to the front, so the
-// terrain never repeats and nothing is allocated while playing.
+// terrain never repeats and nothing is allocated while playing. The chunks
+// reach just as far as the fog lets anything be seen, and only the pines
+// and markers inside the camera's view are drawn.
 
 import * as THREE from 'three';
 import { PISTE, SLOPE, canvasTexture, rand, slopeY, smoothstep } from './shared.js';
-import { backdropGeometry, markerGeometry, pineGeometry } from './models.js';
+import { backdropGeometry, forestPineGeometry, markerGeometry } from './models.js';
 
-export const CHUNK = 30; // length of a terrain chunk
-const CHUNKS = 5;
-const BEHIND = 18; // a chunk moves to the front once it is this far behind the skier
-const ROWS = 10; // vertex rows per chunk
-const TREE_ROWS = 12; // rows of forest per chunk and side
+export const CHUNK = 20; // length of a terrain chunk
+const CHUNKS = 6; // 120 units: from just behind the camera to the end of the fog
+const BEHIND = 4; // a chunk moves to the front once it is this far behind the camera
+const ROWS = 5; // vertex rows of the banks per chunk; the flat piste needs one
+const TREE_ROWS = 8; // rows of forest per chunk and side
 const TREES_PER_CHUNK = TREE_ROWS * 2 * 3;
 const MARKERS_PER_CHUNK = 4;
 const BACKDROP_DIST = 170;
 
-// Vertex columns: fine on the piste (for the groomed stripes), coarse on the hills.
-const XS = [];
-for (let x = -76; x < -24; x += 4) XS.push(x);
-for (let x = -24; x < -16; x += 2) XS.push(x);
-for (let x = -16; x < 16; x += 1) XS.push(x);
-for (let x = 16; x < 24; x += 2) XS.push(x);
-for (let x = 24; x <= 76; x += 4) XS.push(x);
-const COLS = XS.length;
+// Vertex columns of the piste: one unit apart, for the groomed stripes.
+const PX = [];
+for (let x = -PISTE; x <= PISTE; x++) PX.push(x);
+// Columns of one bank, from the piste edge out: fine where the bank rises
+// and the forest stands, coarse on the far hills.
+const BX = [PISTE, 16.5, 18, 20, 22.5, 26, 31, 38, 47, 58, 76];
+const PCOLS = PX.length;
+const BCOLS = BX.length;
 
 // Height of the snow above the slope plane: flat on the piste, banks rising
 // on both sides and rolling hills further out.
@@ -70,20 +72,33 @@ const PISTE_B = new THREE.Color(0xe2ebf6);
 const BANK_LOW = new THREE.Color(0xe4edf7);
 const BANK_HIGH = new THREE.Color(0xfbfdff);
 
+// Quads of a grid `cols` vertices wide and `rows` + 1 high starting at
+// vertex `base`, counter-clockwise seen from above. flip mirrors the
+// winding (the left bank's columns run from the piste outwards, to -x).
+function gridIndex(index, base, cols, rows, flip) {
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const a = base + r * cols + c;
+      const b = a + cols;
+      if (flip) index.push(a, b, a + 1, b, b + 1, a + 1);
+      else index.push(a, a + 1, b, b, a + 1, b + 1);
+    }
+  }
+}
+
 export function createWorld(scene) {
   const texture = snowTexture();
   const snow = new THREE.MeshLambertMaterial({ vertexColors: true, map: texture });
 
-  // Ground chunks: one geometry each, rewritten when the chunk is recycled.
-  const verts = COLS * (ROWS + 1);
+  // Ground chunks: one geometry each (the piste, then the right and the left
+  // bank), rewritten when the chunk is recycled.
+  const pisteVerts = PCOLS * 2;
+  const bankVerts = BCOLS * (ROWS + 1);
+  const verts = pisteVerts + bankVerts * 2;
   const index = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS - 1; c++) {
-      const a = r * COLS + c;
-      const b = a + COLS;
-      index.push(a, a + 1, b, b, a + 1, b + 1); // counter-clockwise seen from above
-    }
-  }
+  gridIndex(index, 0, PCOLS, 1, false);
+  gridIndex(index, pisteVerts, BCOLS, ROWS, false);
+  gridIndex(index, pisteVerts + bankVerts, BCOLS, ROWS, true);
   const chunks = [];
   for (let i = 0; i < CHUNKS; i++) {
     const g = new THREE.BufferGeometry();
@@ -94,13 +109,12 @@ export function createWorld(scene) {
     g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(verts * 2), 2));
     const mesh = new THREE.Mesh(g, snow);
     scene.add(mesh);
-    chunks.push({ n: -1, mesh });
+    chunks.push({ n: NaN, mesh });
   }
 
   const lambert = new THREE.MeshLambertMaterial({ vertexColors: true });
-  const pineGeo = pineGeometry();
-  const forest = new THREE.InstancedMesh(pineGeo, lambert, CHUNKS * TREES_PER_CHUNK);
-  forest.frustumCulled = false; // instances move with the chunks
+  const forest = new THREE.InstancedMesh(forestPineGeometry(), lambert, CHUNKS * TREES_PER_CHUNK);
+  forest.frustumCulled = false; // culled tree by tree in cull()
   scene.add(forest);
   const markers = new THREE.InstancedMesh(markerGeometry(), lambert, CHUNKS * MARKERS_PER_CHUNK);
   markers.frustumCulled = false;
@@ -114,27 +128,37 @@ export function createWorld(scene) {
   backdrop.frustumCulled = false;
   scene.add(backdrop);
 
-  const dummy = new THREE.Object3D();
   const color = new THREE.Color();
-  const trees = new Float32Array(CHUNKS * TREES_PER_CHUNK * 6); // x, y, z, sx, sy, sz
+  // Per chunk slot: the pines (x, y, z, sx, sy, sz) and the markers (x, y, z).
+  const trees = new Float32Array(CHUNKS * TREES_PER_CHUNK * 6);
   const treeCount = new Int32Array(CHUNKS);
-  let forestDirty = false;
+  const marks = new Float32Array(CHUNKS * MARKERS_PER_CHUNK * 3);
 
-  function writeForest() {
-    let n = 0;
-    for (let slot = 0; slot < CHUNKS; slot++) {
-      for (let t = 0; t < treeCount[slot]; t++) {
-        const i = (slot * TREES_PER_CHUNK + t) * 6;
-        dummy.position.set(trees[i], trees[i + 1], trees[i + 2]);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(trees[i + 3], trees[i + 4], trees[i + 5]);
-        dummy.updateMatrix();
-        forest.setMatrixAt(n++, dummy.matrix);
-      }
-    }
-    forest.count = n;
-    forest.instanceMatrix.needsUpdate = true;
-    forestDirty = false;
+  // One vertex of a chunk: position, normal (from the height gradient; the
+  // slope itself adds to d/dz), color and uv.
+  function vertex(g, i, x, z, v, piste, stripe) {
+    const pos = g.attributes.position.array;
+    const nor = g.attributes.normal.array;
+    const col = g.attributes.color.array;
+    const uv = g.attributes.uv.array;
+    const e = 0.5;
+    const h = piste ? 0 : bankHeight(x, z);
+    pos[i * 3] = x;
+    pos[i * 3 + 1] = slopeY(z) + h;
+    pos[i * 3 + 2] = z;
+    const hx = piste ? 0 : (bankHeight(x + e, z) - bankHeight(x - e, z)) / (2 * e);
+    const hz = SLOPE + (piste ? 0 : (bankHeight(x, z + e) - bankHeight(x, z - e)) / (2 * e));
+    const len = Math.sqrt(hx * hx + 1 + hz * hz);
+    nor[i * 3] = -hx / len;
+    nor[i * 3 + 1] = 1 / len;
+    nor[i * 3 + 2] = -hz / len;
+    if (piste) color.copy(stripe ? PISTE_A : PISTE_B);
+    else color.lerpColors(BANK_LOW, BANK_HIGH, Math.min(1, h / 3));
+    col[i * 3] = color.r;
+    col[i * 3 + 1] = color.g;
+    col[i * 3 + 2] = color.b;
+    uv[i * 2] = x / 4;
+    uv[i * 2 + 1] = v;
   }
 
   // Chunk n covers z from -n * CHUNK down to -(n + 1) * CHUNK.
@@ -142,35 +166,18 @@ export function createWorld(scene) {
     const chunk = chunks[slot];
     chunk.n = n;
     const g = chunk.mesh.geometry;
-    const pos = g.attributes.position.array;
-    const nor = g.attributes.normal.array;
-    const col = g.attributes.color.array;
-    const uv = g.attributes.uv.array;
     const z0 = -n * CHUNK;
-    const e = 0.5;
-    for (let r = 0; r <= ROWS; r++) {
-      const z = z0 - (r * CHUNK) / ROWS;
-      for (let c = 0; c < COLS; c++) {
-        const x = XS[c];
-        const i = r * COLS + c;
-        const h = bankHeight(x, z);
-        pos[i * 3] = x;
-        pos[i * 3 + 1] = slopeY(z) + h;
-        pos[i * 3 + 2] = z;
-        // Normal from the height gradient (the slope itself adds to d/dz).
-        const hx = (bankHeight(x + e, z) - bankHeight(x - e, z)) / (2 * e);
-        const hz = SLOPE + (bankHeight(x, z + e) - bankHeight(x, z - e)) / (2 * e);
-        const len = Math.sqrt(hx * hx + 1 + hz * hz);
-        nor[i * 3] = -hx / len;
-        nor[i * 3 + 1] = 1 / len;
-        nor[i * 3 + 2] = -hz / len;
-        if (Math.abs(x) < PISTE + 0.5) color.copy(c & 1 ? PISTE_A : PISTE_B);
-        else color.lerpColors(BANK_LOW, BANK_HIGH, Math.min(1, h / 3));
-        col[i * 3] = color.r;
-        col[i * 3 + 1] = color.g;
-        col[i * 3 + 2] = color.b;
-        uv[i * 2] = x / 4;
-        uv[i * 2 + 1] = (r * CHUNK) / ROWS / 5;
+    // The piste: one row, as it is flat.
+    for (let r = 0; r <= 1; r++) {
+      for (let c = 0; c < PCOLS; c++) vertex(g, r * PCOLS + c, PX[c], z0 - r * CHUNK, (r * CHUNK) / 5, true, c & 1);
+    }
+    // The banks, right then left.
+    for (let s = 0; s < 2; s++) {
+      const base = PCOLS * 2 + s * BCOLS * (ROWS + 1);
+      const sx = s === 0 ? 1 : -1;
+      for (let r = 0; r <= ROWS; r++) {
+        const z = z0 - (r * CHUNK) / ROWS;
+        for (let c = 0; c < BCOLS; c++) vertex(g, base + r * BCOLS + c, sx * BX[c], z, (r * CHUNK) / ROWS / 5, false, 0);
       }
     }
     g.attributes.position.needsUpdate = true;
@@ -180,21 +187,21 @@ export function createWorld(scene) {
     g.computeBoundingSphere();
 
     // Forest on the banks: dense near the piste, thinning out up the hills.
-    // Each chunk keeps its own list; writeForest packs them all together.
+    // Each chunk keeps its own list; cull() draws those in view.
     const base = slot * TREES_PER_CHUNK;
     let t = 0;
     for (let row = 0; row < TREE_ROWS; row++) {
       for (let side = -1; side <= 1; side += 2) {
         for (let k = 0; k < 3; k++) {
-          const chance = k === 0 ? 0.9 : k === 1 ? 0.65 : 0.4;
+          const chance = k === 0 ? 0.9 : k === 1 ? 0.6 : 0.3;
           if (Math.random() > chance) continue;
           const ax = k === 0 ? rand(1.6, 3.6) : k === 1 ? rand(4, 9) : rand(9, 24);
           const x = side * (PISTE + ax);
           const z = z0 - (row + rand(0.1, 0.9)) * (CHUNK / TREE_ROWS);
-          const s = rand(0.85, 1.5);
+          const s = rand(0.85, 1.5) * (k === 2 ? 1.15 : 1);
           const i = (base + t) * 6;
           trees[i] = x;
-          trees[i + 1] = slopeY(z) + bankHeight(x, z) - 0.05;
+          trees[i + 1] = slopeY(z) + bankHeight(x, z) - 0.1;
           trees[i + 2] = z;
           trees[i + 3] = s * rand(0.9, 1.1);
           trees[i + 4] = s * rand(0.9, 1.25);
@@ -204,34 +211,49 @@ export function createWorld(scene) {
       }
     }
     treeCount[slot] = t;
-    forestDirty = true;
 
-    let m = slot * MARKERS_PER_CHUNK;
+    let m = slot * MARKERS_PER_CHUNK * 3;
     for (let k = 0; k < 2; k++) {
       for (let side = -1; side <= 1; side += 2) {
         const z = z0 - CHUNK * (0.25 + k * 0.5);
-        dummy.position.set(side * (PISTE + 0.9), slopeY(z), z);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.setScalar(1);
-        dummy.updateMatrix();
-        markers.setMatrixAt(m++, dummy.matrix);
+        marks[m++] = side * (PISTE + 0.9);
+        marks[m++] = slopeY(z);
+        marks[m++] = z;
       }
     }
-    markers.instanceMatrix.needsUpdate = true;
+  }
+
+  // Writes an instance matrix that only moves and scales (no turn) straight
+  // into the instance buffer.
+  function put(array, n, x, y, z, sx, sy, sz) {
+    const o = n * 16;
+    array[o] = sx;
+    array[o + 1] = 0;
+    array[o + 2] = 0;
+    array[o + 3] = 0;
+    array[o + 4] = 0;
+    array[o + 5] = sy;
+    array[o + 6] = 0;
+    array[o + 7] = 0;
+    array[o + 8] = 0;
+    array[o + 9] = 0;
+    array[o + 10] = sz;
+    array[o + 11] = 0;
+    array[o + 12] = x;
+    array[o + 13] = y;
+    array[o + 14] = z;
+    array[o + 15] = 1;
   }
 
   return {
-    // Lays out fresh chunks around z (where the skier starts).
+    // Lays out fresh chunks around a camera at z.
     reset(z) {
-      const first = Math.floor((-z - BEHIND) / CHUNK);
-      for (let k = 0; k < CHUNKS; k++) {
-        const n = first + k;
-        build(((n % CHUNKS) + CHUNKS) % CHUNKS, n);
-      }
-      writeForest();
+      // NaN is no chunk number, so every slot is built afresh.
+      for (let slot = 0; slot < CHUNKS; slot++) chunks[slot].n = NaN;
+      this.update(z);
     },
 
-    // Moves chunks that fell behind the skier to the front.
+    // Moves chunks that fell behind the camera (at z) to the front.
     update(z) {
       const first = Math.floor((-z - BEHIND) / CHUNK);
       for (let k = 0; k < CHUNKS; k++) {
@@ -239,7 +261,30 @@ export function createWorld(scene) {
         const slot = ((n % CHUNKS) + CHUNKS) % CHUNKS;
         if (chunks[slot].n !== n) build(slot, n);
       }
-      if (forestDirty) writeForest();
+    },
+
+    // Draws only the pines and markers in view (see createView).
+    cull(view) {
+      const ta = forest.instanceMatrix.array;
+      let n = 0;
+      for (let slot = 0; slot < CHUNKS; slot++) {
+        for (let t = 0; t < treeCount[slot]; t++) {
+          const i = (slot * TREES_PER_CHUNK + t) * 6;
+          const sy = trees[i + 4];
+          if (!view.sees(trees[i], trees[i + 1] + 1.4 * sy, trees[i + 2], 1.8 * Math.max(trees[i + 3], sy))) continue;
+          put(ta, n++, trees[i], trees[i + 1], trees[i + 2], trees[i + 3], sy, trees[i + 5]);
+        }
+      }
+      forest.count = n;
+      forest.instanceMatrix.needsUpdate = true;
+      const ma = markers.instanceMatrix.array;
+      n = 0;
+      for (let i = 0; i < CHUNKS * MARKERS_PER_CHUNK * 3; i += 3) {
+        if (!view.sees(marks[i], marks[i + 1] + 0.75, marks[i + 2], 0.8)) continue;
+        put(ma, n++, marks[i], marks[i + 1], marks[i + 2], 1, 1, 1);
+      }
+      markers.count = n;
+      markers.instanceMatrix.needsUpdate = true;
     },
 
     // The backdrop travels with the camera, a little below its eye line.

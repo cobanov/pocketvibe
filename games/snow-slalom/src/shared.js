@@ -34,6 +34,19 @@ export function randInt(lo, hi) {
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 }
 
+// A small seeded random generator (mulberry32): the same seed gives the
+// same numbers every time, so a fixed course comes out the same every run.
+export function seededRandom(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 export function smoothstep(e0, e1, x) {
   const t = clamp((x - e0) / (e1 - e0), 0, 1);
   return t * t * (3 - 2 * t);
@@ -92,6 +105,40 @@ export function box(w, h, d, x, y, z, hex, topHex) {
   const g = new THREE.BoxGeometry(w, h, d);
   g.translate(x, y, z);
   return topHex === undefined ? paint(g, hex) : paintTop(g, topHex, hex);
+}
+
+// What the camera can see this frame: in its view and closer than `far`,
+// where the fog has hidden everything. Instanced objects use it to draw
+// only the instances that can be seen.
+export function createView() {
+  const frustum = new THREE.Frustum();
+  const matrix = new THREE.Matrix4();
+  const sphere = new THREE.Sphere();
+  const view = {
+    x: 0,
+    z: 0,
+    far: 100,
+
+    update(camera, far) {
+      camera.updateMatrixWorld();
+      matrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      frustum.setFromProjectionMatrix(matrix);
+      view.x = camera.position.x;
+      view.z = camera.position.z;
+      view.far = far;
+    },
+
+    // True when a sphere of radius r around (x, y, z) can be seen.
+    sees(x, y, z, r) {
+      const dx = x - view.x;
+      const dz = z - view.z;
+      if (dx * dx + dz * dz > (view.far + r) * (view.far + r)) return false;
+      sphere.center.set(x, y, z);
+      sphere.radius = r;
+      return frustum.intersectsSphere(sphere);
+    },
+  };
+  return view;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);

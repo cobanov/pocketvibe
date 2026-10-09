@@ -2,14 +2,14 @@
   "id": "snow-slalom",
   "title": "Snow Slalom",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "An endless downhill slalom: carve between red and blue gates, build a combo, fly off kickers and dodge pines, rocks and fences.",
+  "version": "1.2.0",
+  "description": "A downhill slalom, endless or against the clock: carve between red and blue gates, build a combo, spin off kickers, slide across ice and dodge pines, rocks and fences.",
   "genre": "Sports",
   "controls": {
-    "D-pad": "LEFT / RIGHT carve, DOWN tuck, UP brake",
-    "A": "Start / play again",
-    "B": "Back to title (paused or game over)",
-    "START": "Pause / resume"
+    "D-pad": "LEFT / RIGHT carve, DOWN tuck, UP brake; choose in menus",
+    "A": "Select / spin in the air off a kicker",
+    "B": "Back",
+    "START": "Pause menu"
   },
   "responsive": true
 }

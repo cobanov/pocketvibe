@@ -7,7 +7,9 @@ import { SLOPE_ANGLE, slopeY } from './shared.js';
 import { quadGeometry } from './models.js';
 
 const MAX = 220;
-const TRACKS = 260;
+// Pieces of ski track: enough to reach back past the camera, which is all
+// of a track that can ever be seen.
+const TRACKS = 56;
 const SEG = 0.7; // length of one piece of ski track
 
 export function createFx(scene) {

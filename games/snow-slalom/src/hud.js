@@ -1,7 +1,8 @@
-// HUD and menus as HTML on top of the canvas: score and distance top left,
-// the combo in the middle, strikes top right, speed bottom left, popups and
-// callouts over the slope. The DOM is touched only when a value changes or
-// an event happens. CSS animations restart by swapping between two class
+// HUD and menus as HTML on top of the canvas: score and distance top left
+// (the clock and the gate count in the time trial), the combo in the
+// middle, strikes top right (the best time in the trial), speed bottom
+// left, popups and callouts over the slope. The DOM is touched only when a
+// value changes or an event happens. CSS animations restart by swapping between two class
 // names with the same keyframes, so no reflow is forced.
 
 const POPUPS = 5;
@@ -12,18 +13,22 @@ export function createHud(root) {
     <div class="hud-top">
       <div class="left"><div id="score"></div><div id="dist"></div></div>
       <div id="combo"><b></b><small>COMBO</small></div>
-      <div id="strikes">${'<i class="strike"></i>'.repeat(3)}</div>
+      <div class="right"><div id="strikes">${'<i class="strike"></i>'.repeat(3)}</div><div id="target"></div></div>
     </div>
     <div id="speed"><b></b><small>km/h</small></div>
     <div id="popups">${'<div class="popup"></div>'.repeat(POPUPS)}</div>
     <div id="callout"></div>
-    <div id="message"></div>`;
+    <div id="message"></div>
+    <div id="hint"></div>`;
   const top = root.querySelector('.hud-top');
   const scoreEl = root.querySelector('#score');
   const distEl = root.querySelector('#dist');
   const comboEl = root.querySelector('#combo');
   const comboValue = comboEl.querySelector('b');
+  const strikesEl = root.querySelector('#strikes');
   const strikeEls = root.querySelectorAll('.strike');
+  const targetEl = root.querySelector('#target');
+  const hintEl = root.querySelector('#hint');
   const speedEl = root.querySelector('#speed');
   const speedValue = speedEl.querySelector('b');
   const popups = root.querySelectorAll('.popup');
@@ -32,7 +37,8 @@ export function createHud(root) {
   const messageEl = root.querySelector('#message');
 
   let shownScore = -1;
-  let shownDist = -1;
+  let shownDist = '';
+  let shownMeters = -1;
   let shownCombo = -1;
   let shownStrikes = -1;
   let shownSpeed = -1;
@@ -42,6 +48,7 @@ export function createHud(root) {
   let comboFlip = false;
   let calloutFlip = false;
   let flashFlip = false;
+  let hintFlip = false;
 
   return {
     score(value) {
@@ -56,10 +63,32 @@ export function createHud(root) {
       scoreEl.className = scoreFlip ? 'pop-a' : 'pop-b';
     },
 
+    // The clock of the time trial, in the score's place.
+    time(text) {
+      if (text === shownScore) return;
+      shownScore = text;
+      scoreEl.textContent = text;
+    },
+
     distance(meters) {
-      if (meters === shownDist) return;
-      shownDist = meters;
-      distEl.textContent = `${meters} m`;
+      if (meters === shownMeters) return;
+      shownMeters = meters;
+      this.sub(`${meters} m`);
+    },
+
+    // The line under the score: the distance, or the gates in the trial.
+    sub(text) {
+      if (text === shownDist) return;
+      shownDist = text;
+      shownMeters = -1;
+      distEl.textContent = text;
+    },
+
+    // The time trial shows the best time where the strikes are.
+    trial(on, target) {
+      strikesEl.hidden = on;
+      targetEl.hidden = !on || !target;
+      targetEl.textContent = target ? `BEST ${target}` : '';
     },
 
     combo(value) {
@@ -109,7 +138,7 @@ export function createHud(root) {
       el.className = `popup ${kind} ${popupFlip[i] ? 'show-a' : 'show-b'}`;
     },
 
-    // A big word in the middle of the screen; kind is '', 'gold' or 'bad'.
+    // A big word in the middle of the screen; kind is '', 'gold', 'good' or 'bad'.
     callout(text, kind) {
       calloutEl.textContent = text;
       calloutFlip = !calloutFlip;
@@ -138,6 +167,14 @@ export function createHud(root) {
     message(html, place = '') {
       messageEl.className = place;
       messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
+    },
+
+    // A line of button hints along the bottom edge ('' hides it). fade
+    // shows it for a few seconds only.
+    hint(text, fade = false) {
+      hintEl.textContent = text;
+      hintFlip = !hintFlip;
+      hintEl.className = fade ? (hintFlip ? 'fade-a' : 'fade-b') : '';
     },
   };
 }

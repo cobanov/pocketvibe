@@ -102,6 +102,30 @@ export function pineGeometry() {
   return mergeGeometries(parts);
 }
 
+// The forest's pine, seen only from afar on the banks: the same three
+// snowy tiers on five sides instead of seven, no trunk (it stands in deep
+// snow) and no shadow, 30 triangles instead of 61.
+export function forestPineGeometry() {
+  const parts = [];
+  const tiers = [
+    [1.2, 1.4, 0.15],
+    [0.95, 1.2, 0.82],
+    [0.68, 1.05, 1.48],
+  ];
+  for (let i = 0; i < tiers.length; i++) {
+    const [r, h, y] = tiers[i];
+    const cone = new THREE.ConeGeometry(r, h, 5, 1, true);
+    cone.rotateY(i * 0.6);
+    cone.translate(0, y + h / 2, 0);
+    parts.push(paintGradient(cone, 0x1e4a34, 0x3d8452, y, y + h));
+    const cap = new THREE.ConeGeometry(r * 0.56, h * 0.5, 5, 1, true);
+    cap.rotateY(i * 0.6);
+    cap.translate(0, y + h * 0.76, 0);
+    parts.push(paintGradient(cap, 0xdfe9f5, 0xffffff, y + h * 0.5, y + h));
+  }
+  return mergeGeometries(parts);
+}
+
 // A grey boulder with snow on its top faces.
 export function rockGeometry() {
   const g = new THREE.IcosahedronGeometry(0.8, 0);
@@ -141,7 +165,7 @@ export function fenceGeometry() {
 
 // A snow mogul: a low dome with a blue-shaded base.
 export function mogulGeometry() {
-  const g = new THREE.SphereGeometry(1, 12, 4, 0, Math.PI * 2, 0, Math.PI / 2);
+  const g = new THREE.SphereGeometry(1, 9, 3, 0, Math.PI * 2, 0, Math.PI / 2);
   return paintGradient(g, 0xdbe6f3, 0xffffff, 0, 0.8);
 }
 
@@ -174,16 +198,111 @@ export function rampGeometry() {
 }
 
 // A gate flag: a pole with the panel reaching out along +x. Everything is
-// white so the instance color paints it red or blue.
+// white so the instance color paints it red or blue. The panel and its
+// stripe are thin, so they are two quads back to back rather than boxes.
 export function flagGeometry() {
-  const pole = new THREE.CylinderGeometry(0.055, 0.055, 2.0, 6, 1, true);
+  const pole = new THREE.CylinderGeometry(0.055, 0.055, 2.0, 5, 1, true);
   pole.translate(0, 1.0, 0);
   paint(pole, 0xffffff);
-  const panel = new THREE.BoxGeometry(0.78, 0.58, 0.035);
-  panel.translate(0.43, 1.6, 0);
-  paint(panel, 0xffffff);
-  const stripe = box(0.78, 0.1, 0.04, 0.43, 1.44, 0, 0xcfd6e0);
-  return mergeGeometries([pole, panel, stripe].map(toPlain));
+  return mergeGeometries(
+    [pole, ...card(0.78, 0.4, 0.43, 1.69, 0.012, 0xffffff), ...card(0.78, 0.1, 0.43, 1.44, 0.012, 0xcfd6e0)].map(toPlain),
+  );
+}
+
+// A flat rectangle w x h centered on (x, y) facing both +z and -z, `gap`
+// apart: a flag's panel.
+function card(w, h, x, y, gap, hex) {
+  const front = new THREE.PlaneGeometry(w, h);
+  front.translate(x, y, gap / 2);
+  const back = new THREE.PlaneGeometry(w, h);
+  back.rotateY(Math.PI);
+  back.translate(x, y, -gap / 2);
+  return [paint(front, hex), paint(back, hex)];
+}
+
+// A bonus flag: a short white pole with a gold pennant and a gold gem on
+// top, turning slowly so it catches the eye.
+export function bonusFlagGeometry() {
+  const pole = new THREE.CylinderGeometry(0.045, 0.045, 1.7, 5, 1, true);
+  pole.translate(0, 0.85, 0);
+  paint(pole, 0xffffff);
+  const pennant = new THREE.BufferGeometry();
+  // Front and back faces of one triangle.
+  pennant.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([0, 1.66, 0, 0, 1.18, 0, 0.8, 1.42, 0, 0, 1.66, 0, 0.8, 1.42, 0, 0, 1.18, 0], 3),
+  );
+  pennant.computeVertexNormals();
+  paint(pennant, 0xffc021);
+  const gem = new THREE.OctahedronGeometry(0.22);
+  gem.scale(1, 1.3, 1);
+  gem.translate(0, 1.95, 0);
+  paint(gem, 0xffe066);
+  return mergeGeometries([pole, pennant, gem].map(toPlain));
+}
+
+// A sheet of ice: a flat disc, pale blue fading to white in the middle,
+// with two glints across it. Unit size; the instance stretches it.
+export function iceGeometry() {
+  const disc = new THREE.CircleGeometry(1, 16);
+  disc.rotateX(-Math.PI / 2);
+  paint(disc, 0xa9d3f2);
+  const colors = disc.attributes.color;
+  const pos = disc.attributes.position;
+  const c = new THREE.Color();
+  const rim = new THREE.Color(0x9cc9ee);
+  for (let i = 0; i < pos.count; i++) {
+    const r = Math.hypot(pos.getX(i), pos.getZ(i));
+    c.setHex(0xe9f6ff).lerp(rim, r);
+    colors.setXYZ(i, c.r, c.g, c.b);
+  }
+  const glint = (w, d, x, z, angle) => {
+    const g = new THREE.PlaneGeometry(w, d);
+    g.rotateX(-Math.PI / 2);
+    g.rotateY(angle);
+    g.translate(x, 0.01, z);
+    return paint(g, 0xffffff);
+  };
+  return mergeGeometries([disc, glint(1.1, 0.07, -0.15, 0.12, 0.6), glint(0.55, 0.05, 0.3, -0.3, 0.6)].map(toPlain));
+}
+
+// The time trial's finish: blue posts on both piste edges with a checkered
+// banner between them, and a checkered band across the snow. Built for a
+// piste `half` wide on each side; the band lies on the slope.
+export function finishGeometry(half) {
+  const parts = [];
+  const top = 5.8;
+  const sq = 0.75;
+  for (let s = -1; s <= 1; s += 2) {
+    parts.push(box(0.5, top, 0.5, s * (half + 0.6), top / 2, 0, 0x2f6fe0, 0xffffff));
+  }
+  const width = 2 * (half + 0.6);
+  parts.push(box(width, sq * 2 + 0.2, 0.12, 0, top - sq - 0.2, 0, 0x1d2533));
+  const cols = Math.floor(width / sq);
+  const x0 = -(cols * sq) / 2;
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < 2; r++) {
+      if ((c + r) % 2) continue;
+      const q = new THREE.PlaneGeometry(sq, sq);
+      q.translate(x0 + (c + 0.5) * sq, top - 0.3 - (r + 0.5) * sq, 0.07);
+      parts.push(paint(q, 0xffffff));
+    }
+  }
+  // The band on the snow: dark squares on white.
+  const bandCols = Math.floor((2 * half) / sq);
+  const bx0 = -(bandCols * sq) / 2;
+  for (let c = 0; c < bandCols; c++) {
+    for (let r = 0; r < 2; r++) {
+      if ((c + r) % 2 === 0) continue;
+      const q = new THREE.PlaneGeometry(sq, sq);
+      q.rotateX(-Math.PI / 2);
+      q.translate(bx0 + (c + 0.5) * sq, 0, (r - 1 + 0.5) * sq);
+      q.rotateX(-SLOPE_ANGLE);
+      q.translate(0, 0.05, 0);
+      parts.push(paint(q, 0x1d2533));
+    }
+  }
+  return mergeGeometries(parts.map(toPlain));
 }
 
 // A blue piste marker pole with an orange tip.
