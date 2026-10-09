@@ -102,12 +102,18 @@ final class PadLayout: UIView {
 /// of them goes on to the page underneath. A finger keeps the d-pad until it
 /// lifts, steering by where it is from the middle; a finger on a button may
 /// slide onto another, as a thumb rolls from B to A.
+///
+/// Each part is its own layer, and a press only changes a layer's colour:
+/// redrawing the whole screen on the CPU for every press held up the main
+/// thread, and with it the WebView's frames.
 final class TouchPad: UIView {
     private struct Button {
         let key: Key
         let label: String
         let round: Bool
         var box = CGRect.zero
+        let shape = CAShapeLayer()
+        let text = CATextLayer()
     }
 
     private enum Owner: Equatable {
@@ -132,10 +138,16 @@ final class TouchPad: UIView {
     private var held = Set<Key>()
     private let haptic = UIImpactFeedbackGenerator(style: .light)
 
-    private let fill = UIColor(red: 0x26 / 255, green: 0x29 / 255, blue: 0x36 / 255, alpha: 1)
-    private let lit = UIColor(red: 1, green: 0xC8 / 255, blue: 0x3D / 255, alpha: 1) // --accent
-    private let hub = UIColor(red: 0x1E / 255, green: 0x20 / 255, blue: 0x2B / 255, alpha: 1)
-    private let text = UIColor(red: 0xC9 / 255, green: 0xCB / 255, blue: 0xD8 / 255, alpha: 1)
+    private let fill = UIColor(red: 0x26 / 255, green: 0x29 / 255, blue: 0x36 / 255, alpha: 1).cgColor
+    private let lit = UIColor(red: 1, green: 0xC8 / 255, blue: 0x3D / 255, alpha: 1).cgColor // --accent
+    private let hub = UIColor(red: 0x1E / 255, green: 0x20 / 255, blue: 0x2B / 255, alpha: 1).cgColor
+    private let text = UIColor(red: 0xC9 / 255, green: 0xCB / 255, blue: 0xD8 / 255, alpha: 1).cgColor
+    private let dark = background.cgColor
+
+    private let dpadBase = CAShapeLayer()
+    private let dpadHub = CAShapeLayer()
+    private let arms: [Key: CAShapeLayer] = [.left: CAShapeLayer(), .right: CAShapeLayer(), .up: CAShapeLayer(), .down: CAShapeLayer()]
+    private let arrows: [Key: CAShapeLayer] = [.left: CAShapeLayer(), .right: CAShapeLayer(), .up: CAShapeLayer(), .down: CAShapeLayer()]
 
     init(onKey: @escaping (Key, Bool) -> Void) {
         self.onKey = onKey
@@ -143,7 +155,22 @@ final class TouchPad: UIView {
         isOpaque = false
         backgroundColor = .clear
         isMultipleTouchEnabled = true
-        contentMode = .redraw
+        dpadBase.fillColor = fill
+        dpadHub.fillColor = hub
+        layer.addSublayer(dpadBase)
+        for arm in arms.values {
+            arm.fillColor = lit
+            layer.addSublayer(arm)
+        }
+        layer.addSublayer(dpadHub)
+        for arrow in arrows.values { layer.addSublayer(arrow) }
+        for b in buttons {
+            b.text.string = b.label
+            b.text.alignmentMode = .center
+            layer.addSublayer(b.shape)
+            layer.addSublayer(b.text)
+        }
+        paint()
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -160,7 +187,7 @@ final class TouchPad: UIView {
         pill(.r, x: 3 * w / 4, y: y - r - 40, width: 88, height: 36)
         pill(.select, x: w / 2 - 48, y: menuY, width: 80, height: 32)
         pill(.start, x: w / 2 + 48, y: menuY, width: 80, height: 32)
-        setNeedsDisplay()
+        shapeLayers()
     }
 
     func arrangeSideways(size: CGSize, game: CGRect, safe: UIEdgeInsets) {
@@ -176,7 +203,7 @@ final class TouchPad: UIView {
         pill(.r, x: rightX, y: 34, width: width, height: 36)
         pill(.select, x: leftX, y: bottom, width: min(width, 80), height: 32)
         pill(.start, x: rightX, y: bottom, width: min(width, 80), height: 32)
-        setNeedsDisplay()
+        shapeLayers()
     }
 
     // The d-pad, and A, B, X and Y in a diamond, as on the handheld: A right,
@@ -275,7 +302,7 @@ final class TouchPad: UIView {
         for key in pressed { onKey(key, true) }
         if !pressed.isEmpty { haptic.impactOccurred() }
         held = now
-        setNeedsDisplay()
+        paint()
     }
 
     func releaseAll() {
@@ -285,59 +312,59 @@ final class TouchPad: UIView {
 
     // ---------- Drawing ----------
 
-    override func draw(_ rect: CGRect) {
-        drawDpad()
-        for b in buttons {
-            let on = held.contains(b.key)
-            (on ? lit : fill).setFill()
-            if b.round {
-                UIBezierPath(ovalIn: b.box).fill()
-                label(b.label, in: b.box, size: b.box.width * 0.42, color: on ? background : text)
-            } else {
-                UIBezierPath(roundedRect: b.box, cornerRadius: b.box.height / 2).fill()
-                label(b.label, in: b.box, size: 13, color: on ? background : text)
-            }
-        }
-    }
-
-    private func label(_ text: String, in box: CGRect, size: CGFloat, color: UIColor) {
-        let attributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: size, weight: .bold), .foregroundColor: color]
-        let measured = (text as NSString).size(withAttributes: attributes)
-        (text as NSString).draw(at: CGPoint(x: box.midX - measured.width / 2, y: box.midY - measured.height / 2), withAttributes: attributes)
-    }
-
-    private func drawDpad() {
+    // The layers' shapes, once per layout.
+    private func shapeLayers() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         let c = padCenter
         let r = padRadius
         let arm = r * 0.36 // half an arm's width
         let corner = arm * 0.35
-        func bar(_ rect: CGRect, _ color: UIColor) {
-            color.setFill()
-            UIBezierPath(roundedRect: rect, cornerRadius: corner).fill()
-        }
-        bar(CGRect(x: c.x - r, y: c.y - arm, width: 2 * r, height: 2 * arm), fill)
-        bar(CGRect(x: c.x - arm, y: c.y - r, width: 2 * arm, height: 2 * r), fill)
-        // A lit arm for each direction held.
-        if held.contains(.left) { bar(CGRect(x: c.x - r, y: c.y - arm, width: r, height: 2 * arm), lit) }
-        if held.contains(.right) { bar(CGRect(x: c.x, y: c.y - arm, width: r, height: 2 * arm), lit) }
-        if held.contains(.up) { bar(CGRect(x: c.x - arm, y: c.y - r, width: 2 * arm, height: r), lit) }
-        if held.contains(.down) { bar(CGRect(x: c.x - arm, y: c.y, width: 2 * arm, height: r), lit) }
-        hub.setFill()
-        UIBezierPath(ovalIn: CGRect(x: c.x - arm * 0.6, y: c.y - arm * 0.6, width: arm * 1.2, height: arm * 1.2)).fill()
+        let base = UIBezierPath(roundedRect: CGRect(x: c.x - r, y: c.y - arm, width: 2 * r, height: 2 * arm), cornerRadius: corner)
+        base.append(UIBezierPath(roundedRect: CGRect(x: c.x - arm, y: c.y - r, width: 2 * arm, height: 2 * r), cornerRadius: corner))
+        dpadBase.path = base.cgPath
+        arms[.left]?.path = UIBezierPath(roundedRect: CGRect(x: c.x - r, y: c.y - arm, width: r, height: 2 * arm), cornerRadius: corner).cgPath
+        arms[.right]?.path = UIBezierPath(roundedRect: CGRect(x: c.x, y: c.y - arm, width: r, height: 2 * arm), cornerRadius: corner).cgPath
+        arms[.up]?.path = UIBezierPath(roundedRect: CGRect(x: c.x - arm, y: c.y - r, width: 2 * arm, height: r), cornerRadius: corner).cgPath
+        arms[.down]?.path = UIBezierPath(roundedRect: CGRect(x: c.x - arm, y: c.y, width: 2 * arm, height: r), cornerRadius: corner).cgPath
+        dpadHub.path = UIBezierPath(ovalIn: CGRect(x: c.x - arm * 0.6, y: c.y - arm * 0.6, width: arm * 1.2, height: arm * 1.2)).cgPath
         // An arrow on each arm, pointing out.
         let tip = r * 0.82
-        let base = r * 0.58
+        let back = r * 0.58
         let half = arm * 0.45
         for (key, angle) in [(Key.right, 0.0), (.down, 90.0), (.left, 180.0), (.up, 270.0)] {
             let arrow = UIBezierPath()
             arrow.move(to: CGPoint(x: tip, y: 0))
-            arrow.addLine(to: CGPoint(x: base, y: -half))
-            arrow.addLine(to: CGPoint(x: base, y: half))
+            arrow.addLine(to: CGPoint(x: back, y: -half))
+            arrow.addLine(to: CGPoint(x: back, y: half))
             arrow.close()
             arrow.apply(CGAffineTransform(rotationAngle: angle * .pi / 180))
             arrow.apply(CGAffineTransform(translationX: c.x, y: c.y))
-            (held.contains(key) ? background : text).setFill()
-            arrow.fill()
+            arrows[key]?.path = arrow.cgPath
         }
+        let scale = traitCollection.displayScale > 0 ? traitCollection.displayScale : 3
+        for b in buttons {
+            b.shape.path = (b.round ? UIBezierPath(ovalIn: b.box) : UIBezierPath(roundedRect: b.box, cornerRadius: b.box.height / 2)).cgPath
+            let font = UIFont.systemFont(ofSize: b.round ? b.box.width * 0.42 : 13, weight: .bold)
+            b.text.font = font
+            b.text.fontSize = font.pointSize
+            b.text.contentsScale = scale
+            b.text.frame = CGRect(x: b.box.minX, y: b.box.midY - font.lineHeight / 2, width: b.box.width, height: font.lineHeight)
+        }
+        CATransaction.commit()
+    }
+
+    // The colours for what is held: lit, and dark text on it.
+    private func paint() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (key, arm) in arms { arm.isHidden = !held.contains(key) }
+        for (key, arrow) in arrows { arrow.fillColor = held.contains(key) ? dark : text }
+        for b in buttons {
+            let on = held.contains(b.key)
+            b.shape.fillColor = on ? lit : fill
+            b.text.foregroundColor = on ? dark : text
+        }
+        CATransaction.commit()
     }
 }
