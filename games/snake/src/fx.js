@@ -77,6 +77,14 @@ export function createFx(scene) {
       ringAge = RING_TIME;
     },
 
+    // A few cubes and the ring at (x, z) for the loading frame, so their
+    // shaders compile and buffers upload then; clear() takes them away.
+    warmUp(x, z) {
+      this.burst(x, 0.5, z, 0xffffff, 4, 1);
+      this.wave(x, z, 0xffffff);
+      this.update(0.001);
+    },
+
     update(dt) {
       let top = 0; // one past the last live slot
       for (let i = 0; i < MAX; i++) {

@@ -1,12 +1,13 @@
 // The apple and the bonus star: where they are on the grid, how they pop in,
-// bob and get swallowed. The star has a countdown ring and vanishes when it
-// runs out.
+// bob and get swallowed. The star has a countdown ring, blinks for its last
+// HURRY seconds and vanishes when it runs out.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { COLS, ROWS, ball, cellX, cellZ, paint, shadowDisc } from './shared.js';
 
-export const BONUS_TIME = 6; // seconds the star stays on the board
+export const HURRY = 1.5; // the star blinks for its last seconds
+const STAR_REACH = 16; // the star shows up at most this many cells from the head
 const POP_TIME = 0.55;
 const RING_SEGMENTS = 32;
 
@@ -83,18 +84,21 @@ export function createFood(scene, snake) {
     bonusX: 0,
     bonusZ: 0,
     bonusAge: 0,
+    bonusTime: 1, // seconds this star stays
     bonusLeft: 0,
     pickX: 0, // result of pick()
     pickZ: 0,
 
-    // Picks a free cell, preferably not right next to the head, and stores it
-    // in this.pickX / this.pickZ. Returns false when the board is full.
-    pick() {
-      for (let tries = 0; tries < 40; tries++) {
+    // Picks a free cell, preferably at least 3 and at most `reach` cells from
+    // the head, and stores it in this.pickX / this.pickZ. Returns false when
+    // the board is full.
+    pick(reach = COLS + ROWS) {
+      for (let tries = 0; tries < 60; tries++) {
         const cx = Math.floor(Math.random() * COLS);
         const cz = Math.floor(Math.random() * ROWS);
         if (!this.usable(cx, cz)) continue;
-        if (Math.abs(cx - snake.headX) + Math.abs(cz - snake.headZ) < 3) continue;
+        const d = Math.abs(cx - snake.headX) + Math.abs(cz - snake.headZ);
+        if (d < 3 || d > reach) continue;
         this.pickX = cx;
         this.pickZ = cz;
         return true;
@@ -129,14 +133,34 @@ export function createFood(scene, snake) {
       this.appleAge = 0;
     },
 
-    spawnBonus() {
+    // time: seconds the star stays. main.js gives it a number of steps at
+    // the snake's speed, so it is as reachable at any speed.
+    spawnBonus(time) {
       this.bonusOn = false;
-      if (!this.pick()) return;
+      if (!this.pick(STAR_REACH)) return false;
       this.bonusOn = true;
       this.bonusX = this.pickX;
       this.bonusZ = this.pickZ;
       this.bonusAge = 0;
-      this.bonusLeft = BONUS_TIME;
+      this.bonusTime = time;
+      this.bonusLeft = time;
+      return true;
+    },
+
+    // Shows an apple and a star at (cx, cz) for the loading frame, so their
+    // shaders compile then.
+    warmUp(cx, cz) {
+      this.appleOn = true;
+      this.appleX = cx;
+      this.appleZ = cz;
+      this.appleAge = POP_TIME;
+      this.bonusOn = true;
+      this.bonusX = cx + 1;
+      this.bonusZ = cz;
+      this.bonusAge = POP_TIME;
+      this.bonusTime = HURRY * 2; // not blinking, so it is drawn
+      this.bonusLeft = HURRY * 2;
+      this.draw(0);
     },
 
     clear() {
@@ -177,7 +201,7 @@ export function createFood(scene, snake) {
         appleShadow.scale.setScalar(Math.max(0.01, pop));
       }
 
-      const blinking = this.bonusLeft < 1.6 && Math.floor(this.bonusLeft * 8) % 2 === 0;
+      const blinking = this.bonusLeft < HURRY && Math.floor(this.bonusLeft * 8) % 2 === 0;
       star.visible = this.bonusOn && !blinking;
       starShadow.visible = this.bonusOn;
       ring.visible = this.bonusOn;
@@ -193,7 +217,7 @@ export function createFood(scene, snake) {
         starShadow.position.z = z;
         ring.position.x = x;
         ring.position.z = z;
-        const left = Math.ceil((this.bonusLeft / BONUS_TIME) * RING_SEGMENTS);
+        const left = Math.ceil((this.bonusLeft / this.bonusTime) * RING_SEGMENTS);
         ringGeometry.setDrawRange(0, left * 6);
       }
     },

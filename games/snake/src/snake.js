@@ -1,14 +1,18 @@
-// The snake: grid logic (body cells, turn queue, collisions) and its look.
-// main.js calls step() on a fixed tick; draw(t) places every segment between
-// its previous and its current cell, so the motion looks smooth.
+// The snake: grid logic (body cells, the board's blocks, turn queue,
+// collisions) and its look. main.js calls step() on a fixed tick; draw(t)
+// places every segment between its previous and its current cell, so the
+// motion looks smooth.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CELLS, COLS, DIR_X, DIR_Z, RIGHT, ROWS, ball, box, cellX, cellZ, shadowDisc } from './shared.js';
 
 const START_LEN = 4;
+const START_X = 6; // the head's first cell, on row START_ROW, heading right
+const START_ROW = 8;
 const QUEUE = 2; // turns that can wait for the next ticks
 const BEAD = 0.88; // body thickness in world units
+const BEAD_TOP = 0.78; // bead height, times its thickness
 const BULGES = 4; // swallowed apples travelling down the body at once
 const BULGE_SPEED = 22; // segments per second
 const FLASH_TIME = 1.1;
@@ -25,8 +29,8 @@ function headGeometry() {
     ball(0.5, 0.96, 0.72, 1.12, 0, 0.36, 0.02, HEAD_HEX, 10), // skull, nose towards +z
     ball(0.17, 1, 1, 1, -0.24, 0.62, 0.14, 0xffffff), // eyes
     ball(0.17, 1, 1, 1, 0.24, 0.62, 0.14, 0xffffff),
-    ball(0.09, 1, 1, 1, -0.26, 0.73, 0.23, 0x16202a), // pupils, on top so they show from any side
-    ball(0.09, 1, 1, 1, 0.26, 0.73, 0.23, 0x16202a),
+    ball(0.09, 1, 1, 1, -0.26, 0.73, 0.23, 0x16202a, 6), // pupils, on top so they show from any side
+    ball(0.09, 1, 1, 1, 0.26, 0.73, 0.23, 0x16202a, 6),
     ball(0.1, 0.5, 0.8, 1, -0.44, 0.34, 0.22, 0xff9eb0, 6), // cheeks
     ball(0.1, 0.5, 0.8, 1, 0.44, 0.34, 0.22, 0xff9eb0, 6),
     box(0.06, 0.04, 0.05, -0.1, 0.44, 0.56, 0x1d6b3a), // nostrils
@@ -43,6 +47,18 @@ function tongueGeometry() {
   ]);
 }
 
+// A bead of the body: a ball cut a little below its middle, standing on the
+// floor. From the camera's height its lower half hardly shows, and two rings
+// of faces read as round at this size: 24 triangles with 8 segments (a full
+// ball was 64, and a long snake ran over the triangle budget).
+const CUT = THREE.MathUtils.degToRad(100);
+const DOME_TOP = 0.5 * (1 - Math.cos(CUT)); // height of the unscaled dome
+function beadGeometry(segments) {
+  const g = new THREE.SphereGeometry(0.5, segments, 2, 0, Math.PI * 2, 0, CUT);
+  g.translate(0, -0.5 * Math.cos(CUT), 0);
+  return g;
+}
+
 function wrapAngle(a) {
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
@@ -50,17 +66,18 @@ function wrapAngle(a) {
 }
 
 export function createSnake(scene) {
-  // Body: one InstancedMesh with a bead per segment plus a smaller bead between
-  // neighbours, so the body reads as one continuous tube.
-  const bodyMesh = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.5, 8, 5), // 64 triangles: even a full board stays under budget
-    new THREE.MeshLambertMaterial({ color: 0xffffff }),
-    CELLS * 2,
-  );
-  bodyMesh.frustumCulled = false; // instances move, so the cached bounds would be wrong
-  bodyMesh.count = 0;
-  bodyMesh.setColorAt(0, HEAD_COLOR); // creates instanceColor once, up front
-  scene.add(bodyMesh);
+  // Body: a bead per segment plus a smaller one between neighbours (mostly
+  // hidden, so it has fewer faces), so the body reads as one continuous tube.
+  // 42 triangles per segment: a 150-long snake is about 6,300.
+  const bodyMaterial = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const beadMesh = new THREE.InstancedMesh(beadGeometry(8), bodyMaterial, CELLS);
+  const linkMesh = new THREE.InstancedMesh(beadGeometry(6), bodyMaterial, CELLS);
+  for (const mesh of [beadMesh, linkMesh]) {
+    mesh.frustumCulled = false; // instances move, so the cached bounds would be wrong
+    mesh.count = 0;
+    mesh.setColorAt(0, HEAD_COLOR); // creates instanceColor once, up front
+    scene.add(mesh);
+  }
 
   const headMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
   const head = new THREE.Group();
@@ -76,7 +93,8 @@ export function createSnake(scene) {
   // Logic state. Cells are integers; index 0 is the head.
   const bx = new Int16Array(CELLS);
   const bz = new Int16Array(CELLS);
-  const grid = new Uint8Array(CELLS); // 1 where the body is
+  const grid = new Uint8Array(CELLS); // 1 where the body is, 2 for a block
+  let blocks = null; // the board's blocks (boards.js), copied into grid on reset
   const queue = new Int8Array(QUEUE);
   let queued = 0;
 
@@ -102,6 +120,7 @@ export function createSnake(scene) {
     dir: RIGHT,
     grow: 0,
     alive: true,
+    turned: false, // the last step changed direction
     // Cell the tail left on the last step (the tail's "from" cell).
     tailX: 0,
     tailZ: 0,
@@ -113,21 +132,26 @@ export function createSnake(scene) {
       return bz[0];
     },
 
+    // The board the next reset() sets up: a blocks array from boards.js.
+    setBlocks(b) {
+      blocks = b;
+    },
+
     reset() {
-      grid.fill(0);
+      for (let i = 0; i < CELLS; i++) grid[i] = blocks && blocks[i] ? 2 : 0;
       this.len = START_LEN;
       this.dir = RIGHT;
       this.grow = 0;
       this.alive = true;
+      this.turned = false;
       queued = 0;
-      const row = ROWS >> 1;
       for (let i = 0; i < START_LEN; i++) {
-        bx[i] = 6 - i;
-        bz[i] = row;
-        grid[row * COLS + bx[i]] = 1;
+        bx[i] = START_X - i;
+        bz[i] = START_ROW;
+        grid[START_ROW * COLS + bx[i]] = 1;
       }
-      this.tailX = 6 - START_LEN;
-      this.tailZ = row;
+      this.tailX = START_X - START_LEN;
+      this.tailZ = START_ROW;
       bulge.fill(-1);
       flash = 0;
       gulp = 0;
@@ -140,7 +164,7 @@ export function createSnake(scene) {
       tongue.visible = true;
     },
 
-    // True if a cell is on the board and not part of the body.
+    // True if a cell is on the board and neither body nor block.
     isFree(cx, cz) {
       return cx >= 0 && cx < COLS && cz >= 0 && cz < ROWS && grid[cz * COLS + cx] === 0;
     },
@@ -149,24 +173,27 @@ export function createSnake(scene) {
     // (the tail moves away unless the snake is growing).
     canEnter(cx, cz) {
       if (cx < 0 || cx >= COLS || cz < 0 || cz >= ROWS) return false;
-      if (grid[cz * COLS + cx] === 0) return true;
+      const g = grid[cz * COLS + cx];
+      if (g === 0) return true;
       const t = this.len - 1;
-      return this.grow === 0 && cx === bx[t] && cz === bz[t];
+      return g === 1 && this.grow === 0 && cx === bx[t] && cz === bz[t];
     },
 
     // Queues a turn. Turning back into the neck or repeating the same
     // direction is ignored; up to QUEUE turns wait for the next steps, so two
-    // quick taps (a U-turn) both count.
+    // quick taps (a U-turn) both count. Returns true if the turn was queued.
     turn(d) {
-      if (queued >= QUEUE) return;
+      if (queued >= QUEUE) return false;
       const ref = queued > 0 ? queue[queued - 1] : this.dir;
-      if (d === ref || d === (ref + 2) % 4) return;
+      if (d === ref || d === (ref + 2) % 4) return false;
       queue[queued++] = d;
+      return true;
     },
 
     // Moves one cell. Returns false (and does not move) when the head would
     // hit a wall or the body.
     step() {
+      this.turned = queued > 0;
       if (queued > 0) {
         this.dir = queue[0];
         queue[0] = queue[1];
@@ -284,25 +311,28 @@ export function createSnake(scene) {
       }
 
       // Beads for segments 1..n-1 (the head mesh covers segment 0), then one
-      // in-between bead for every pair of neighbours.
-      let m = 0;
+      // in-between bead for every pair of neighbours. They stand a little
+      // into the floor, so the bobbing never lifts one off it.
+      const tall = BEAD_TOP / DOME_TOP;
       for (let i = 1; i < n; i++) {
         const s = ps[i];
         const bob = this.alive ? Math.sin(wiggle * 10 - i * 0.9) * 0.025 : 0;
-        dummy.position.set(px[i], s * 0.4 + bob, pz[i]);
-        dummy.scale.set(s, s * 0.82, s);
+        dummy.position.set(px[i], bob - 0.03, pz[i]);
+        dummy.scale.set(s, s * tall, s);
         dummy.updateMatrix();
-        bodyMesh.setMatrixAt(m++, dummy.matrix);
+        beadMesh.setMatrixAt(i - 1, dummy.matrix);
       }
       for (let i = 0; i < n - 1; i++) {
         const s = (ps[i] + ps[i + 1]) * 0.5 * (i === 0 ? 0.95 : 0.9);
-        dummy.position.set((px[i] + px[i + 1]) * 0.5, s * 0.4, (pz[i] + pz[i + 1]) * 0.5);
-        dummy.scale.set(s, s * 0.8, s);
+        dummy.position.set((px[i] + px[i + 1]) * 0.5, -0.03, (pz[i] + pz[i + 1]) * 0.5);
+        dummy.scale.set(s, s * tall * 0.97, s);
         dummy.updateMatrix();
-        bodyMesh.setMatrixAt(m++, dummy.matrix);
+        linkMesh.setMatrixAt(i, dummy.matrix);
       }
-      bodyMesh.count = m;
-      bodyMesh.instanceMatrix.needsUpdate = true;
+      beadMesh.count = n - 1;
+      linkMesh.count = n - 1;
+      beadMesh.instanceMatrix.needsUpdate = true;
+      linkMesh.instanceMatrix.needsUpdate = true;
 
       this.colorize(dt);
       this.drawHead(t, dt);
@@ -321,8 +351,8 @@ export function createSnake(scene) {
       if (key === colorsFor) return;
       colorsFor = key;
 
-      let m = 0;
       for (let pass = 0; pass < 2; pass++) {
+        const mesh = pass === 0 ? beadMesh : linkMesh;
         const first = pass === 0 ? 1 : 0;
         const last = pass === 0 ? n : n - 1;
         for (let i = first; i < last; i++) {
@@ -334,10 +364,10 @@ export function createSnake(scene) {
             if (pass === 1) color.multiplyScalar(0.9); // in-between beads a touch darker
             if (mode === 3) color.lerp(DEAD_TINT, 0.55);
           }
-          bodyMesh.setColorAt(m++, color);
+          mesh.setColorAt(i - first, color);
         }
+        mesh.instanceColor.needsUpdate = true;
       }
-      bodyMesh.instanceColor.needsUpdate = true;
 
       if (mode === 1) {
         headMaterial.color.setRGB(1, 1, 1);

@@ -1,10 +1,12 @@
 // The static scenery: checker board, low walls, the wooden plinth under it,
-// the grass around it and a ring of trees, rocks and flowers. Everything is
-// merged into one vertex-colored mesh, so the whole scene is one draw call.
+// the grass around it and a ring of trees, rocks and flowers, merged into one
+// vertex-colored mesh. The checker floor is one quad with a tiny texture (a
+// quad per cell cost 768 triangles), and each board's blocks are a merged
+// mesh of their own, shown while that board is chosen.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { COLS, ROWS, box, cellX, cellZ, paint } from './shared.js';
+import { COLS, ROWS, box, paint } from './shared.js';
 
 const WALL_T = 0.6; // wall thickness
 const WALL_H = 0.7;
@@ -39,12 +41,14 @@ function place(geometry, x, y, z, scale, rotY) {
   return geometry;
 }
 
+// Trees leave out the caps of their trunk and cones: from above they are
+// never seen, and dropping them takes a third of each tree's triangles.
 function tree(x, y, z, s) {
-  const trunk = new THREE.CylinderGeometry(0.18, 0.24, 1, 5);
+  const trunk = new THREE.CylinderGeometry(0.18, 0.24, 1, 5, 1, true);
   trunk.translate(0, 0.5, 0);
-  const low = new THREE.ConeGeometry(1.1, 1.6, 7);
+  const low = new THREE.ConeGeometry(1.1, 1.6, 7, 1, true);
   low.translate(0, 1.5, 0);
-  const high = new THREE.ConeGeometry(0.8, 1.3, 7);
+  const high = new THREE.ConeGeometry(0.8, 1.3, 7, 1, true);
   high.translate(0, 2.4, 0);
   const rot = rand() * Math.PI;
   return [
@@ -73,6 +77,64 @@ function flower(x, y, z) {
   return [box(0.1, 0.45, 0.1, x, y + 0.22, z, 0x3a8f3a), box(0.4, 0.16, 0.4, x, y + 0.5, z, hex)];
 }
 
+// The checker floor: one quad, one texel per cell (the texture is 32 wide, a
+// power of two, and the quad shows the first COLS columns of it).
+function floorMesh() {
+  const texW = 32;
+  const data = new Uint8Array(texW * ROWS * 4);
+  for (let ty = 0; ty < ROWS; ty++) {
+    for (let tx = 0; tx < texW; tx++) {
+      // Texture rows go up the quad, board rows towards the camera.
+      const hex = (tx + ROWS - 1 - ty) % 2 === 0 ? TILE_A : TILE_B;
+      const i = (ty * texW + tx) * 4;
+      data[i] = hex >> 16;
+      data[i + 1] = (hex >> 8) & 255;
+      data[i + 2] = hex & 255;
+      data[i + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, texW, ROWS);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.needsUpdate = true;
+  const g = new THREE.PlaneGeometry(COLS, ROWS);
+  g.rotateX(-Math.PI / 2);
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * (COLS / texW));
+  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: texture }));
+}
+
+// A board's blocks as few boxes as possible: each block grows right as far
+// as it can, then down while the rows below match.
+function blocksGeometry(blocks) {
+  const parts = [];
+  const used = new Uint8Array(blocks.length);
+  for (let z = 0; z < ROWS; z++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = z * COLS + x;
+      if (!blocks[i] || used[i]) continue;
+      let w = 1;
+      while (x + w < COLS && blocks[i + w] && !used[i + w]) w++;
+      let h = 1;
+      for (; z + h < ROWS; h++) {
+        let full = true;
+        for (let k = 0; k < w && full; k++) full = blocks[(z + h) * COLS + x + k] && !used[(z + h) * COLS + x + k];
+        if (!full) break;
+      }
+      for (let dz = 0; dz < h; dz++) for (let k = 0; k < w; k++) used[(z + dz) * COLS + x + k] = 1;
+      const cx = x - COLS / 2 + w / 2;
+      const cz = z - ROWS / 2 + h / 2;
+      parts.push(box(w - 0.12, WALL_H, h - 0.12, cx, WALL_H / 2, cz, WALL));
+      parts.push(box(w - 0.04, 0.12, h - 0.04, cx, WALL_H + 0.06, cz, WALL_TOP));
+    }
+  }
+  if (parts.length === 0) return null;
+  const geometry = mergeGeometries(parts);
+  for (const g of parts) g.dispose();
+  return geometry;
+}
+
 // One random prop at (x, z) on the grass; trees only when tall is set.
 function prop(parts, x, y, z, tall) {
   const r = rand();
@@ -86,18 +148,10 @@ function prop(parts, x, y, z, tall) {
 }
 
 // view: what the screen shows beyond the 720x480 view, { taller, wider }.
-export function createBoard(scene, view) {
+// boards: BOARDS from boards.js. Returns { show(i), warmUp(on) }.
+export function createBoard(scene, view, boards) {
   const parts = [];
-
-  // Checker floor, one quad per cell.
-  for (let cz = 0; cz < ROWS; cz++) {
-    for (let cx = 0; cx < COLS; cx++) {
-      const g = new THREE.PlaneGeometry(1, 1);
-      g.rotateX(-Math.PI / 2);
-      g.translate(cellX(cx), 0, cellZ(cz));
-      parts.push(paint(g, (cx + cz) % 2 === 0 ? TILE_A : TILE_B));
-    }
-  }
+  scene.add(floorMesh());
 
   // Low walls around the board with a lighter top rim and orange corner posts.
   const hw = COLS / 2 + WALL_T / 2;
@@ -175,7 +229,33 @@ export function createBoard(scene, view) {
     parts[i].dispose();
     flat[i].dispose();
   }
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true }));
-  scene.add(mesh);
-  return mesh;
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  scene.add(new THREE.Mesh(geometry, material));
+
+  // The blocks of every board, made now; only the chosen board's show.
+  const blockMeshes = boards.map((b) => {
+    const g = blocksGeometry(b.blocks);
+    if (!g) return null;
+    const mesh = new THREE.Mesh(g, material);
+    mesh.visible = false;
+    scene.add(mesh);
+    return mesh;
+  });
+  let shown = 0;
+
+  return {
+    show(i) {
+      shown = i;
+      blockMeshes.forEach((m, k) => {
+        if (m) m.visible = k === i;
+      });
+    },
+    // All of them at once for one frame while loading, so every geometry is
+    // uploaded before play.
+    warmUp(on) {
+      blockMeshes.forEach((m, k) => {
+        if (m) m.visible = on || k === shown;
+      });
+    },
+  };
 }

@@ -2,14 +2,14 @@
   "id": "snake",
   "title": "Snake",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Classic snake on a 3D toy board: eat apples, grab golden stars before they vanish, and don't bite your own tail.",
+  "version": "1.2.0",
+  "description": "Classic snake on a 3D toy board: eat apples, grab golden stars before they vanish, and don't bite your own tail. Four boards, from the open classic to toy-block mazes, each with its own best.",
   "genre": "Arcade",
   "controls": {
-    "D-pad": "Steer",
-    "A": "Start / play again",
-    "B": "Back to title (paused or game over)",
-    "START": "Pause / resume"
+    "D-pad": "Steer / choose in menus",
+    "A": "Select / play again",
+    "B": "Back / title after game over",
+    "START": "Pause menu / resume"
   },
   "responsive": true
 }
