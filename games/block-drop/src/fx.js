@@ -1,15 +1,17 @@
-// Particles: small spinning cubes from cleared lines and hard drops. A fixed
-// pool drawn as one InstancedMesh; new particles overwrite the oldest.
+// Particles: small spinning cubes from cleared lines, hard drops and the
+// finish of a Sprint or Dig. A fixed pool drawn as one InstancedMesh; new
+// particles overwrite the oldest. Plain cubes (12 triangles): at this size a
+// bevel does not show, and a burst of 80 of them stays cheap.
 
 import * as THREE from 'three';
-import { PIECE_RGB, bake, bevelBox } from './shared.js';
+import { PIECE_RGB, bake } from './shared.js';
 
 const MAX = 160;
 const GRAVITY = 26;
 
 export function createFx(scene) {
   const mesh = new THREE.InstancedMesh(
-    bake(bevelBox(1, 1, 1, 0.2), 0xffffff),
+    bake(new THREE.BoxGeometry(1, 1, 1), 0xffffff),
     new THREE.MeshBasicMaterial({ vertexColors: true }),
     MAX,
   );
@@ -80,6 +82,14 @@ export function createFx(scene) {
           0.16 + Math.random() * 0.12,
           0.3 + Math.random() * 0.2,
         );
+      }
+    },
+
+    // Confetti thrown up from the floor of the well across its width.
+    confetti(x0, x1, y) {
+      for (let i = 0; i < 36; i++) {
+        const x = x0 + Math.random() * (x1 - x0);
+        add(x, y, 0.6, 1 + (i % 7), (Math.random() - 0.5) * 9, 14 + Math.random() * 12, 0.3 + Math.random() * 0.25, 1.1 + Math.random() * 0.6);
       }
     },
 

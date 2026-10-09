@@ -1,18 +1,30 @@
-// The rules: the well, the falling piece, SRS rotation with wall kicks, lock
-// delay, line clears, scoring and levels. Nothing is drawn here; well.js shows
-// this state and main.js reacts to the events in `ev`.
+// The rules: the well, the falling piece, SRS rotation with wall kicks and
+// T-spins, lock delay, line clears, scoring, levels and the three modes.
+// Nothing is drawn here; well.js shows this state and main.js reacts to the
+// events in `ev`.
 
-import { BOARD_ROWS, COLS, ROWS } from './shared.js';
+import { BOARD_ROWS, COLS, GARBAGE, ROWS, T } from './shared.js';
 import { SHAPES, SPAWN_X, SPAWN_Y, kicksFor } from './pieces.js';
 
-const DAS = 0.16; // hold left/right this long before auto-repeat starts
-const ARR = 0.05; // then move one column this often
+const DAS = 0.15; // hold left/right this long before auto-repeat starts
+const ARR = 0.033; // then move one column this often (every other frame)
 const SOFT_DROP = 0.03; // seconds per row while DOWN is held
 const LOCK_DELAY = 0.5;
 const MAX_RESETS = 15; // moves/rotations on the ground that restart the lock delay
 const CLEAR_TIME = 0.3; // cleared rows flash this long, then collapse
+const READY_TIME = 0.9; // READY ... GO: the first piece appears after this
 const LINE_POINTS = [0, 100, 300, 500, 800];
+const TSPIN_POINTS = [400, 800, 1200, 1600];
+const MINI_POINTS = [100, 200, 400];
+const ALL_CLEAR_POINTS = [0, 800, 1200, 1800, 2000];
 const MAX_LEVEL = 20;
+
+export const SPRINT_LINES = 40; // Sprint: clear this many lines
+export const DIG_ROWS = 10; // Dig: the well starts with this many rows of garbage
+
+// The four cells diagonal to the T's centre (x, y): top left, top right,
+// bottom right, bottom left. The T points at corners rot and rot + 1.
+const CORNERS = [-1, 1, 1, 1, 1, -1, -1, -1];
 
 // Seconds per row at each level (the usual guideline curve).
 function gravity(level) {
@@ -34,14 +46,21 @@ export function createGame() {
   let dasTimer = 0;
   let arrTimer = 0;
   let clearTimer = 0;
-  // Buttons pressed while rows clear, applied to the next piece when it appears.
+  let readyTimer = 0;
+  // A T-spin needs the piece's last move to be a rotation; the fifth kick
+  // always makes it a full one.
+  let lastRotate = false;
+  let lastKick = 0;
+  // Buttons pressed while rows clear (or before GO), applied to the next
+  // piece when it appears.
   let pendingRot = 0;
   let pendingShift = 0;
   let pendingHold = false;
 
   const g = {
     board,
-    phase: 'idle', // idle | fall | clear | dead
+    mode: 'marathon', // marathon | sprint | dig
+    phase: 'idle', // idle | ready | fall | clear | dead | done
     type: 0,
     rot: 0,
     x: 0,
@@ -53,6 +72,9 @@ export function createGame() {
     score: 0,
     lines: 0,
     level: 1,
+    left: 0, // Sprint: lines still to clear; Dig: rows of garbage left
+    pieces: 0,
+    time: 0, // seconds since GO, while pieces fall
     combo: -1,
     b2b: false,
     lockProgress: 0, // 0..1 while the piece rests on the stack
@@ -63,20 +85,27 @@ export function createGame() {
 
     // Events of the last update, for effects. Reset at the start of update().
     ev: {
+      go: false, // the first piece appeared
       shiftX: 0, // columns moved
       shiftY: 0, // rows fallen (not counting hard drops)
-      rotated: false,
+      softRows: 0, // rows of those soft dropped
+      rotated: 0, // 1 clockwise, -1 counter-clockwise
+      twist: false, // the rotation left a T where it would score a T-spin
       hardRows: 0,
       locked: false,
       lockedCells: new Int16Array(4),
+      tspin: 0, // the lock was a T-spin: 1 mini, 2 full
       cleared: 0,
       points: 0,
       backToBack: false,
+      allClear: false,
       collapsed: false,
       rowShift: new Int8Array(BOARD_ROWS), // rows each row fell in the collapse
       levelUp: false,
       held: false,
+      denied: false, // hold pressed when it is used up for this piece
       dead: false,
+      finished: false, // Sprint or Dig done
     },
   };
   const ev = g.ev;
@@ -90,6 +119,27 @@ export function createGame() {
       if (board[cy * COLS + cx] !== 0) return false;
     }
     return true;
+  }
+
+  // A cell counts as blocked for the T-spin check if it is filled or
+  // outside the walls or the floor.
+  function blocked(x, y) {
+    if (x < 0 || x >= COLS || y < 0) return true;
+    return y < BOARD_ROWS && board[y * COLS + x] !== 0;
+  }
+
+  // The three-corner rule: 0 no T-spin, 1 mini, 2 full.
+  function spinKind() {
+    if (g.type !== T || !lastRotate) return 0;
+    const cx = g.x + 1;
+    const cy = g.y + 1;
+    let n = 0;
+    for (let i = 0; i < 8; i += 2) if (blocked(cx + CORNERS[i], cy + CORNERS[i + 1])) n++;
+    if (n < 3) return 0;
+    const a = g.rot * 2;
+    const b = ((g.rot + 1) & 3) * 2;
+    const front = blocked(cx + CORNERS[a], cy + CORNERS[a + 1]) && blocked(cx + CORNERS[b], cy + CORNERS[b + 1]);
+    return front || lastKick === 4 ? 2 : 1;
   }
 
   // 7-bag randomizer: every run of seven pieces holds each piece once.
@@ -121,6 +171,7 @@ export function createGame() {
     lockTimer = 0;
     resets = 0;
     lowestY = g.y;
+    lastRotate = false;
     g.phase = 'fall';
     // A blocked spawn gets one row of leeway above the well before the game ends.
     if (!fits(type, 0, g.x, g.y)) g.y++;
@@ -149,6 +200,7 @@ export function createGame() {
     const grounded = onGround();
     g.x += dx;
     ev.shiftX += dx;
+    lastRotate = false;
     moved(grounded);
     return true;
   }
@@ -166,7 +218,10 @@ export function createGame() {
         g.x = nx;
         g.y = ny;
         g.rot = to;
-        ev.rotated = true;
+        ev.rotated = dir;
+        lastRotate = true;
+        lastKick = i / 2;
+        ev.twist = spinKind() > 0;
         moved(grounded);
         if (g.y < lowestY) {
           lowestY = g.y;
@@ -181,6 +236,7 @@ export function createGame() {
     if (!fits(g.type, g.rot, g.x, g.y - 1)) return false;
     g.y--;
     lockTimer = 0;
+    lastRotate = false;
     if (g.y < lowestY) {
       lowestY = g.y;
       resets = 0;
@@ -188,7 +244,26 @@ export function createGame() {
     return true;
   }
 
+  // Sprint: lines still to clear. Dig: rows that still hold garbage.
+  function countLeft() {
+    if (g.mode === 'sprint') {
+      g.left = Math.max(0, SPRINT_LINES - g.lines);
+    } else if (g.mode === 'dig') {
+      let n = 0;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (board[r * COLS + c] === GARBAGE) {
+            n++;
+            break;
+          }
+        }
+      }
+      g.left = n;
+    }
+  }
+
   function lock() {
+    const spin = spinKind();
     const s = SHAPES[g.type][g.rot];
     let above = 0;
     for (let i = 0; i < 4; i++) {
@@ -202,26 +277,32 @@ export function createGame() {
     ev.locked = true;
     g.canHold = true;
     g.lockProgress = 0;
+    g.pieces++;
 
-    // Full rows, bottom first.
+    // Full rows, bottom first, and how many cells are filled in all.
     let n = 0;
-    for (let r = 0; r < BOARD_ROWS && n < 4; r++) {
-      let full = true;
-      for (let c = 0; c < COLS; c++) {
-        if (board[r * COLS + c] === 0) {
-          full = false;
-          break;
-        }
-      }
-      if (full) {
+    let filled = 0;
+    for (let r = 0; r < BOARD_ROWS; r++) {
+      let count = 0;
+      for (let c = 0; c < COLS; c++) if (board[r * COLS + c] !== 0) count++;
+      filled += count;
+      if (count === COLS && n < 4) {
         for (let c = 0; c < COLS; c++) g.clearedTypes[n * COLS + c] = board[r * COLS + c];
         g.clearedRows[n++] = r;
       }
     }
     g.clearCount = n;
+    const level = g.level;
 
     if (n === 0) {
       g.combo = -1;
+      // A T-spin that clears nothing still scores (and keeps back-to-back).
+      if (spin > 0) {
+        const points = (spin === 2 ? TSPIN_POINTS[0] : MINI_POINTS[0]) * level;
+        g.score += points;
+        ev.tspin = spin;
+        ev.points = points;
+      }
       // Locked entirely above the well: the stack topped out.
       if (above === 4) {
         g.phase = 'dead';
@@ -232,9 +313,11 @@ export function createGame() {
       return;
     }
 
-    // Scoring: quads in a row earn a back-to-back bonus, consecutive clears a combo.
-    let points = LINE_POINTS[n] * g.level;
-    if (n === 4) {
+    // Scoring: quads and T-spins in a row earn a back-to-back bonus,
+    // consecutive clears a combo, an empty well an all clear bonus.
+    const kind = spin === 1 && n === 3 ? 2 : spin; // there is no mini triple
+    let points = (kind === 2 ? TSPIN_POINTS[n] : kind === 1 ? MINI_POINTS[n] : LINE_POINTS[n]) * level;
+    if (n === 4 || kind > 0) {
       if (g.b2b) {
         points = Math.floor(points * 1.5);
         ev.backToBack = true;
@@ -244,12 +327,18 @@ export function createGame() {
       g.b2b = false;
     }
     g.combo++;
-    if (g.combo > 0) points += 50 * g.combo * g.level;
+    if (g.combo > 0) points += 50 * g.combo * level;
+    if (filled === n * COLS) {
+      points += ALL_CLEAR_POINTS[n] * level;
+      ev.allClear = true;
+    }
     g.score += points;
-    const oldLevel = g.level;
     g.lines += n;
-    g.level = 1 + Math.floor(g.lines / 10);
-    ev.levelUp = g.level > oldLevel;
+    if (g.mode === 'marathon') {
+      g.level = 1 + Math.floor(g.lines / 10);
+      ev.levelUp = g.level > level;
+    }
+    ev.tspin = kind;
     ev.cleared = n;
     ev.points = points;
 
@@ -275,18 +364,37 @@ export function createGame() {
     }
     board.fill(0, write * COLS);
     ev.collapsed = true;
+    countLeft();
+    if (g.mode !== 'marathon' && g.left === 0) {
+      g.phase = 'done';
+      ev.finished = true;
+      return;
+    }
     spawn(takeNext());
   }
 
   // Hold: swap with the held piece (or take the next one) once per piece.
   function doHold() {
-    if (!g.canHold || g.phase !== 'fall') return;
+    if (g.phase !== 'fall') return;
+    if (!g.canHold) {
+      ev.denied = true;
+      return;
+    }
     const current = g.type;
     const incoming = g.hold === 0 ? takeNext() : g.hold;
     g.hold = current;
     g.canHold = false;
     ev.held = true;
     spawn(incoming);
+  }
+
+  // Between pieces (rows clearing, or before GO) presses wait for the next one.
+  function buffer(input) {
+    if (input.pressed('A')) pendingRot++;
+    if (input.pressed('B')) pendingRot--;
+    if (input.pressed('L') || input.pressed('R')) pendingHold = true;
+    if (input.pressed('LEFT')) pendingShift--;
+    if (input.pressed('RIGHT')) pendingShift++;
   }
 
   function applyPending() {
@@ -310,18 +418,25 @@ export function createGame() {
   }
 
   function resetEvents() {
+    ev.go = false;
     ev.shiftX = 0;
     ev.shiftY = 0;
-    ev.rotated = false;
+    ev.softRows = 0;
+    ev.rotated = 0;
+    ev.twist = false;
     ev.hardRows = 0;
     ev.locked = false;
+    ev.tspin = 0;
     ev.cleared = 0;
     ev.points = 0;
     ev.backToBack = false;
+    ev.allClear = false;
     ev.collapsed = false;
     ev.levelUp = false;
     ev.held = false;
+    ev.denied = false;
     ev.dead = false;
+    ev.finished = false;
   }
 
   function handleShift(dt, input) {
@@ -359,9 +474,21 @@ export function createGame() {
   }
 
   return Object.assign(g, {
-    // Empties the well and starts a new game.
-    start() {
+    // Empties the well (Dig fills its bottom with garbage) and starts a new
+    // game; the first piece appears after READY_TIME.
+    start(mode) {
+      g.mode = mode;
       board.fill(0);
+      if (mode === 'dig') {
+        // One hole per row, never straight above the one below.
+        let hole = -1;
+        for (let r = 0; r < DIG_ROWS; r++) {
+          let h = Math.floor(Math.random() * (hole < 0 ? COLS : COLS - 1));
+          if (hole >= 0 && h >= hole) h++;
+          hole = h;
+          for (let c = 0; c < COLS; c++) board[r * COLS + c] = c === hole ? 0 : GARBAGE;
+        }
+      }
       queueLen = 0;
       refill();
       g.hold = 0;
@@ -369,18 +496,21 @@ export function createGame() {
       g.score = 0;
       g.lines = 0;
       g.level = 1;
+      g.pieces = 0;
+      g.time = 0;
       g.combo = -1;
       g.b2b = false;
       g.clearCount = 0;
       g.clearProgress = 0;
       g.lockProgress = 0;
+      countLeft();
       dasDir = 0;
       pendingRot = 0;
       pendingShift = 0;
       pendingHold = false;
+      readyTimer = 0;
       resetEvents();
-      spawn(takeNext());
-      updateGhost();
+      g.phase = 'ready';
     },
 
     // A colourful leftover stack for the title screen, with no falling piece.
@@ -408,14 +538,24 @@ export function createGame() {
     update(dt, input) {
       resetEvents();
 
+      if (g.phase === 'ready') {
+        readyTimer += dt;
+        buffer(input);
+        handleShift(dt, input);
+        if (readyTimer >= READY_TIME) {
+          spawn(takeNext());
+          ev.go = true;
+          applyPending();
+          if (g.phase === 'fall') updateGhost();
+        }
+        return;
+      }
+
       if (g.phase === 'clear') {
+        g.time += dt;
         clearTimer += dt;
         g.clearProgress = Math.min(1, clearTimer / CLEAR_TIME);
-        if (input.pressed('A')) pendingRot++;
-        if (input.pressed('B')) pendingRot--;
-        if (input.pressed('L') || input.pressed('R')) pendingHold = true;
-        if (input.pressed('LEFT')) pendingShift--;
-        if (input.pressed('RIGHT')) pendingShift++;
+        buffer(input);
         handleShift(dt, input);
         if (clearTimer >= CLEAR_TIME) {
           collapse();
@@ -425,7 +565,10 @@ export function createGame() {
         return;
       }
       if (g.phase !== 'fall') return;
+      g.time += dt;
 
+      // Every press acts on the frame it arrives: hold, then rotation, then
+      // sideways moves, then the drop.
       if (input.pressed('L') || input.pressed('R')) {
         doHold();
         if (g.phase === 'dead') return;
@@ -439,6 +582,7 @@ export function createGame() {
         updateGhost();
         const rows = g.y - g.ghostY;
         g.y = g.ghostY;
+        if (rows > 0) lastRotate = false;
         g.score += rows * 2;
         ev.hardRows = Math.max(1, rows);
         lock();
@@ -450,8 +594,9 @@ export function createGame() {
       const soft = input.down('DOWN');
       const fall = gravity(g.level);
       const interval = soft ? Math.min(fall, SOFT_DROP) : fall;
-      // Time saved up under slow gravity must not turn into a jump of
-      // several rows the moment DOWN is pressed.
+      // DOWN moves the piece a row on the frame it is pressed. Time saved up
+      // under slow gravity must not turn into a jump of several rows.
+      if (input.pressed('DOWN')) fallTimer = Math.max(fallTimer, interval);
       fallTimer = Math.min(fallTimer + dt, interval + dt);
       while (fallTimer >= interval) {
         fallTimer -= interval;
@@ -460,7 +605,10 @@ export function createGame() {
           break;
         }
         ev.shiftY++;
-        if (soft) g.score++;
+        if (soft) {
+          g.score++;
+          ev.softRows++;
+        }
       }
 
       if (onGround()) {

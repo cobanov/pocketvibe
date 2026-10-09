@@ -8,11 +8,13 @@ export const ROWS = 20; // visible rows of the well
 export const BOARD_ROWS = 24; // rows 20..23 are hidden spawn space
 export const DRAW_ROWS = 22; // rows drawn; the two above the well peek out
 
-// Piece types are 1..7 (I O T S Z J L); 0 is an empty cell and GREY the
-// colour of a lost stack.
+// Piece types are 1..7 (I O T S Z J L); 0 is an empty cell, GREY the
+// colour of a lost stack and GARBAGE the rows Dig mode starts with.
 export const I = 1;
 export const O = 2;
+export const T = 3;
 export const GREY = 8;
+export const GARBAGE = 9;
 
 export const PIECE_HEX = [
   0x000000,
@@ -24,6 +26,7 @@ export const PIECE_HEX = [
   0x4d7cff, // J blue
   0xff9a35, // L orange
   0x7d84a3, // grey
+  0x8a8fb0, // garbage
 ];
 
 // Linear RGB of each piece colour, ready to copy into instance colour arrays.
@@ -74,8 +77,10 @@ export function bake(geometry, hex) {
 }
 
 // A box with chamfered edges and corners (44 triangles), centred on the
-// origin. Flat normals, so each bevel catches the light on its own.
-export function bevelBox(w, h, d, bevel) {
+// origin. Flat normals, so each bevel catches the light on its own. With
+// `open`, the back face and the bevels around it are left out (30
+// triangles): the camera never sees the back of a block in the well.
+export function bevelBox(w, h, d, bevel, open = false) {
   const outer = [w / 2, h / 2, d / 2];
   const inner = [w / 2 - bevel, h / 2 - bevel, d / 2 - bevel];
   const pos = [];
@@ -93,6 +98,7 @@ export function bevelBox(w, h, d, bevel) {
     const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
     const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     const out = nx * (a[0] + b[0] + c[0]) + ny * (a[1] + b[1] + c[1]) + nz * (a[2] + b[2] + c[2]);
+    if (open && (out < 0 ? -nz : nz) < -1e-6) return;
     if (out < 0) pos.push(...a, ...c, ...b);
     else pos.push(...a, ...b, ...c);
   }

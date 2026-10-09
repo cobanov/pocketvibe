@@ -135,14 +135,30 @@ body.handheld #legend {
 
 /* Line clear pop-up over the well. Two identical animations, so switching
    the class restarts it without touching layout. */
+/* A column centred on the well; a line wider than the well spills over
+   both sides evenly instead of wrapping. */
 #popup {
   position: absolute;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  white-space: nowrap;
   opacity: 0;
+}
+
+#popup-tag {
+  font-size: 22px;
+  letter-spacing: 1px;
+  color: #b8f0ff;
+}
+
+#popup-tag:empty {
+  display: none;
 }
 
 #popup-main {
   font-size: 30px;
+  line-height: 1.1;
   letter-spacing: 1px;
   color: #fff;
 }
@@ -221,23 +237,75 @@ body.handheld #legend {
 .panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 22px 34px;
+  gap: 6px;
+  min-width: 300px;
+  padding: 16px 34px 18px;
   border-radius: 12px;
-  background: rgba(16, 18, 48, 0.82);
+  background: rgba(16, 18, 48, 0.86);
   box-shadow: 0 0 0 3px #e4defc;
   font-size: 24px;
 }
 
 .panel .title {
   font-size: 46px;
+  line-height: 1.1;
   letter-spacing: 3px;
   color: #ffd23f;
+}
+
+.panel .big {
+  font-size: 52px;
+  line-height: 1.05;
 }
 
 .panel .small {
   font-size: 18px;
   color: #d6dcf5;
+}
+
+.panel .info {
+  margin-top: 2px;
+  color: #fff;
+}
+
+.panel .gold {
+  color: #ffd23f;
+}
+
+.panel .dim {
+  color: #8f97c4;
+}
+
+/* Menus: the highlighted entry on a gold pill. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 2px 0;
+}
+
+.menu .item {
+  min-width: 200px;
+  padding: 1px 18px;
+  border-radius: 12px;
+  color: #c9d2f2;
+}
+
+.menu .item.sel {
+  background: rgba(255, 210, 63, 0.2);
+  box-shadow: inset 0 0 0 2px rgba(255, 210, 63, 0.8);
+  color: #ffd23f;
+}
+
+/* While paused the animations freeze, and a frozen pop-up would show
+   through the pause panel. */
+#hud.paused * {
+  animation-play-state: paused;
+}
+
+#hud.paused #popup {
+  visibility: hidden;
 }
 
 /* The NEXT box sits top right, so the perf overlay goes bottom right. */

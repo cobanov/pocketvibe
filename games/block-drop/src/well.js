@@ -96,7 +96,8 @@ export function createWell(scene) {
   scene.add(grid);
 
   // Every block on screen: the stack, the falling piece, next and hold.
-  const cubeGeometry = bake(bevelBox(1, 1, 1, 0.16), 0xffffff);
+  // Their backs never face the camera, so the block has none (30 triangles).
+  const cubeGeometry = bake(bevelBox(1, 1, 1, 0.16, true), 0xffffff);
   const blocks = new THREE.InstancedMesh(
     cubeGeometry,
     new THREE.MeshBasicMaterial({ vertexColors: true }),
@@ -204,6 +205,11 @@ export function createWell(scene) {
   }
 
   return {
+    // 0..1 as the stack nears the top (eased), for the warning sound.
+    get danger() {
+      return danger;
+    },
+
     reset() {
       cellFlash.fill(0);
       rowFall.fill(0);
@@ -307,7 +313,7 @@ export function createWell(scene) {
       blocks.instanceColor.needsUpdate = true;
 
       // The grid glows red and pulses when the stack is close to the top.
-      const target = game.phase === 'idle' ? 0 : Math.min(1, Math.max(0, (highest - 13) / 5));
+      const target = game.phase === 'idle' || game.phase === 'done' ? 0 : Math.min(1, Math.max(0, (highest - 13) / 5));
       danger += (target - danger) * Math.min(1, dt * 4);
       const pulse = danger * (0.6 + 0.4 * Math.sin(time * 7));
       gridMaterial.color.setRGB(1 + pulse * 5, 1 - pulse * 0.45, 1 - pulse * 0.6);
