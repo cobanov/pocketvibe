@@ -1,4 +1,4 @@
-# PocketVibe: devir notu (2026-10-09 sabah; handheld 0.7.1, Android 0.7.1)
+# PocketVibe: devir notu (2026-10-09; handheld 0.7.1, Android 0.7.2)
 
 Önce bunu, sonra `docs/plan.md` ve `docs/development.md`'yi oku; memory'de `pocketvibe-project.md`,
 `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` var. Eski devir notları git
@@ -6,6 +6,12 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Durum
 
+- **Android 0.7.2** (`android-v0.7.2`, latest değil, 2026-10-09): telefonlar için ekranda tuşlar
+  (`android/.../TouchPad.kt`). Dikeyde oyun üstte 3:2, tuşlar altında; yatayda tuşlar oyunun iki
+  yanında. Gamepad bağlıyken (el konsolunun kendi tuşları da gamepad sayılıyor) gizli, oyun tüm ekranı
+  alıyor. Galaxy S25+'ta (Android 16) iki yönde denendi, sorunsuz. RG Rotate ve RP3+'ta gizli kaldığı
+  **denenmedi**; tuşlar algılanmazsa ilk fiziksel tuşta kayboluyor. Handheld değişmedi, `v0.7.2`
+  çıkmadı (config 0.7.2). Samsung'da Otomatik Engelleyici APK kurulumunu ve adb'yi engelliyor.
 - **Handheld ve Android 0.7.1** (`v0.7.1` "Latest", `android-v0.7.1`, 2026-10-09): Kütüphane'de mağazada
   yenisi olan oyunda rozet; A önce günceller sonra açar ("Güncelle ve oyna", güncelleme alınamazsa kurulu
   sürüm açılır). Ayarlar > Oyunlar > Tüm oyunları güncelle (tek toast). Sadece launcher değişti.
