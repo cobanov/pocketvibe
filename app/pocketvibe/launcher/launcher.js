@@ -57,6 +57,7 @@ const state = {
   layout: load('layout2', { library: 'grid', store: 'grid' }),
   view: load('view', { library: 'recent', store: 'latest' }),
   hideInstalled: load('hideInstalled', false), // the store lists only games to get
+  hiddenAuthors: load('hiddenAuthors', []), // authors whose games the store leaves out (More > Hide)
   library: [],
   store: { online: true, games: [], stores: [] },
   storeLoaded: false,
@@ -94,6 +95,7 @@ function save() {
     localStorage.setItem('layout2', JSON.stringify(state.layout));
     localStorage.setItem('view', JSON.stringify(state.view));
     localStorage.setItem('hideInstalled', JSON.stringify(state.hideInstalled));
+    localStorage.setItem('hiddenAuthors', JSON.stringify(state.hiddenAuthors));
   } catch {
     // Not important if it fails.
   }
@@ -170,9 +172,11 @@ function libraryGames() {
 function tabGames(tab = state.tab) {
   if (tab === 'library') return libraryGames();
   if (tab !== 'store') return [];
-  if (!state.hideInstalled) return state.store.games;
+  // Games by an author the player hid stay out of the store (installed ones stay in the Library).
+  const games = state.hiddenAuthors.length ? state.store.games.filter((g) => !state.hiddenAuthors.includes(g.author)) : state.store.games;
+  if (!state.hideInstalled) return games;
   // Updates still need getting, and a download stays until its ring is full.
-  return state.store.games.filter((g) => !g.installed || g.update || downloading(g.id));
+  return games.filter((g) => !g.installed || g.update || downloading(g.id));
 }
 
 function items() {
@@ -422,7 +426,8 @@ function detailBadgeHtml(game, installed) {
 
 function detailHtml(game) {
   const installed = state.library.some((g) => g.id === game.id);
-  const meta = [game.author, game.genre, game.version && `v${game.version}`, sizeText(game.size)].filter(Boolean);
+  const age = Number.isInteger(game.age) ? t('ageRating', { age: game.age }) : '';
+  const meta = [game.author, game.genre, age, game.version && `v${game.version}`, sizeText(game.size)].filter(Boolean);
   const controls = Object.entries(game.controls ?? {})
     .slice(0, 8)
     .map(([button, action]) => `<tr><td>${escapeHtml(button)}</td><td>${escapeHtml(action)}</td></tr>`)
@@ -484,6 +489,9 @@ function settingsSections() {
           value: store.online === false ? t('storeOfflineShort') : store.count !== undefined ? t('storeGames', { count: store.count }) : '',
         })),
         { id: 'addStore', label: `+ ${t('addStore')}`, value: '' },
+        ...(state.hiddenAuthors.length
+          ? [{ id: 'hiddenAuthors', label: t('hiddenAuthors'), sub: escapeHtml(state.hiddenAuthors.join(', ')), value: String(state.hiddenAuthors.length) }]
+          : []),
       ],
     },
     {
@@ -663,6 +671,12 @@ function settingsAction(button, repeat) {
     updateAllGames();
   } else if (id === 'addStore' && button === 'A') {
     addStore();
+  } else if (id === 'hiddenAuthors' && button === 'A') {
+    showDialog(t('showHiddenAuthors'), () => {
+      state.hiddenAuthors = [];
+      save();
+      render();
+    });
   } else if (id.startsWith('store:') && button === 'Y') {
     const url = id.slice(6);
     showDialog(t('removeStoreConfirm'), async () => {
@@ -934,11 +948,12 @@ function renderHints() {
     const installed = state.library.some((l) => l.id === g?.id);
     if (g && !downloading(g.id)) parts.push(hint('A', g.update ? t('update') : installed ? t('play') : t('download')));
     if (installed && !downloading(g.id)) parts.push(hint('Y', t('remove')));
+    if (g && moreItems(g).length) parts.push(hint('X', t('more')));
     parts.push(hint('B', t('back')));
   } else if (state.tab === 'settings') {
     const id = state.settingRows[state.focus.settings] ?? '';
     if (['music', 'uiSounds', 'showFps', 'musicVolume', 'sfxVolume', 'language'].includes(id)) parts.push(hint('A', t('change')));
-    if (['addStore', 'backup', 'restore'].includes(id)) parts.push(hint('A', t('select')));
+    if (['addStore', 'backup', 'restore', 'hiddenAuthors'].includes(id)) parts.push(hint('A', t('select')));
     if (id === 'updateGames') parts.push(hint('A', t('update')));
     if (id === 'update') parts.push(hint('A', state.update?.available ? t('update') : t('check')));
     if (id === 'gpu') parts.push(hint('A', t('gpuSwitch')));
@@ -981,6 +996,68 @@ function closeDialog() {
   state.dialog = null;
   ui.dialog.hidden = true;
   renderHints();
+}
+
+// ---------- A link to a game ----------
+
+// ?game=<id> opens that game's page, once: the iPhone app adds it when a
+// link to the game (pocketvibe.dev/game/<id>) opens the app.
+let linked = new URLSearchParams(location.search).get('game');
+
+function openLinked() {
+  if (!linked) return;
+  const installed = state.library.some((g) => g.id === linked);
+  if (!installed && !state.store.games.some((g) => g.id === linked)) return; // the store may still be loading
+  state.tab = installed ? 'library' : 'store';
+  state.detail = linked;
+  linked = null;
+}
+
+// ---------- Reports and hidden authors ----------
+
+// What the detail screen's More (X) offers: reporting a store game to its
+// store, and hiding its author's games (the App Store asks for both, for
+// games other people make).
+function moreItems(g) {
+  const list = [];
+  if (g.download) list.push({ label: t('reportGame'), run: () => askReport(g) });
+  if (g.author && !g.official && !state.hiddenAuthors.includes(g.author)) {
+    list.push({ label: t('hideAuthor', { author: g.author }), run: () => hideAuthor(g.author) });
+  }
+  return list;
+}
+
+function askReport(g) {
+  const reasons = [
+    ['offensive', 'reasonOffensive'],
+    ['broken', 'reasonBroken'],
+    ['copyright', 'reasonCopyright'],
+    ['other', 'reasonOther'],
+  ];
+  openPicker(t('reportWhy', { title: g.title }), reasons.map(([reason, key]) => ({ label: t(key), reason })), (item) => sendReport(g, item.reason));
+}
+
+// Straight to the game's store, which keeps it for the store's admin.
+async function sendReport(g, reason) {
+  try {
+    const res = await fetch(new URL('/api/report', g.download), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game: g.id, reason, platform: state.info?.platform ?? '' }),
+    });
+    if (!res.ok) throw new Error(res.statusText);
+    toast(t('reported'), 'save_done');
+  } catch {
+    toast(t('reportFailed'), 'error');
+  }
+}
+
+function hideAuthor(author) {
+  state.hiddenAuthors = [...state.hiddenAuthors, author];
+  save();
+  state.detail = null;
+  toast(t('authorHidden', { author }));
+  render();
 }
 
 function openPicker(title, list, onPick) {
@@ -1306,6 +1383,8 @@ function handleButton(button, repeat) {
       else play(g);
     } else if (button === 'Y' && g && installed && !downloading(g.id)) {
       confirmRemove(g);
+    } else if (button === 'X' && g && moreItems(g).length) {
+      openPicker(g.title, moreItems(g), (item) => item.run());
     }
     return;
   }
@@ -1476,8 +1555,12 @@ async function unlockAudio() {
   // Buttons work from the start. The store may need the network, so it fills
   // in when it answers instead of holding up the launcher.
   requestAnimationFrame(poll);
-  refreshStore().then(() => !keyboard.active && render());
+  refreshStore().then(() => {
+    openLinked();
+    if (!keyboard.active) render();
+  });
   await Promise.all([refreshLibrary(), refreshInfo()]);
+  openLinked();
   // Back from a game: keep it selected, wherever the sort order moved it.
   const played = load('played', null);
   if (played) {
