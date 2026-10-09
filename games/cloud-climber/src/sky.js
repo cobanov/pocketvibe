@@ -1,30 +1,33 @@
 // Scenery: the sky gradient that turns from pastel day to dusk to a starry
-// night as the climber gets higher, the sun and moon, the meadow and hills at
+// night and, very high up, the edge of space as the climber gets higher, the
+// sun, the moon and a ringed planet, the meadow and hills at
 // the start, and parallax layers of big clouds, hot-air balloons and birds.
 // Far layers sit deeper behind the column, so the perspective camera moves
 // them slower. Each layer is one InstancedMesh whose pieces are moved back
 // up above the view once they drop out of it.
 
 import * as THREE from 'three';
-import { CAM_Z, HALF_W, box, lowPoly, merge, paint, part, puff, rand, smoothstep, viewDrop, viewHalf } from './shared.js';
-import { balloonGeometry, birdGeometry, discGeometry, skyCloudGeometry } from './models.js';
+import { CAM_Z, HALF_W, box, keep, lowPoly, merge, paint, part, puff, rand, smoothstep, viewDrop, viewHalf } from './shared.js';
+import { balloonGeometry, birdGeometry, discGeometry, planetGeometry, skyCloudGeometry } from './models.js';
 
 const FRAME_Z = 0.7; // just in front of the clouds
 const SKY_Z = -80;
 const STAR_Z = -76;
 const DISC_Z = -70;
 const STARS = 110;
-const CLOUDS = 7;
+const CLOUDS = 5;
 
-// Sky colors (top, middle, bottom of the screen) for day, dusk and night.
+// Sky colors (top, middle, bottom of the screen) for day, dusk, night and space.
 const DAY = [0x86cdf6, 0xbfe6fb, 0xffe1ee];
 const DUSK = [0x6a5cb5, 0xf09ab8, 0xffbf7a];
 const NIGHT = [0x0a1034, 0x1a2760, 0x3a3e86];
+const SPACE = [0x020108, 0x0a0820, 0x241a4c];
 
 // Light colors and strengths: hemisphere sky, hemisphere ground, sun.
 const LIGHT_DAY = [0xffffff, 0xb6a8d0, 0xffffff, 1.35, 1.5];
 const LIGHT_DUSK = [0xffd6c8, 0x8a5a86, 0xffa968, 1.2, 1.35];
 const LIGHT_NIGHT = [0xb0bcff, 0x3a4078, 0xc4d0ff, 1.1, 0.85];
+const LIGHT_SPACE = [0xd4c8ff, 0x2c2260, 0xffe6d0, 1.05, 0.95];
 
 const BALLOON_COLORS = [0xff6b6b, 0xffb347, 0x5cc2ff, 0xb28dff, 0x5fd39a, 0xff8fc8];
 
@@ -33,7 +36,9 @@ function colors(list) {
 }
 
 // The meadow the climb starts from, with hills, trees, a cottage and far
-// mountains behind it. Static, so it is one merged mesh.
+// mountains behind it. Static, so it is merged: one mesh for the meadow and
+// one for the far hills and mountains, which stay in view much longer, so the
+// meadow drops out of the drawing as soon as it is out of sight.
 function meadowGeometry() {
   const parts = [];
   // Striped grass on top (y = 0 is where the climber stands) and soil below.
@@ -49,6 +54,7 @@ function meadowGeometry() {
   for (let i = 0; i < 26; i++) {
     const x = -22 + i * 1.75 + rand(-0.4, 0.4);
     const z = rand(-1.5, 2);
+    if (Math.abs(x) > 12) continue; // past the edge of the widest screen
     if (i % 3 === 0) {
       for (let k = 0; k < 3; k++) {
         const blade = new THREE.ConeGeometry(0.08, 0.36 - k * 0.06, 4);
@@ -83,24 +89,28 @@ function meadowGeometry() {
   }
   for (let i = 0; i < 14; i++) {
     const x = -24 + i * 3.6 + rand(-1, 1);
-    if (Math.abs(x) < 6) continue;
+    if (Math.abs(x) < 6 || Math.abs(x) > 15) continue;
     const s = rand(0.8, 1.3);
     parts.push(box(0.25 * s, 0.7 * s, 0.25 * s, x, 0.35 * s, -6.5 + rand(-1, 1), 0x7a5232));
     parts.push(part(new THREE.ConeGeometry(0.8 * s, 1.6 * s, 6), x, 1.4 * s, -6.5, 0x46ad57));
   }
   // Far hills and mountains, hazy blue.
+  const far = [];
   for (let i = 0; i < 6; i++) {
     const hill = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
     hill.scale(rand(9, 12), rand(5, 8), 4);
-    parts.push(part(hill, -34 + i * 13 + rand(-3, 3), -1.5, -26, i % 2 ? 0xa8dcb4 : 0x9cd2b0));
+    far.push(part(hill, -34 + i * 13 + rand(-3, 3), -1.5, -26, i % 2 ? 0xa8dcb4 : 0x9cd2b0));
   }
   for (let i = 0; i < 5; i++) {
     const s = rand(10, 15);
     const x = -40 + i * 20 + rand(-4, 4);
-    parts.push(part(new THREE.ConeGeometry(s * 0.8, s * 1.3, 6), x, s * 0.65 - 3, -46, 0xb5c2ec));
-    parts.push(part(new THREE.ConeGeometry(s * 0.27, s * 0.44, 6), x, s * 1.08 - 3, -46, 0xf4f6ff));
+    far.push(part(new THREE.ConeGeometry(s * 0.8, s * 1.3, 6), x, s * 0.65 - 3, -46, 0xb5c2ec));
+    far.push(part(new THREE.ConeGeometry(s * 0.27, s * 0.44, 6), x, s * 1.08 - 3, -46, 0xf4f6ff));
   }
-  return merge(parts);
+  // The camera sees the meadow from the front only, a little wider than the
+  // column, and from above, so the backs and undersides can go.
+  const seen = (a, b, c, n) => n.z >= -0.75 * n.length() && n.y >= -0.3 * n.length();
+  return [keep(merge(parts), seen), keep(merge(far), seen)];
 }
 
 // The margins either side of the column are dimmed a little, with a light
@@ -198,9 +208,11 @@ export function createSky(scene, renderer, aspect) {
   const day = colors(DAY);
   const dusk = colors(DUSK);
   const night = colors(NIGHT);
+  const space = colors(SPACE);
   const lightDay = colors(LIGHT_DAY.slice(0, 3));
   const lightDusk = colors(LIGHT_DUSK.slice(0, 3));
   const lightNight = colors(LIGHT_NIGHT.slice(0, 3));
+  const lightSpace = colors(LIGHT_SPACE.slice(0, 3));
   const now = [new THREE.Color(), new THREE.Color(), new THREE.Color()];
   const tmp = new THREE.Color();
 
@@ -234,11 +246,15 @@ export function createSky(scene, renderer, aspect) {
     new THREE.CircleGeometry(6.5, 24),
     new THREE.MeshBasicMaterial({ color: 0x9fb2ff, transparent: true, opacity: 0.22, fog: false, depthWrite: false }),
   );
-  scene.add(sunHalo, sunDisc, moonHalo, moonDisc);
+  // A ringed planet rises in the right margin at the edge of space.
+  const planet = new THREE.Mesh(planetGeometry(3.6), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+  planet.visible = false;
+  scene.add(sunHalo, sunDisc, moonHalo, moonDisc, planet);
   const discHalf = viewHalf(DISC_Z);
 
-  const meadow = new THREE.Mesh(meadowGeometry(), lowPoly());
-  scene.add(meadow);
+  const [meadowNear, meadowFar] = meadowGeometry();
+  const meadowMaterial = lowPoly();
+  scene.add(new THREE.Mesh(meadowNear, meadowMaterial), new THREE.Mesh(meadowFar, meadowMaterial));
 
   const frame = new THREE.Mesh(
     frameGeometry(),
@@ -254,7 +270,7 @@ export function createSky(scene, renderer, aspect) {
     it.x = (Math.random() < 0.5 ? -1 : 1) * rand(halfW * cloudFrom, halfW * (cloudFrom + 0.37));
     it.s = rand(2.4, 4);
     it.sy = it.s * rand(0.6, 0.8);
-    it.turn = rand(-0.4, 0.4);
+    it.turn = rand(-0.2, 0.2);
     it.vx = rand(-0.25, 0.25);
   });
 
@@ -292,16 +308,25 @@ export function createSky(scene, renderer, aspect) {
 
   let shownDusk = -1;
   let shownNight = -1;
+  let shownSpace = -1;
   let duskAmt = 0;
   let nightAmt = 0;
+  let spaceAmt = 0;
 
-  function mix(out, a, b, c) {
-    return out.lerpColors(a, b, duskAmt).lerp(c, nightAmt);
+  function mix(out, a, b, c, d) {
+    return out.lerpColors(a, b, duskAmt).lerp(c, nightAmt).lerp(d, spaceAmt);
   }
 
-  // Recolors the sky, the fog and the lights for the current dusk and night.
+  // A light's strength (index 3 or 4 of the light lists) for the time of day.
+  function amount(i) {
+    const dusk = LIGHT_DAY[i] + (LIGHT_DUSK[i] - LIGHT_DAY[i]) * duskAmt;
+    const night = dusk + (LIGHT_NIGHT[i] - LIGHT_DUSK[i]) * nightAmt;
+    return night + (LIGHT_SPACE[i] - LIGHT_NIGHT[i]) * spaceAmt;
+  }
+
+  // Recolors the sky, the fog and the lights for the current time of day.
   function recolor() {
-    for (let k = 0; k < 3; k++) mix(now[k], day[k], dusk[k], night[k]);
+    for (let k = 0; k < 3; k++) mix(now[k], day[k], dusk[k], night[k], space[k]);
     for (let i = 0; i < skyPos.count; i++) {
       const v = (skyPos.getY(i) + skyHalf) / (skyHalf * 2); // 0 at the bottom, 1 at the top
       if (v < 0.5) tmp.lerpColors(now[2], now[1], v * 2);
@@ -311,11 +336,11 @@ export function createSky(scene, renderer, aspect) {
     skyColors.needsUpdate = true;
     scene.fog.color.lerpColors(now[2], now[1], 0.45);
     renderer.setClearColor(now[1]);
-    mix(hemi.color, lightDay[0], lightDusk[0], lightNight[0]);
-    mix(hemi.groundColor, lightDay[1], lightDusk[1], lightNight[1]);
-    mix(sun.color, lightDay[2], lightDusk[2], lightNight[2]);
-    hemi.intensity = LIGHT_DAY[3] + (LIGHT_DUSK[3] - LIGHT_DAY[3]) * duskAmt + (LIGHT_NIGHT[3] - LIGHT_DUSK[3]) * nightAmt;
-    sun.intensity = LIGHT_DAY[4] + (LIGHT_DUSK[4] - LIGHT_DAY[4]) * duskAmt + (LIGHT_NIGHT[4] - LIGHT_DUSK[4]) * nightAmt;
+    mix(hemi.color, lightDay[0], lightDusk[0], lightNight[0], lightSpace[0]);
+    mix(hemi.groundColor, lightDay[1], lightDusk[1], lightNight[1], lightSpace[1]);
+    mix(sun.color, lightDay[2], lightDusk[2], lightNight[2], lightSpace[2]);
+    hemi.intensity = amount(3);
+    sun.intensity = amount(4);
     sunDisc.material.color.setHex(0xfff2a6).lerp(tmp.setHex(0xff9a52), duskAmt);
     sunHalo.material.color.copy(sunDisc.material.color);
     starMaterial.opacity = nightAmt;
@@ -361,15 +386,22 @@ export function createSky(scene, renderer, aspect) {
       for (let i = 0; i < 5; i++) balloons.items[i].y = Math.max(balloons.items[i].y, rand(4, 12));
       for (let i = 0; i < 6; i++) birds.items[i].y = Math.max(birds.items[i].y, rand(3, 9));
       shownDusk = -1;
+      shownSpace = -1;
     },
 
     // height drives the time of day; camY is where the camera looks.
     update(dt, camY, height) {
       duskAmt = smoothstep(120, 380, height);
       nightAmt = smoothstep(430, 720, height);
-      if (Math.abs(duskAmt - shownDusk) > 0.002 || Math.abs(nightAmt - shownNight) > 0.002) {
+      spaceAmt = smoothstep(880, 1080, height);
+      if (
+        Math.abs(duskAmt - shownDusk) > 0.002 ||
+        Math.abs(nightAmt - shownNight) > 0.002 ||
+        Math.abs(spaceAmt - shownSpace) > 0.002
+      ) {
         shownDusk = duskAmt;
         shownNight = nightAmt;
+        shownSpace = spaceAmt;
         recolor();
       }
 
@@ -388,6 +420,8 @@ export function createSky(scene, renderer, aspect) {
       moonDisc.position.set(-discX, moonY, DISC_Z);
       moonHalo.position.set(moonDisc.position.x, moonY, DISC_Z - 0.5);
       moonDisc.visible = moonHalo.visible = nightAmt > 0.01;
+      planet.visible = spaceAmt > 0.01;
+      if (planet.visible) planet.position.set(discX * 0.92, discMid + discHalf * (-1.4 + spaceAmt * 1.75), DISC_Z + 1);
 
       for (let i = 0; i < CLOUDS; i++) clouds.items[i].x += clouds.items[i].vx * dt;
       for (let i = 0; i < 5; i++) {
@@ -404,6 +438,9 @@ export function createSky(scene, renderer, aspect) {
       clouds.recycle(camY, 4);
       balloons.recycle(camY, 3);
       birds.recycle(camY, 1);
+      // No clouds or balloons out in space.
+      clouds.mesh.count = Math.round(CLOUDS * (1 - spaceAmt));
+      balloons.mesh.count = Math.round(5 * (1 - spaceAmt));
       writeLayer(clouds, dt, false);
       writeLayer(balloons, dt, false);
       // Birds go to roost as night falls.

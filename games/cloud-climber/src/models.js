@@ -2,9 +2,12 @@
 // a single geometry (vertex colors), so a whole kind of object is one draw call.
 
 import * as THREE from 'three';
-import { box, merge, paint, part, puff } from './shared.js';
+import { box, cullBack, keep, merge, paint, part, puffs } from './shared.js';
 
 const INK = 0x2a2238;
+// Models that only ever face the camera drop the faces it never sees (see
+// cullBack in shared.js).
+const FRONT = -0.55;
 
 // The climber faces the camera (+z). Its origin is the middle of the body,
 // BODY_MID above the feet, so spins turn around the belly.
@@ -15,17 +18,20 @@ export function climberGeometry() {
   const coral = 0xff8a5b;
   const cream = 0xffe6c7;
   const y = -0.42;
+  // The climber turns and flips, so only the buried faces go.
   const parts = [
-    puff(0.36, 1, 0.95, 0.86, 0, y + 0.47, 0, coral), // round body
-    puff(0.22, 1, 0.9, 0.45, 0, y + 0.38, 0.22, cream), // belly
-    puff(0.11, 1, 1.1, 0.5, -0.13, y + 0.57, 0.25, 0xffffff), // eyes
-    puff(0.11, 1, 1.1, 0.5, 0.13, y + 0.57, 0.25, 0xffffff),
-    puff(0.055, 1, 1.2, 0.6, -0.12, y + 0.56, 0.3, INK, 0),
-    puff(0.055, 1, 1.2, 0.6, 0.12, y + 0.56, 0.3, INK, 0),
-    puff(0.05, 1.3, 0.8, 0.5, -0.25, y + 0.45, 0.22, 0xff5f7e, 0), // cheeks
-    puff(0.05, 1.3, 0.8, 0.5, 0.25, y + 0.45, 0.22, 0xff5f7e, 0),
-    puff(0.085, 1, 1, 1, -0.36, y + 0.37, 0.02, coral, 0), // arms
-    puff(0.085, 1, 1, 1, 0.36, y + 0.37, 0.02, coral, 0),
+    puffs([
+      [0.36, 1, 0.95, 0.86, 0, y + 0.47, 0, coral], // round body
+      [0.22, 1, 0.9, 0.45, 0, y + 0.38, 0.22, cream], // belly
+      [0.11, 1, 1.1, 0.5, -0.13, y + 0.57, 0.25, 0xffffff], // eyes
+      [0.11, 1, 1.1, 0.5, 0.13, y + 0.57, 0.25, 0xffffff],
+      [0.055, 1, 1.2, 0.6, -0.12, y + 0.56, 0.3, INK, 0],
+      [0.055, 1, 1.2, 0.6, 0.12, y + 0.56, 0.3, INK, 0],
+      [0.05, 1.3, 0.8, 0.5, -0.25, y + 0.45, 0.22, 0xff5f7e, 0], // cheeks
+      [0.05, 1.3, 0.8, 0.5, 0.25, y + 0.45, 0.22, 0xff5f7e, 0],
+      [0.085, 1, 1, 1, -0.36, y + 0.37, 0.02, coral, 0], // arms
+      [0.085, 1, 1, 1, 0.36, y + 0.37, 0.02, coral, 0],
+    ]),
     box(0.17, 0.1, 0.24, -0.13, y + 0.05, 0.04, 0x8a4b2a), // boots
     box(0.17, 0.1, 0.24, 0.13, y + 0.05, 0.04, 0x8a4b2a),
   ];
@@ -70,14 +76,10 @@ export function bladeGeometry() {
 }
 
 // Clouds have their walkable top at y = 0 and hang below it. A puff list is
-// [radius, sx, sy, sz, x, y, z, color].
-function cloud(puffs) {
-  const parts = [];
-  for (let i = 0; i < puffs.length; i++) {
-    const p = puffs[i];
-    parts.push(puff(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]));
-  }
-  return merge(parts);
+// [radius, sx, sy, sz, x, y, z, color]. Clouds never turn, so they keep only
+// the faces the camera can see: about half.
+function cloud(list) {
+  return puffs(list, FRONT);
 }
 
 // Plain cloud: white on top, lilac underneath.
@@ -101,12 +103,14 @@ export function movingCloudGeometry() {
   const side = 0xc4ebff;
   const under = 0x8fd0f5;
   const g = [
-    puff(0.42, 1.25, 0.72, 0.95, 0, -0.22, 0, side),
-    puff(0.32, 1.1, 0.8, 0.95, -0.54, -0.26, 0.02, side),
-    puff(0.32, 1.1, 0.8, 0.95, 0.54, -0.26, 0.02, side),
-    puff(0.3, 1.15, 0.62, 1, -0.22, -0.1, -0.02, top),
-    puff(0.3, 1.15, 0.62, 1, 0.24, -0.11, -0.02, top),
-    puff(0.34, 1.6, 0.48, 0.85, 0, -0.42, 0.06, under),
+    cloud([
+      [0.42, 1.25, 0.72, 0.95, 0, -0.22, 0, side],
+      [0.32, 1.1, 0.8, 0.95, -0.54, -0.26, 0.02, side],
+      [0.32, 1.1, 0.8, 0.95, 0.54, -0.26, 0.02, side],
+      [0.3, 1.15, 0.62, 1, -0.22, -0.1, -0.02, top],
+      [0.3, 1.15, 0.62, 1, 0.24, -0.11, -0.02, top],
+      [0.34, 1.6, 0.48, 0.85, 0, -0.42, 0.06, under],
+    ]),
   ];
   for (let s = -1; s <= 1; s += 2) {
     for (let k = 0; k < 3; k++) {
@@ -117,30 +121,31 @@ export function movingCloudGeometry() {
       g.push(f);
     }
   }
-  return merge(g);
+  return cullBack(merge(g), FRONT);
 }
 
 // Storm cloud that breaks: built from two halves with a crack between them.
-// The left half is its own geometry; the right half is the same one turned
-// half way round, so the broken pieces need only one mesh.
-export function crumbleHalfGeometry() {
+// The broken pieces are the left half twice, the second one turned half way
+// round, so they need only one mesh; as they tumble, they keep their backs.
+function crumbleHalf(mirror) {
   const top = 0xb4b2c6;
   const side = 0x9493ab;
   const under = 0x6c6a86;
-  return cloud([
-    [0.36, 1, 0.72, 0.95, -0.24, -0.22, 0, side],
-    [0.3, 1.1, 0.8, 0.95, -0.6, -0.27, 0.02, side],
-    [0.27, 1.1, 0.62, 1, -0.3, -0.1, -0.02, top],
-    [0.3, 1.2, 0.5, 0.85, -0.34, -0.44, 0.04, under],
-  ]);
+  return [
+    [0.36, 1, 0.72, 0.95, -0.24 * mirror, -0.22, 0, side],
+    [0.3, 1.1, 0.8, 0.95, -0.6 * mirror, -0.27, 0.02, side],
+    [0.27, 1.1, 0.62, 1, -0.3 * mirror, -0.1, -0.02, top],
+    [0.3, 1.2, 0.5, 0.85, -0.34 * mirror, -0.44, 0.04, under],
+  ];
+}
+
+export function crumbleHalfGeometry() {
+  return puffs(crumbleHalf(1));
 }
 
 export function crumbleCloudGeometry() {
-  const left = crumbleHalfGeometry();
-  const right = crumbleHalfGeometry();
-  right.rotateY(Math.PI);
   const crack = box(0.05, 0.36, 0.5, 0, -0.24, 0.32, 0x4a4862);
-  return merge([left, right, crack]);
+  return merge([cloud(crumbleHalf(1)), cloud(crumbleHalf(-1)), crack]);
 }
 
 // One-shot cloud: a loose row of small lemon puffs that looks fragile.
@@ -173,7 +178,7 @@ export function springGeometry() {
   parts.push(part(pad, 0, SPRING_H - 0.05, 0, 0xff4f5e));
   const shine = new THREE.CylinderGeometry(0.12, 0.12, 0.02, 8);
   parts.push(part(shine, -0.04, SPRING_H + 0.005, 0.03, 0xff9aa3));
-  return merge(parts);
+  return cullBack(merge(parts), FRONT);
 }
 
 // A five-pointed star, standing up and facing the camera.
@@ -194,13 +199,20 @@ export function starGeometry() {
 // separate mesh so they can flap.
 export function pestGeometry() {
   const body = 0x7a52c7;
+  // Pests only lean and spin in the screen's plane, so they too keep only
+  // the faces the camera sees.
   return merge([
-    puff(0.34, 1, 0.9, 0.85, 0, 0, 0, body),
-    puff(0.2, 1.1, 0.8, 0.5, 0, -0.1, 0.18, 0xb79cf0),
-    puff(0.1, 1, 1, 0.5, -0.12, 0.07, 0.25, 0xffffff),
-    puff(0.1, 1, 1, 0.5, 0.12, 0.07, 0.25, 0xffffff),
-    puff(0.05, 1, 1, 0.6, -0.1, 0.05, 0.31, 0xd61f3c, 0),
-    puff(0.05, 1, 1, 0.6, 0.1, 0.05, 0.31, 0xd61f3c, 0),
+    puffs(
+      [
+        [0.34, 1, 0.9, 0.85, 0, 0, 0, body],
+        [0.2, 1.1, 0.8, 0.5, 0, -0.1, 0.18, 0xb79cf0],
+        [0.1, 1, 1, 0.5, -0.12, 0.07, 0.25, 0xffffff],
+        [0.1, 1, 1, 0.5, 0.12, 0.07, 0.25, 0xffffff],
+        [0.05, 1, 1, 0.6, -0.1, 0.05, 0.31, 0xd61f3c, 0],
+        [0.05, 1, 1, 0.6, 0.1, 0.05, 0.31, 0xd61f3c, 0],
+      ],
+      FRONT,
+    ),
     angled(box(0.16, 0.04, 0.05, 0, 0, 0, INK), -0.12, 0.19, 0.27, -0.45), // angry brows
     angled(box(0.16, 0.04, 0.05, 0, 0, 0, INK), 0.12, 0.19, 0.27, 0.45),
     part(new THREE.ConeGeometry(0.06, 0.18, 5), -0.16, 0.34, 0, 0xffd23f), // horns
@@ -237,19 +249,19 @@ export function wingGeometry() {
 // Background hot-air balloon: a striped envelope (white and grey stripes, so
 // the instance color tints it), a basket and four ropes.
 export function balloonGeometry() {
-  const env = new THREE.SphereGeometry(1, 10, 8).toNonIndexed();
+  const env = new THREE.SphereGeometry(1, 8, 6).toNonIndexed();
   env.scale(1, 1.15, 1);
   const pos = env.attributes.position;
   const colors = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i += 3) {
     const cx = (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3;
     const cz = (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3;
-    const seg = Math.floor(((Math.atan2(cz, cx) + Math.PI) / (Math.PI * 2)) * 10 + 0.5) % 10;
+    const seg = Math.floor(((Math.atan2(cz, cx) + Math.PI) / (Math.PI * 2)) * 8) % 8;
     const v = seg % 2 ? 1 : 0.72;
     for (let k = 0; k < 3; k++) colors.set([v, v, v], (i + k) * 3);
   }
   env.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  const neck = new THREE.CylinderGeometry(0.62, 0.28, 0.5, 10);
+  const neck = new THREE.CylinderGeometry(0.62, 0.28, 0.5, 8);
   const parts = [env, part(neck, 0, -1.2, 0, 0xd8d8d8), box(0.42, 0.3, 0.42, 0, -2.02, 0, 0xe0b98a)];
   for (let s = 0; s < 4; s++) {
     const dx = s % 2 ? 0.18 : -0.18;
@@ -270,14 +282,19 @@ export function birdGeometry() {
 }
 
 // Big soft background cloud, flatter and bluer than the ones to climb.
+// They turn a little and sit far out to the sides, so they keep a wider
+// margin of back faces than the clouds to climb.
 export function skyCloudGeometry() {
-  return merge([
-    puff(1, 1.3, 0.7, 0.6, 0, 0, 0, 0xf2f6ff),
-    puff(0.75, 1.2, 0.75, 0.6, -1.3, -0.2, 0.1, 0xe4ecfb),
-    puff(0.8, 1.2, 0.75, 0.6, 1.35, -0.22, 0.1, 0xe4ecfb),
-    puff(0.7, 1.1, 0.8, 0.6, 0.5, 0.4, -0.2, 0xf2f6ff),
-    puff(0.62, 1.1, 0.8, 0.6, -0.6, 0.32, -0.1, 0xf2f6ff),
-  ]);
+  return puffs(
+    [
+      [1, 1.3, 0.7, 0.6, 0, 0, 0, 0xf2f6ff],
+      [0.75, 1.2, 0.75, 0.6, -1.3, -0.2, 0.1, 0xe4ecfb],
+      [0.8, 1.2, 0.75, 0.6, 1.35, -0.22, 0.1, 0xe4ecfb],
+      [0.7, 1.1, 0.8, 0.6, 0.5, 0.4, -0.2, 0xf2f6ff],
+      [0.62, 1.1, 0.8, 0.6, -0.6, 0.32, -0.1, 0xf2f6ff],
+    ],
+    -0.78,
+  );
 }
 
 // A flat disc for the sun or the moon, with optional craters given as
@@ -288,5 +305,125 @@ export function discGeometry(r, hex, craters) {
     const c = craters[i];
     parts.push(part(new THREE.CircleGeometry(c[2] * r, 10), c[0] * r, c[1] * r, 0.05, 0xd9d6ef));
   }
+  return merge(parts);
+}
+
+// Thundercloud: a big dark cloud with a grumpy face. It is a hazard, not a
+// cloud to stand on, and the face says so.
+export function thunderCloudGeometry() {
+  const top = 0x8c8aa8;
+  const side = 0x6c6a8a;
+  const under = 0x4a4866;
+  return merge([
+    cloud([
+      [0.46, 1.3, 0.75, 0.95, 0, -0.2, 0, side],
+      [0.36, 1.1, 0.8, 0.95, -0.66, -0.26, 0.02, side],
+      [0.36, 1.1, 0.8, 0.95, 0.66, -0.26, 0.02, side],
+      [0.33, 1.15, 0.65, 1, -0.28, -0.04, -0.02, top],
+      [0.33, 1.15, 0.65, 1, 0.3, -0.05, -0.02, top],
+      [0.4, 1.7, 0.5, 0.85, 0, -0.46, 0.06, under],
+    ]),
+    puffs(
+      [
+        [0.12, 1, 0.8, 0.5, -0.17, -0.22, 0.4, 0xffffff],
+        [0.12, 1, 0.8, 0.5, 0.17, -0.22, 0.4, 0xffffff],
+        [0.055, 1, 1, 0.6, -0.15, -0.24, 0.46, INK, 0],
+        [0.055, 1, 1, 0.6, 0.15, -0.24, 0.46, INK, 0],
+      ],
+      FRONT,
+    ),
+    angled(box(0.2, 0.05, 0.05, 0, 0, 0, INK), -0.17, -0.1, 0.44, -0.4), // a frown
+    angled(box(0.2, 0.05, 0.05, 0, 0, 0, INK), 0.17, -0.1, 0.44, 0.4),
+  ]);
+}
+
+// A bolt of lightning hanging from y = 0 down to y = -1 (scaled to its
+// length): a white zigzag core on a wider yellow glow, facing the camera.
+export function boltGeometry() {
+  const path = [0, 0, 0.16, -0.18, -0.1, -0.37, 0.14, -0.57, -0.12, -0.78, 0.04, -1];
+  const pos = [];
+  const col = [];
+  const layer = (w, z, hex) => {
+    const c = new THREE.Color(hex);
+    for (let i = 0; i < path.length - 2; i += 2) {
+      const [x0, y0, x1, y1] = [path[i], path[i + 1], path[i + 2], path[i + 3]];
+      pos.push(x0 - w, y0, z, x1 - w, y1, z, x1 + w, y1, z, x0 - w, y0, z, x1 + w, y1, z, x0 + w, y0, z);
+      for (let k = 0; k < 6; k++) col.push(c.r, c.g, c.b);
+    }
+  };
+  layer(0.16, 0, 0xffe45c);
+  layer(0.06, 0.02, 0xffffff);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+
+// The rocket: a white body with a red nose and fins, a porthole and a
+// nozzle. Its base is at y = 0 and it points up.
+export function rocketGeometry() {
+  const parts = [
+    part(new THREE.CylinderGeometry(0.15, 0.15, 0.5, 8), 0, 0.35, 0, 0xf4f2fa),
+    part(new THREE.ConeGeometry(0.15, 0.26, 8), 0, 0.73, 0, 0xff4f5e),
+    part(new THREE.CylinderGeometry(0.155, 0.155, 0.06, 8), 0, 0.52, 0, 0xff4f5e),
+    part(new THREE.CylinderGeometry(0.1, 0.13, 0.1, 8), 0, 0.05, 0, 0x6a6f7a),
+  ];
+  const port = new THREE.CylinderGeometry(0.06, 0.06, 0.04, 8);
+  port.rotateX(Math.PI / 2);
+  parts.push(part(port, 0, 0.38, 0.14, 0x8fe3ff));
+  for (let s = -1; s <= 1; s += 2) {
+    const fin = box(0.12, 0.22, 0.04, 0, 0, 0, 0xff4f5e);
+    fin.rotateZ(s * -0.35);
+    fin.translate(s * 0.18, 0.18, 0);
+    parts.push(fin);
+  }
+  return merge(parts);
+}
+
+// The rocket's flame: an orange cone with a yellow heart, pointing down from
+// y = 0.
+export function flameGeometry() {
+  const outer = new THREE.ConeGeometry(0.13, 0.42, 6);
+  outer.rotateX(Math.PI);
+  const inner = new THREE.ConeGeometry(0.07, 0.26, 6);
+  inner.rotateX(Math.PI);
+  return merge([part(outer, 0, -0.21, 0, 0xff8a2a), part(inner, 0, -0.13, 0.05, 0xfff2a0)]);
+}
+
+// Bunting strung across the column at the best height so far: a line with
+// little pennants hanging from it and a white pole at each edge.
+export function buntingGeometry(width) {
+  const colors = [0xff6b6b, 0xffd23f, 0x5cc2ff, 0x5fd39a, 0xb28dff];
+  const parts = [box(width, 0.04, 0.04, 0, 0, 0, 0xffffff)];
+  const n = Math.floor(width / 0.6);
+  for (let i = 0; i < n; i++) {
+    const x = -width / 2 + (i + 0.5) * (width / n);
+    const flag = new THREE.BufferGeometry();
+    flag.setAttribute('position', new THREE.Float32BufferAttribute([x - 0.2, 0, 0, x, -0.38, 0, x + 0.2, 0, 0], 3));
+    flag.setAttribute('normal', new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+    flag.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 2));
+    parts.push(paint(flag, colors[i % colors.length]));
+  }
+  for (let s = -1; s <= 1; s += 2) parts.push(box(0.07, 1.1, 0.07, (s * width) / 2, -0.4, 0, 0xffffff));
+  return merge(parts);
+}
+
+// A ringed planet for the edge of space: a peach disc with darker bands and
+// a ring tilted across it, the ring's far half behind the disc.
+export function planetGeometry(r) {
+  const parts = [paint(new THREE.CircleGeometry(r, 24), 0xf6c49a)];
+  for (const [y, h, hex] of [[0.32, 0.07, 0xe2a07a], [-0.04, 0.1, 0xd88e6c], [-0.4, 0.06, 0xe2a07a]]) {
+    const band = new THREE.CircleGeometry(r * 0.88, 16);
+    band.scale(1, h, 1);
+    parts.push(part(band, 0, y * r, 0.02, hex));
+  }
+  const ring = new THREE.RingGeometry(r * 1.35, r * 1.8, 32, 1).toNonIndexed();
+  ring.scale(1, 0.24, 1);
+  ring.rotateZ(0.22);
+  const far = keep(ring.clone(), (a, b, c) => a.y + b.y + c.y > 0);
+  const near = keep(ring, (a, b, c) => a.y + b.y + c.y <= 0);
+  far.translate(0, 0, -0.1);
+  near.translate(0, 0, 0.1);
+  parts.push(paint(far, 0xd6c2ff), paint(near, 0xe8dcff));
   return merge(parts);
 }

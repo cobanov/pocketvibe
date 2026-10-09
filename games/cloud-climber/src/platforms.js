@@ -4,7 +4,7 @@
 // get a mesh of their own.
 
 import * as THREE from 'three';
-import { BODY_HALF, MOVING, NORMAL, PLAT_HALF, lowPoly, wrapDx } from './shared.js';
+import { BODY_HALF, CRUMBLE, MOVING, NORMAL, PLAT_HALF, lowPoly, wrapDx } from './shared.js';
 import {
   SPRING_H,
   crumbleCloudGeometry,
@@ -110,6 +110,18 @@ export function createPlatforms(scene) {
       return true;
     },
 
+    // True if no cloud to bounce on (storm clouds do not count) has its top
+    // between lo and hi (from springLo for clouds with a spring) with its
+    // swing closer than dist to x.
+    clearOfBounces(x, lo, hi, springLo, dist) {
+      for (let i = 0; i < MAX; i++) {
+        const p = list[i];
+        if (!p.active || p.kind === CRUMBLE || p.y > hi || p.y < (p.spring ? springLo : lo)) continue;
+        if (Math.abs(wrapDx(p.cx, x)) < dist + p.amp) return false;
+      }
+      return true;
+    },
+
     // Finds what the climber's feet touched while falling from prevY to y:
     // returns the cloud, or null. onSpring tells whether its spring was hit.
     land(prevY, y, x) {
@@ -185,7 +197,9 @@ export function createPlatforms(scene) {
       let nSprings = 0;
       for (let i = 0; i < MAX; i++) {
         const p = list[i];
-        if (!p.active || p.y < bottom - 1.5 || p.y > top + 1) continue;
+        // A cloud's top is at p.y and it hangs about 0.6 below: only those
+        // that show are drawn.
+        if (!p.active || p.y < bottom - 0.3 || p.y > top + 0.8) continue;
 
         if (p.state === BREAKING) {
           // Two halves drift apart, tip over and drop.

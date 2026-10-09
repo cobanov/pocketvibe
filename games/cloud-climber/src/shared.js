@@ -36,6 +36,8 @@ export const JUMP_V = 15.5; // every bounce: about 4 m high
 export const SPRING_V = 26; // about 11 m
 export const FLY_V = 15; // climbing speed under the propeller cap
 export const FLY_TIME = 2.4;
+export const ROCKET_V = 26; // the rocket: faster and a little shorter
+export const ROCKET_TIME = 1.8;
 export const MAX_VX = 8;
 export const ACCEL = 34;
 export const FRICTION = 16;
@@ -138,6 +140,76 @@ export function merge(parts) {
   const merged = mergeGeometries(parts);
   for (let i = 0; i < parts.length; i++) parts[i].dispose();
   return merged;
+}
+
+// A copy of a non-indexed geometry with only the triangles test(a, b, c, n)
+// keeps (a, b, c its corners, n its unnormalized face normal).
+const ta = new THREE.Vector3();
+const tb = new THREE.Vector3();
+const tc = new THREE.Vector3();
+const tn = new THREE.Vector3();
+const te = new THREE.Vector3();
+export function keep(geometry, test) {
+  const pos = geometry.attributes.position;
+  const kept = [];
+  for (let i = 0; i < pos.count; i += 3) {
+    ta.fromBufferAttribute(pos, i);
+    tb.fromBufferAttribute(pos, i + 1);
+    tc.fromBufferAttribute(pos, i + 2);
+    tn.subVectors(tc, tb).cross(te.subVectors(ta, tb));
+    if (test(ta, tb, tc, tn)) kept.push(i);
+  }
+  const out = new THREE.BufferGeometry();
+  for (const name in geometry.attributes) {
+    const src = geometry.attributes[name];
+    const size = src.itemSize;
+    const data = new Float32Array(kept.length * 3 * size);
+    for (let k = 0; k < kept.length; k++) {
+      for (let v = 0; v < 3; v++) {
+        for (let c = 0; c < size; c++) data[(k * 3 + v) * size + c] = src.getComponent(kept[k] + v, c);
+      }
+    }
+    out.setAttribute(name, new THREE.BufferAttribute(data, size));
+  }
+  geometry.dispose();
+  return out;
+}
+
+// Drops the faces turned away from the camera: it always looks at the column
+// from the front and never more than about 30 degrees off, so a face whose
+// normal points back further than minNz (the z of the unit normal) is never
+// seen. Only for models that do not turn.
+export function cullBack(geometry, minNz) {
+  return keep(geometry, (a, b, c, n) => n.z >= minNz * n.length());
+}
+
+function insidePuff(p, v) {
+  const dx = (v.x - p[4]) / (p[0] * p[1]);
+  const dy = (v.y - p[5]) / (p[0] * p[2]);
+  const dz = (v.z - p[6]) / (p[0] * p[3]);
+  return dx * dx + dy * dy + dz * dz < 0.97;
+}
+
+// Low-poly balls given as [radius, sx, sy, sz, x, y, z, color, detail?],
+// merged, without the faces buried inside a neighbour and, if minNz is
+// given, the ones facing away (see cullBack). A cloud keeps about half of
+// its triangles, and looks the same.
+export function puffs(list, minNz = -2) {
+  const parts = [];
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i];
+    const g = puff(p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8] ?? 1);
+    parts.push(
+      keep(g, (a, b, c, n) => {
+        if (n.z < minNz * n.length()) return false;
+        for (let j = 0; j < list.length; j++) {
+          if (j !== i && insidePuff(list[j], a) && insidePuff(list[j], b) && insidePuff(list[j], c)) return false;
+        }
+        return true;
+      }),
+    );
+  }
+  return merge(parts);
 }
 
 // Flat-shaded vertex-color material: the faceted low-poly look.

@@ -1,9 +1,16 @@
-// Things to grab: golden stars (one InstancedMesh, a small pool) and the rare
-// propeller cap that carries the climber up for a few seconds.
+// Things to grab: golden stars (one InstancedMesh, a small pool), the rare
+// propeller cap that carries the climber up for a few seconds and, higher
+// up, the even rarer rocket that carries it faster and further.
 
 import * as THREE from 'three';
 import { BODY_H, lowPoly, wrapDx } from './shared.js';
-import { bladeGeometry, capGeometry, starGeometry } from './models.js';
+import { bladeGeometry, capGeometry, flameGeometry, rocketGeometry, starGeometry } from './models.js';
+import { CAP, ROCKET } from './player.js';
+
+// What collect() reports.
+export const NOTHING = 0;
+export const STAR = 3;
+export { CAP, ROCKET };
 
 const MAX_STARS = 14;
 const STAR_REACH = 0.55; // horizontal pickup distance
@@ -22,16 +29,23 @@ export function createPickups(scene) {
   const stars = [];
   for (let i = 0; i < MAX_STARS; i++) stars.push({ active: false, x: 0, y: 0, t: 0 });
 
-  // The cap waiting on a cloud: two plain meshes, there is only ever one.
-  const capMaterial = lowPoly(0x202020);
+  // The cap or the rocket waiting on a cloud: plain meshes, there is only
+  // ever one of them out.
+  const gearMaterial = lowPoly(0x202020);
   const cap = new THREE.Group();
-  const blades = new THREE.Mesh(bladeGeometry(), capMaterial);
+  const blades = new THREE.Mesh(bladeGeometry(), gearMaterial);
   blades.position.y = 0.38;
-  cap.add(new THREE.Mesh(capGeometry(), capMaterial), blades);
-  cap.scale.setScalar(1.5); // bigger than when worn, so it catches the eye
+  cap.add(new THREE.Mesh(capGeometry(), gearMaterial), blades);
+  cap.scale.setScalar(1.5); // bigger than when worn, so they catch the eye
   cap.visible = false;
-  scene.add(cap);
-  const capItem = { active: false, x: 0, y: 0, t: 0 };
+  const rocket = new THREE.Group();
+  const flame = new THREE.Mesh(flameGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true }));
+  flame.scale.setScalar(0.4);
+  rocket.add(new THREE.Mesh(rocketGeometry(), gearMaterial), flame);
+  rocket.scale.setScalar(1.35);
+  rocket.visible = false;
+  scene.add(cap, rocket);
+  const item = { active: false, kind: CAP, x: 0, y: 0, t: 0 };
 
   const dummy = new THREE.Object3D();
   let clock = 0;
@@ -43,8 +57,9 @@ export function createPickups(scene) {
 
     clear() {
       for (let i = 0; i < MAX_STARS; i++) stars[i].active = false;
-      capItem.active = false;
+      item.active = false;
       cap.visible = false;
+      rocket.visible = false;
       starMesh.count = 0;
     },
 
@@ -60,18 +75,20 @@ export function createPickups(scene) {
       }
     },
 
-    // Puts the cap on a cloud top at (x, y). Returns false if one is out already.
-    addCap(x, y) {
-      if (capItem.active) return false;
-      capItem.active = true;
-      capItem.x = x;
-      capItem.y = y;
-      capItem.t = 0;
+    // Puts the cap or the rocket (CAP or ROCKET) on a cloud top at (x, y).
+    // Returns false if one is out already.
+    addGear(kind, x, y) {
+      if (item.active) return false;
+      item.active = true;
+      item.kind = kind;
+      item.x = x;
+      item.y = y;
+      item.t = 0;
       return true;
     },
 
     // Checks the climber's box (feet at y) against the pickups. Returns
-    // 0 for nothing, 1 for a star, 2 for the cap.
+    // NOTHING, STAR, CAP or ROCKET.
     collect(x, y) {
       for (let i = 0; i < MAX_STARS; i++) {
         const s = stars[i];
@@ -80,17 +97,18 @@ export function createPickups(scene) {
           s.active = false;
           this.hitX = s.x;
           this.hitY = s.y;
-          return 1;
+          return STAR;
         }
       }
-      if (capItem.active && Math.abs(wrapDx(capItem.x, x)) < CAP_REACH && y < capItem.y + 0.9 && y + BODY_H > capItem.y) {
-        capItem.active = false;
+      if (item.active && Math.abs(wrapDx(item.x, x)) < CAP_REACH && y < item.y + 0.9 && y + BODY_H > item.y) {
+        item.active = false;
         cap.visible = false;
-        this.hitX = capItem.x;
-        this.hitY = capItem.y + 0.3;
-        return 2;
+        rocket.visible = false;
+        this.hitX = item.x;
+        this.hitY = item.y + 0.3;
+        return item.kind;
       }
-      return 0;
+      return NOTHING;
     },
 
     update(dt, bottom, top) {
@@ -115,13 +133,20 @@ export function createPickups(scene) {
       starMesh.count = n;
       starMesh.instanceMatrix.needsUpdate = true;
 
-      if (capItem.active && capItem.y < bottom - 1) capItem.active = false;
-      cap.visible = capItem.active;
-      if (capItem.active) {
-        capItem.t += dt;
-        cap.position.set(capItem.x, capItem.y + 0.12 + Math.abs(Math.sin(capItem.t * 4)) * 0.18, 0.1);
+      if (item.active && item.y < bottom - 1) item.active = false;
+      cap.visible = item.active && item.kind === CAP;
+      rocket.visible = item.active && item.kind === ROCKET;
+      if (cap.visible) {
+        item.t += dt;
+        cap.position.set(item.x, item.y + 0.12 + Math.abs(Math.sin(item.t * 4)) * 0.18, 0.1);
         cap.rotation.set(0, Math.sin(clock * 1.5) * 0.5, Math.sin(clock * 4) * 0.08);
         blades.rotation.y = clock * 9;
+      } else if (rocket.visible) {
+        // Stands on the cloud, rocking, with a little pilot flame.
+        item.t += dt;
+        rocket.position.set(item.x, item.y + 0.12 + Math.abs(Math.sin(item.t * 3)) * 0.1, 0.1);
+        rocket.rotation.set(0, Math.sin(clock * 1.2) * 0.6, Math.sin(clock * 5) * 0.06);
+        flame.scale.set(0.4, 0.3 + Math.random() * 0.25, 0.4);
       }
     },
   };

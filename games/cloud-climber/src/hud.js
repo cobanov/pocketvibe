@@ -32,6 +32,7 @@ export function createHud(root) {
   const messageEl = root.querySelector('#message');
   const popups = root.querySelectorAll('.popup');
 
+  let menuEl = null;
   let shownHeight = -1;
   let shownBest = -1;
   let shownStars = -1;
@@ -87,7 +88,8 @@ export function createHud(root) {
       replay(toastEl, 'show');
     },
 
-    // A short flash over the whole screen ('hit' white, 'boost' gold).
+    // A short flash over the whole screen ('hit' white, 'boost' gold, 'zap'
+    // lightning yellow, 'fade' between demo climbs).
     flash(kind) {
       flashEl.className = kind;
       replay(flashEl, 'on');
@@ -99,6 +101,13 @@ export function createHud(root) {
     message(html, layout = 'center') {
       messageEl.className = layout;
       messageEl.innerHTML = !html ? '' : layout === 'split' ? html : `<div class="panel">${html}</div>`;
+      menuEl = messageEl.querySelector('.menu');
+    },
+
+    // Redraws only the menu inside the message, so the panel does not pop
+    // in again when the cursor moves or a switch flips.
+    menu(html) {
+      if (menuEl) menuEl.innerHTML = html;
     },
   };
 }

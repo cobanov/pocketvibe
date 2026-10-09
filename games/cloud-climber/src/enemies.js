@@ -71,6 +71,20 @@ export function createEnemies(scene) {
       return false;
     },
 
+    // How far the nearest live pest is from (x, y), for its buzz.
+    nearest(x, y) {
+      let best = Infinity;
+      for (let i = 0; i < MAX; i++) {
+        const e = list[i];
+        if (!e.active || e.state !== ALIVE) continue;
+        const dx = wrapDx(e.x, x);
+        const dy = e.y - y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < best) best = d;
+      }
+      return best;
+    },
+
     // Tests the climber (feet at y, falling from prevY) against every pest.
     hit(x, y, prevY, vy, flying) {
       for (let i = 0; i < MAX; i++) {
