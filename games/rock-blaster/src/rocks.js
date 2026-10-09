@@ -9,13 +9,18 @@ export const MEDIUM = 1;
 export const SMALL = 2;
 
 // radius: drawn size. hit: collision radius, a little smaller for fairness.
+// mass: the shots it takes to clear the rock and all its pieces (the
+// heartbeat speeds up as the total falls).
 export const SIZES = [
-  { radius: 2.0, hit: 1.8, speedMin: 2.0, speedMax: 3.6, points: 20, detail: 1, cap: 16, tint: 0xf08a5d, sparks: 26, shake: 0.22 },
-  { radius: 1.2, hit: 1.08, speedMin: 3.0, speedMax: 5.4, points: 50, detail: 1, cap: 32, tint: 0xf6b25e, sparks: 16, shake: 0.13 },
-  { radius: 0.68, hit: 0.64, speedMin: 4.2, speedMax: 7.4, points: 100, detail: 0, cap: 64, tint: 0xffd98a, sparks: 10, shake: 0.07 },
+  { radius: 2.0, hit: 1.8, speedMin: 2.0, speedMax: 3.6, points: 20, mass: 7, detail: 1, cap: 16, tint: 0xf08a5d, sparks: 26, shake: 0.22 },
+  { radius: 1.2, hit: 1.08, speedMin: 3.0, speedMax: 5.4, points: 50, mass: 3, detail: 1, cap: 32, tint: 0xf6b25e, sparks: 16, shake: 0.13 },
+  { radius: 0.68, hit: 0.64, speedMin: 4.2, speedMax: 7.4, points: 100, mass: 1, detail: 0, cap: 64, tint: 0xffd98a, sparks: 10, shake: 0.07 },
 ];
 
 const POOL = 96;
+// The distance a large rock travels to come round to where it was.
+const WRAP_W = (HALF_W + SIZES[LARGE].radius) * 2;
+const WRAP_H = (HALF_H + SIZES[LARGE].radius) * 2;
 
 const tmpColor = new THREE.Color();
 const dummy = new THREE.Object3D();
@@ -81,6 +86,7 @@ export function createRocks(scene, fx) {
   }
   const counts = new Int32Array(SIZES.length);
   let active = 0;
+  let mass = 0; // shots still needed to clear the field
 
   function add(size, x, y, vx, vy) {
     for (let i = 0; i < POOL; i++) {
@@ -109,6 +115,7 @@ export function createRocks(scene, fx) {
       r.b = tmpColor.b * v * rand(0.9, 1.15);
       r.flash = 0;
       active++;
+      mass += SIZES[size].mass;
       return r;
     }
     return null;
@@ -153,9 +160,15 @@ export function createRocks(scene, fx) {
       return active;
     },
 
+    // Shots still needed to clear every rock (a large one takes seven).
+    get mass() {
+      return mass;
+    },
+
     clear() {
       for (let i = 0; i < POOL; i++) rocks[i].active = false;
       active = 0;
+      mass = 0;
       draw();
     },
 
@@ -173,7 +186,13 @@ export function createRocks(scene, fx) {
             x = rand(-HALF_W, HALF_W);
             y = (Math.random() < 0.5 ? -1 : 1) * (HALF_H + 1);
           }
-          if ((x - ax) ** 2 + (y - ay) ** 2 > 81) break;
+          // Measured around the wrap too: a rock just past one edge comes
+          // in at the other one at once.
+          let dx = Math.abs(x - ax);
+          let dy = Math.abs(y - ay);
+          dx = Math.min(dx, WRAP_W - dx);
+          dy = Math.min(dy, WRAP_H - dy);
+          if (dx * dx + dy * dy > 100) break;
         }
         launch(LARGE, x, y, speedMul);
       }
@@ -228,6 +247,7 @@ export function createRocks(scene, fx) {
       const def = SIZES[size];
       r.active = false;
       active--;
+      mass -= def.mass;
 
       // Sparks in the rock's own tint, plus a few bright chips.
       fx.burst(r.x, r.y, def.tint, def.sparks, 9 + def.radius * 2, 0.55 + def.radius * 0.15, 0.32 + def.radius * 0.12);

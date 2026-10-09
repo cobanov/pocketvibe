@@ -13,6 +13,11 @@ export const HALF_H = 12;
 
 export const TAU = Math.PI * 2;
 
+// Rocks tumble around z = 0 and reach about 3 units up. The ship, the saucer
+// and the bullets fly just above them, so a rock never hides them; sparks
+// and rings are higher still (fx.js).
+export const FLY_Z = 3.4;
+
 const tmpColor = new THREE.Color();
 
 // Gives a geometry one flat vertex color, so differently colored parts can be

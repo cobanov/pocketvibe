@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { TAU, part, rand, wrap } from './shared.js';
+import { FLY_Z, TAU, part, rand, wrap } from './shared.js';
 
 export const SHIP_HIT = 0.62; // collision radius
 const SCALE = 1.2; // drawn size of the hull
@@ -17,6 +17,7 @@ const DRAG = 0.65; // fraction of speed lost per second
 const BULLET_SPEED = 27;
 const BULLET_LIFE = 0.7;
 const INHERIT = 0.5; // share of the ship's velocity the bullets keep
+const RECOIL = 0.12; // units/s the ship loses with each shot
 const TAP_RATE = 0.085; // seconds between shots when tapping A
 const HOLD_RATE = 0.19; // seconds between shots when holding A
 const INVULN = 2.6;
@@ -69,7 +70,9 @@ function flameGeometry() {
   return g;
 }
 
-export function createShip(scene, fx, findSpot) {
+// findSpot(out) picks where a hyperspace jump ends; onArrive() is called when
+// the ship comes out of it.
+export function createShip(scene, fx, findSpot, onArrive) {
   const group = new THREE.Group();
   group.rotation.order = 'ZYX'; // yaw last, so banking rolls around the nose
   group.scale.setScalar(SCALE);
@@ -159,6 +162,7 @@ export function createShip(scene, fx, findSpot) {
           this.y = spot.y;
           fx.ring(this.x, this.y, 0x9a7bff, 2.2, 0.35);
           fx.burst(this.x, this.y, 0xc8b0ff, 16, 8, 0.35, 0.22);
+          onArrive();
         }
         this.draw();
         return;
@@ -216,19 +220,21 @@ export function createShip(scene, fx, findSpot) {
     },
 
     // tapped: A was pressed this frame (faster than holding it down).
+    // Returns true if a shot left the gun.
     fire(shots, tapped) {
-      if (!this.alive || this.hyper > 0) return;
-      if (this.sinceShot < (tapped ? TAP_RATE : HOLD_RATE)) return;
+      if (!this.alive || this.hyper > 0) return false;
+      if (this.sinceShot < (tapped ? TAP_RATE : HOLD_RATE)) return false;
       const dx = Math.cos(this.angle);
       const dy = Math.sin(this.angle);
       const nx = this.x + dx * 1.05 * SCALE;
       const ny = this.y + dy * 1.05 * SCALE;
-      if (!shots.firePlayer(nx, ny, dx * BULLET_SPEED + this.vx * INHERIT, dy * BULLET_SPEED + this.vy * INHERIT, BULLET_LIFE)) return;
+      if (!shots.firePlayer(nx, ny, dx * BULLET_SPEED + this.vx * INHERIT, dy * BULLET_SPEED + this.vy * INHERIT, BULLET_LIFE)) return false;
       this.sinceShot = 0;
       // A tiny recoil and a muzzle spark.
-      this.vx -= dx * 0.25;
-      this.vy -= dy * 0.25;
+      this.vx -= dx * RECOIL;
+      this.vy -= dy * RECOIL;
       fx.spark(nx, ny, this.vx + dx * 4, this.vy + dy * 4, 0.1, 0.55, 0xfff27a, 0);
+      return true;
     },
 
     // Jumps to a random safe-ish spot. Returns false while recharging.
@@ -238,6 +244,7 @@ export function createShip(scene, fx, findSpot) {
       this.hyperCooldown = HYPER_COOLDOWN;
       this.vx = 0;
       this.vy = 0;
+      this.thrusting = false;
       fx.ring(this.x, this.y, 0x9a7bff, 1.8, 0.3);
       fx.burst(this.x, this.y, 0xc8b0ff, 16, 7, 0.35, 0.22);
       this.draw();
@@ -265,7 +272,7 @@ export function createShip(scene, fx, findSpot) {
       const present = this.alive && this.hyper <= 0;
       // Blink while invulnerable.
       group.visible = present && (this.invuln <= 0 || Math.floor(this.invuln * 12) % 2 === 0);
-      group.position.set(this.x, this.y, 0);
+      group.position.set(this.x, this.y, FLY_Z);
       group.rotation.set(this.bank, 0, this.angle);
 
       flame.visible = this.thrusting;
@@ -279,7 +286,7 @@ export function createShip(scene, fx, findSpot) {
         const t = Math.min(1, this.invuln / 0.6); // fade out over the last moment
         const pulse = 0.55 + 0.25 * Math.sin(this.time * 14);
         shield.material.color.copy(shieldColor).multiplyScalar(pulse * t);
-        shield.position.set(this.x, this.y, 1);
+        shield.position.set(this.x, this.y, FLY_Z + 0.5);
         shield.scale.setScalar(SCALE * (1.05 + 0.06 * Math.sin(this.time * 9)));
       }
     },

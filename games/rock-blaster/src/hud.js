@@ -18,6 +18,7 @@ export function createHud(root) {
   let shownScore = -1;
   let shownWave = -1;
   let shownLives = -1;
+  let shownMessage = null;
   let flip = false;
 
   return {
@@ -52,15 +53,20 @@ export function createHud(root) {
       row.hidden = !visible;
     },
 
-    // A short banner in the upper middle of the screen; '' hides it.
-    toast(html, cls) {
+    // A short banner in the upper middle of the screen, with an optional
+    // smaller line under it; '' hides it.
+    toast(html, cls, sub) {
       toastEl.className = cls || '';
-      toastEl.innerHTML = html;
+      toastEl.innerHTML = html ? `${html}${sub ? `<div class="sub">${sub}</div>` : ''}` : '';
     },
 
-    // html is a fixed string from main.js; '' hides the message.
-    message(html) {
-      messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
+    // html is built from fixed strings in main.js; '' hides the message.
+    // Unchanged html leaves the DOM alone.
+    message(html, kind = '') {
+      const key = kind + html;
+      if (key === shownMessage) return;
+      shownMessage = key;
+      messageEl.innerHTML = html ? `<div class="panel ${kind}">${html}</div>` : '';
     },
   };
 }

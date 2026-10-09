@@ -193,6 +193,23 @@ body.handheld #legend {
   animation: toast-in 0.3s ease-out;
 }
 
+#toast.clear {
+  color: #ffb35e;
+  animation: toast-in 0.3s ease-out;
+}
+
+#toast.best {
+  color: #fff27a;
+  animation: toast-in 0.3s ease-out;
+}
+
+#toast .sub {
+  margin-top: 4px;
+  font-size: 20px;
+  letter-spacing: 1px;
+  color: #ff9fd6;
+}
+
 @keyframes toast-in {
   from { transform: scale(1.6); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -239,6 +256,85 @@ body.handheld #legend {
 
 .panel .best {
   color: #fff27a;
+}
+
+.panel .dim {
+  color: #9fb0c8;
+}
+
+.panel.title-panel {
+  gap: 8px;
+  padding: 16px 30px 14px;
+}
+
+.panel.record {
+  box-shadow: 0 0 0 2px rgba(255, 242, 122, 0.55);
+}
+
+.panel.record .title {
+  color: #fff27a;
+}
+
+/* Menus: the chosen item is lit, with an arrow (a CSS triangle) in front. */
+.panel .menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 2px;
+}
+
+.panel .item {
+  position: relative;
+  padding: 1px 20px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #a9b6d8;
+}
+
+.panel .item.on {
+  color: #8ff0ff;
+}
+
+.panel .item.on::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  margin-top: -9px;
+  border-style: solid;
+  border-width: 9px 0 9px 14px;
+  border-color: transparent transparent transparent #ffb35e;
+}
+
+/* Game over */
+.panel .big-score {
+  font-size: 50px;
+  line-height: 1;
+  color: #fff27a;
+  text-shadow: 0 3px 0 #6b4a12, 0 0 10px #000;
+}
+
+.panel .stats {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  font-size: 20px;
+  color: #d6e2f0;
+}
+
+.panel .stats b {
+  color: #8ff0ff;
+}
+
+.panel .blink {
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to { visibility: hidden; }
 }
 
 /* The lives sit top right, so the perf overlay goes bottom right. */

@@ -6,7 +6,7 @@ import { HALF_H, HALF_W, TAU } from './shared.js';
 
 const MAX_PARTS = 360;
 const MAX_RINGS = 10;
-const FX_Z = 4; // above every rock, so sparks are never hidden inside one
+const FX_Z = 5; // above every rock, ship and saucer, so sparks are never hidden
 
 const tmpColor = new THREE.Color();
 const dummy = new THREE.Object3D();

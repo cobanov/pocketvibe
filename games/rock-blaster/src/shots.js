@@ -2,7 +2,7 @@
 // the saucer's. Bullets wrap around the edges and expire after a short time.
 
 import * as THREE from 'three';
-import { wrap } from './shared.js';
+import { FLY_Z, wrap } from './shared.js';
 
 const PLAYER_MAX = 12;
 const ENEMY_MAX = 10;
@@ -79,7 +79,7 @@ export function createShots(scene) {
         b.px = b.x;
         b.py = b.y;
       }
-      dummy.position.set(b.x, b.y, 0.5);
+      dummy.position.set(b.x, b.y, FLY_Z + 0.3);
       dummy.rotation.set(wobble ? spin : 0, 0, Math.atan2(b.vy, b.vx));
       // Shrink away over the last tenth of a second.
       dummy.scale.setScalar(Math.min(1, b.life * 10));
