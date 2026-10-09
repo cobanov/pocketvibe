@@ -54,6 +54,9 @@ final class Service {
     private var launcher: HttpServer!
     private lazy var music = OggToWav(cache: cache)
 
+    /// Told on the main thread as a game starts: whether it fits any screen shape.
+    var onGameStart: ((Bool) -> Void)?
+
     /// Something to tell the player when the launcher next loads.
     var notice: String?
     /// Set while a game is open; the launcher clears it when it loads.
@@ -686,6 +689,8 @@ final class Service {
             guard isDirectory(games.appendingPathComponent(gid)) else { return .error("not installed", 404) }
             do {
                 let url = try gameUrl(gid)
+                let responsive = readManifest(games.appendingPathComponent(gid))["responsive"] as? Bool == true
+                DispatchQueue.main.sync { onGameStart?(responsive) }
                 inGame = true
                 recordPlay(gid)
                 return .json(["url": url])

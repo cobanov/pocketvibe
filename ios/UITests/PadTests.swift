@@ -37,6 +37,31 @@ final class PadTests: XCTestCase {
         shot("4-playing")
         XCUIDevice.shared.orientation = .landscapeLeft
         sleep(3)
-        shot("5-landscape")
+        shot("5-landscape") // the square game stays square, in the middle
+    }
+
+    // Back from the background (where iOS may close the app's sockets), the
+    // Library still starts a game from the app's own server.
+    func testBackFromBackground() {
+        sleep(4)
+        XCUIDevice.shared.press(.home)
+        sleep(20)
+        app.activate()
+        sleep(3)
+        at(a).tap()
+        sleep(8)
+        shot("8-after-background")
+    }
+
+    func testStartSideways() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        sleep(4)
+        // On its side the buttons sit either side: A is right of the page.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.898, dy: 0.55)).tap()
+        sleep(8)
+        shot("6-sideways-game")
+        XCUIDevice.shared.orientation = .portrait
+        sleep(3)
+        shot("7-upright-after") // the 3:2 game stays 3:2, at the top
     }
 }

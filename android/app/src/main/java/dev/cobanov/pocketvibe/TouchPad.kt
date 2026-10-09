@@ -40,6 +40,22 @@ class PadLayout(context: Context, onKey: (Key, Boolean) -> Unit) : ViewGroup(con
             if (view != null) addView(view, 0)
         }
 
+    /** The running game's shape (width / height), kept when the phone turns:
+     *  a game takes its screen's shape once, as it starts. Null in the launcher. */
+    var gameAspect: Float? = null
+        set(aspect) {
+            if (aspect == field) return
+            field = aspect
+            requestLayout()
+        }
+
+    /** The game now starting gets the page's shape, or 3:2 if it only knows
+     *  the handheld's own screen (no "responsive" in its pocketvibe.json). */
+    fun startGame(responsive: Boolean) {
+        val shape = if (game.height() > 0) game.width().toFloat() / game.height() else 1.5f
+        gameAspect = if (responsive) shape.coerceIn(1f, 2f) else 1.5f
+    }
+
     var padShown = true
         set(shown) {
             if (shown == field) return
@@ -83,16 +99,27 @@ class PadLayout(context: Context, onKey: (Key, Boolean) -> Unit) : ViewGroup(con
             // Upright: the page across the top, under the camera, and square (as
             // on the RG Rotate) when the buttons still fit below it; on a short
             // screen shorter, down to 3:2.
-            val height = (h - cutout.top - cutout.bottom - (BELOW * dp).roundToInt()).coerceIn(w * 2 / 3, w)
-            game.set(0, cutout.top, w, cutout.top + height)
+            val room = h - cutout.top - cutout.bottom - (BELOW * dp).roundToInt()
+            val aspect = gameAspect
+            if (aspect != null) {
+                // A game keeps its shape: as wide as the screen, or narrower if too tall.
+                val height = min((w / aspect).roundToInt(), maxOf(room, w * 2 / 3))
+                val width = min(w, (height * aspect).roundToInt())
+                val x = (w - width) / 2
+                game.set(x, cutout.top, x + width, cutout.top + height)
+            } else {
+                val height = room.coerceIn(w * 2 / 3, w)
+                game.set(0, cutout.top, w, cutout.top + height)
+            }
             pad.arrangeUpright(w, h, game, cutout)
         } else {
             // On its side: the page in the middle, as tall as it can be with
             // room for the buttons either side (and the camera on one of them).
             val left = (SIDE * dp).roundToInt() + cutout.left
             val room = w - left - (SIDE * dp).roundToInt() - cutout.right
-            val width = min(room, h * 3 / 2)
-            val height = width * 2 / 3
+            val aspect = gameAspect ?: 1.5f
+            val width = min(room, (h * aspect).roundToInt())
+            val height = (width / aspect).roundToInt()
             val x = left + (room - width) / 2
             val y = (h - height) / 2
             game.set(x, y, x + width, y + height)

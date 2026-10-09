@@ -50,6 +50,19 @@ final class PadLayout: UIView {
         }
     }
 
+    /// The running game's shape (width / height), kept when the phone turns:
+    /// a game takes its screen's shape once, as it starts. Nil in the launcher.
+    var gameAspect: CGFloat? {
+        didSet { if gameAspect != oldValue { setNeedsLayout() } }
+    }
+
+    /// The game now starting gets the page's shape, or 3:2 if it only knows
+    /// the handheld's own screen (no "responsive" in its pocketvibe.json).
+    func startGame(responsive: Bool) {
+        let shape = (web?.frame.height ?? 0) > 0 ? web!.frame.width / web!.frame.height : 1.5
+        gameAspect = responsive ? min(max(shape, 1), 2) : 1.5
+    }
+
     var padShown = true {
         didSet {
             guard padShown != oldValue else { return }
@@ -81,16 +94,25 @@ final class PadLayout: UIView {
             // Upright: the page across the top, under the camera, and square (as
             // on the RG Rotate) when the buttons still fit below it; on a short
             // screen shorter, down to 3:2.
-            let height = min(max(h - safe.top - safe.bottom - below, (w * 2 / 3).rounded()), w).rounded()
-            game = CGRect(x: 0, y: safe.top, width: w, height: height)
+            let room = h - safe.top - safe.bottom - below
+            if let aspect = gameAspect {
+                // A game keeps its shape: as wide as the screen, or narrower if too tall.
+                let height = min(w / aspect, max(room, w * 2 / 3)).rounded()
+                let width = min(w, (height * aspect).rounded())
+                game = CGRect(x: ((w - width) / 2).rounded(), y: safe.top, width: width, height: height)
+            } else {
+                let height = min(max(room, (w * 2 / 3).rounded()), w).rounded()
+                game = CGRect(x: 0, y: safe.top, width: w, height: height)
+            }
             pad.arrangeUpright(size: bounds.size, game: game, safe: safe)
         } else {
             // On its side: the page in the middle, as tall as it can be with
             // room for the buttons either side (and the camera on one of them).
             let left = side + safe.left
             let room = w - left - side - safe.right
-            let width = min(room, h * 3 / 2).rounded()
-            let height = (width * 2 / 3).rounded()
+            let aspect = gameAspect ?? 1.5
+            let width = min(room, h * aspect).rounded()
+            let height = (width / aspect).rounded()
             game = CGRect(x: (left + (room - width) / 2).rounded(), y: ((h - height) / 2).rounded(), width: width, height: height)
             pad.arrangeSideways(size: bounds.size, game: game, safe: safe)
         }

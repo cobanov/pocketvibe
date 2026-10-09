@@ -85,6 +85,7 @@ class MainActivity : Activity() {
         if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true)
         service = PocketVibe.get(this)
         service.onQuit = { runOnUiThread { finishAndRemoveTask() } }
+        service.onGameStart = { responsive -> runOnUiThread { root.startGame(responsive) } }
         root = PadLayout(this, ::press)
         setContentView(root)
         inputs = getSystemService(InputManager::class.java)
@@ -145,6 +146,7 @@ class MainActivity : Activity() {
 
     private fun openLauncher() {
         service.inGame = false
+        root.gameAspect = null
         web?.loadUrl(service.launcherUrl)
     }
 
@@ -281,6 +283,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
         inputs.unregisterInputDeviceListener(gamepads)
         service.onQuit = null
+        service.onGameStart = null
         web?.destroy()
         web = null
         super.onDestroy()

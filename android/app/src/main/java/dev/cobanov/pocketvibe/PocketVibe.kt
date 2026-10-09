@@ -83,6 +83,8 @@ class PocketVibe private constructor(private val context: Context) {
     /** Set while a game is open; the launcher clears it when it loads. */
     @Volatile var inGame = false
     var onQuit: (() -> Unit)? = null
+    /** Told as a game starts: whether it fits any screen shape. */
+    var onGameStart: ((Boolean) -> Unit)? = null
 
     private val launcher: HttpServer = (8730..8739).firstNotNullOf { port ->
         try {
@@ -742,6 +744,7 @@ class PocketVibe private constructor(private val context: Context) {
                 } catch (e: IOException) {
                     return Response.error(e.message ?: "cannot start", 500)
                 }
+                onGameStart?.invoke(readManifest(File(games, gid)).optBoolean("responsive"))
                 inGame = true
                 recordPlay(gid)
                 Response.json(JSONObject().put("url", url))
