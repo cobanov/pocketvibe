@@ -1,4 +1,4 @@
-# PocketVibe: devir notu (2026-10-09; handheld 0.7.0, Android 0.7.0)
+# PocketVibe: devir notu (2026-10-09 sabah; handheld 0.7.1, Android 0.7.1)
 
 Önce bunu, sonra `docs/plan.md` ve `docs/development.md`'yi oku; memory'de `pocketvibe-project.md`,
 `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` var. Eski devir notları git
@@ -6,7 +6,22 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Durum
 
-- **Handheld 0.7.0** (GitHub `v0.7.0`, "Latest", 2026-10-09): oyunlar ROCKNIX'te ses çalabiliyor.
+- **Handheld ve Android 0.7.1** (`v0.7.1` "Latest", `android-v0.7.1`, 2026-10-09): Kütüphane'de mağazada
+  yenisi olan oyunda rozet; A önce günceller sonra açar ("Güncelle ve oyna", güncelleme alınamazsa kurulu
+  sürüm açılır). Ayarlar > Oyunlar > Tüm oyunları güncelle (tek toast). Sadece launcher değişti.
+- **21 oyunun hepsi yenilendi ve mağazada** (2026-10-09 gece, pocketvibe-store PR #4-#24): Turbo Circuit
+  1.3.0, diğer 20'si 1.2.0. Hepsinde ses (Pulse Dash ve Pole Star kendi sentez motorlarıyla, diğerleri
+  `src/sound.js` + `public/sfx` + ACE-Step `public/music/theme.ogg`), Sound/Music seçenekli başlık ve
+  duraklatma menüleri, hata düzeltmeleri, üçgen bütçesine iniş (çoğu oyun 10k'yı aşıyordu) ve yeni içerik
+  (pistler, bölümler, modlar). Ayrıntı her oyunun commit mesajında. **Hiçbiri cihazda denenmedi.**
+  Sahibin kararını bekleyen ayarlar: Block Drop'ta seviye 20'de anında düşüş; Sky Hopper'a eklenen
+  platin madalya; Neon Pinball jackpot büyüklüğü; Maze Chase'te yakın kamera varsayılanı; Mini Golf
+  Hillside belki kolay; Lane Runner en yüksek hıza 3.7 dakikada çıkıyor; Tile Merge 3x3 hedef 256, 5x5
+  hedef 4096; Pulse Dash cihazda ses gecikmesi kayarsa ofset ayarı gerekir; Pole Star'a öpücük ve yeni
+  bir dans figürü eklendi (istenmezse `dancer.js`'te tek satır); Turbo Circuit'te Maple Woods sisi ve
+  Frost Peak pusu; müzik seçimleri (adaylar hope-wsl'de `~/pv-music/loops` ve
+  `~/Developer/ACE-Step-1.5/output/pocketvibe_games`).
+- **Handheld 0.7.0** (GitHub `v0.7.0`, 2026-10-09): oyunlar ROCKNIX'te ses çalabiliyor.
   WebKit sesi gerçek bir tuşa basılmadan başlatmıyor; oyun, oyunun kendi portunda
   `POST /__pocketvibe__/unlock-audio` istiyor, pocketvibed launcher'ın sanal F13 tuşuna basıyor.
   Varsayılan beş oyun yenilendi ve mağazada: Turbo Circuit 1.3.0 (dört pist), Brick Breaker 1.2.0
