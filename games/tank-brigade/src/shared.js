@@ -119,9 +119,14 @@ export function cylinder(top, bottom, h, segments, x, y, z, hex, topHex) {
   return topHex === undefined ? paint(g, hex) : paintTop(g, topHex, hex);
 }
 
-// A low-poly blob (icosahedron), squashed by (sx, sy, sz).
+// A low-poly blob (icosahedron), squashed by (sx, sy, sz). It stands on a
+// corner, so the five faces around its bottom corner all face down and trim
+// drops them.
+const POLE = -Math.atan((1 + Math.sqrt(5)) / 2);
+
 export function blob(r, sx, sy, sz, x, y, z, hex) {
   const g = new THREE.IcosahedronGeometry(r, 0);
+  g.rotateX(POLE);
   g.scale(sx, sy, sz);
   g.translate(x, y, z);
   return paint(g, hex);
@@ -129,7 +134,8 @@ export function blob(r, sx, sy, sz, x, y, z, hex) {
 
 // Merges painted parts into one geometry. Polyhedra come without an index
 // and boxes with one; mergeGeometries needs them alike, so a mixed list is
-// flattened first. The parts are disposed.
+// flattened first. The parts are disposed. The result keeps only triangles
+// the camera can see (see trim).
 export function merge(parts) {
   let mixed = false;
   for (let i = 1; i < parts.length; i++) if (!parts[i].index !== !parts[0].index) mixed = true;
@@ -139,5 +145,43 @@ export function merge(parts) {
     parts[i].dispose();
     list[i].dispose();
   }
-  return geometry;
+  return trim(geometry);
+}
+
+const ea = new THREE.Vector3();
+const eb = new THREE.Vector3();
+const ec = new THREE.Vector3();
+
+// The camera always looks down on the field from at least 40 degrees above
+// it, whichever way a model is turned, so a triangle facing down more steeply
+// than this is never seen; nor is one with no area (cone tips). trim drops
+// both: every triangle counts against the budget, seen or not.
+const HIDDEN_Y = -0.75;
+
+export function trim(geometry) {
+  const g = geometry.index ? geometry.toNonIndexed() : geometry;
+  if (g !== geometry) geometry.dispose();
+  const pos = g.attributes.position;
+  const keep = [];
+  for (let t = 0; t < pos.count / 3; t++) {
+    ea.fromBufferAttribute(pos, t * 3);
+    eb.fromBufferAttribute(pos, t * 3 + 1).sub(ea);
+    ec.fromBufferAttribute(pos, t * 3 + 2).sub(ea);
+    eb.cross(ec);
+    const area = eb.length();
+    if (area > 1e-7 && eb.y / area >= HIDDEN_Y) keep.push(t);
+  }
+  if (keep.length * 3 === pos.count) return g;
+  const out = new THREE.BufferGeometry();
+  for (const name of Object.keys(g.attributes)) {
+    const src = g.attributes[name];
+    const size = src.itemSize;
+    const data = new Float32Array(keep.length * 3 * size);
+    for (let k = 0; k < keep.length; k++) {
+      for (let j = 0; j < 3 * size; j++) data[k * 3 * size + j] = src.array[keep[k] * 3 * size + j];
+    }
+    out.setAttribute(name, new THREE.BufferAttribute(data, size));
+  }
+  g.dispose();
+  return out;
 }

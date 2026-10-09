@@ -153,10 +153,11 @@ export function createHud(root) {
       replay(flashEl, 'show');
     },
 
-    // html is a fixed string from main.js; '' hides the message.
-    message(html) {
+    // html is a fixed string from main.js; '' hides the message. cls is an
+    // extra class for the panel.
+    message(html, cls) {
       tallyCounts = null;
-      messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
+      messageEl.innerHTML = html ? `<div class="panel ${cls || ''}">${html}</div>` : '';
     },
 
     // The tally after a stage: a row per enemy kind that counts up.
@@ -184,11 +185,12 @@ export function createHud(root) {
       tallyPoints[row].textContent = points;
     },
 
-    tallyEnd(total, bonus) {
+    // next: the hint under the tally, a fixed string from main.js.
+    tallyEnd(total, bonus, next) {
       if (!tallyCounts) return;
       tallyTotal.textContent = total;
       tallyBonus.textContent = bonus > 0 ? `NO HITS TAKEN +${bonus}` : '';
-      tallyNext.textContent = 'Press A to continue';
+      tallyNext.innerHTML = next;
     },
   };
 }

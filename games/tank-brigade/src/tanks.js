@@ -47,6 +47,8 @@ const SLIDE_TIME = 0.34; // how long a tank keeps sliding on ice
 const CLEATS = 5; // per track
 const EPS = 1e-4;
 const MUZZLE = 0.45; // where shells leave the barrel, from the tank's centre
+const AIM_DELAY = 0.25; // how quickly a sharpshooter fires once you line up
+const AIM_REACH = 7;
 const CARRIER_HEX = 0xff3d2e;
 const FROZEN_HEX = 0xa8e6ff;
 
@@ -227,23 +229,62 @@ export function createTanks(scene, field, bullets, fx) {
     return false;
   }
 
+  // The grid line to line up on along one axis: the nearest one, else the one
+  // on the other side, else none (v itself) when another tank stands on both.
+  // Either line keeps the tank on cells it already covers, so never in a wall.
+  function lineUp(t, v, horizontal) {
+    const near = snap(v);
+    const far = near + (near > v ? -CELL : CELL);
+    if (!(horizontal ? overlapsTank(t, near, t.z) : overlapsTank(t, t.x, near))) return near;
+    if (!(horizontal ? overlapsTank(t, far, t.z) : overlapsTank(t, t.x, far))) return far;
+    return v;
+  }
+
   // Faces a new direction. A quarter turn first lines the tank up with the
   // cell grid, which is what lets it slip into a one-tile corridor.
   function turn(t, dir) {
     if (dir === t.dir) return;
     if ((dir & 1) !== (t.dir & 1)) {
       if (DIR_X[t.dir] !== 0) {
-        let nx = snap(t.x);
-        if (overlapsTank(t, nx, t.z)) nx += nx > t.x ? -CELL : CELL;
+        const nx = lineUp(t, t.x, true);
         t.ox += t.x - nx;
         t.x = nx;
       } else {
-        let nz = snap(t.z);
-        if (overlapsTank(t, t.x, nz)) nz += nz > t.z ? -CELL : CELL;
+        const nz = lineUp(t, t.z, false);
         t.oz += t.z - nz;
         t.z = nz;
       }
     }
+    t.dir = dir;
+  }
+
+  // The player's tank up against the corner of a wall, with the way open half
+  // a tile to one side, slides across into the gap instead of stopping dead.
+  function slideAround(t, dist) {
+    const horizontal = DIR_X[t.dir] !== 0;
+    const s = horizontal ? DIR_X[t.dir] : DIR_Z[t.dir];
+    const along = horizontal ? t.x : t.z;
+    const across = horizontal ? t.z : t.x;
+    const edge = along + s * TANK_R;
+    const ahead = s > 0 ? toCell(edge + EPS) : toCell(edge - EPS);
+    const near = snap(across);
+    const lined = Math.abs(near - across) < EPS;
+    const lo = lined ? across - CELL : near > across ? near - CELL : near;
+    const hi = lined ? across + CELL : lo + CELL;
+    // The grid line to slide to: the way ahead of it must be open.
+    let goal = NaN;
+    for (let k = 0; k < 2 && Number.isNaN(goal); k++) {
+      const g = (k === 0) === (hi - across < across - lo) ? hi : lo;
+      let open = true;
+      for (let a = toCell(g - TANK_R + EPS); a <= toCell(g + TANK_R - EPS) && open; a++) {
+        if (horizontal ? field.blocks(ahead, a) : field.blocks(a, ahead)) open = false;
+      }
+      if (open) goal = g;
+    }
+    if (Number.isNaN(goal)) return;
+    const dir = t.dir;
+    t.dir = horizontal ? (goal > across ? DOWN : UP) : goal > across ? RIGHT : LEFT;
+    move(t, Math.min(dist, Math.abs(goal - across)));
     t.dir = dir;
   }
 
@@ -285,13 +326,22 @@ export function createTanks(scene, field, bullets, fx) {
       d = prey && r < 0.7 ? toward(t, prey.x, prey.z) : Math.floor(Math.random() * 4);
     } else if (r < o.coreBias) {
       d = toward(t, field.coreX, field.coreZ);
-    } else if (r < o.coreBias + 0.22 && player.live) {
+    } else if (r < o.coreBias + o.hunt && player.live) {
       d = toward(t, player.x, player.z);
     } else {
       d = Math.floor(Math.random() * 4);
     }
     if (blocked && d === t.dir) d = (d + (Math.random() < 0.5 ? 1 : 3)) % 4;
     turn(t, d);
+  }
+
+  // True if the player's tank is lined up in front of t, within reach.
+  function playerAhead(t, reach) {
+    if (!player.live) return false;
+    const dx = player.x - t.x;
+    const dz = player.z - t.z;
+    if (DIR_X[t.dir] !== 0) return Math.abs(dz) < 0.45 && dx * DIR_X[t.dir] > 0 && Math.abs(dx) < reach;
+    return Math.abs(dx) < 0.45 && dz * DIR_Z[t.dir] > 0 && Math.abs(dz) < reach;
   }
 
   // An enemy lined up with t, within reach and in front of it, or null.
@@ -346,6 +396,9 @@ export function createTanks(scene, field, bullets, fx) {
       if (preyAhead(t)) t.fireT = Math.min(t.fireT, 0);
     }
 
+    // Sharpshooters fire as soon as the player lines up in front of them.
+    if (t.enemy && o.aim && t.fireT > AIM_DELAY && playerAhead(t, AIM_REACH)) t.fireT = AIM_DELAY;
+
     t.fireT -= dt;
     if (t.fireT <= 0) {
       t.fireT = o.fireMin + Math.random() * o.fireRange;
@@ -357,6 +410,7 @@ export function createTanks(scene, field, bullets, fx) {
   const tanks = {
     list,
     player,
+    onFire: null, // called with the tank whenever one fires
 
     reset() {
       for (let i = 0; i < MAX; i++) {
@@ -426,7 +480,7 @@ export function createTanks(scene, field, bullets, fx) {
       const speed = KINDS[t.kind].speed;
       if (dir >= 0) {
         turn(t, dir);
-        move(t, speed * dt);
+        if (move(t, speed * dt) === 1) slideAround(t, speed * dt);
         t.moving = true;
         t.tread += speed * dt;
         t.slide = field.isIce(t.x, t.z) ? SLIDE_TIME : 0;
@@ -448,10 +502,11 @@ export function createTanks(scene, field, bullets, fx) {
       if (!bullets.fire(t.index, t.enemy, x, z, t.dir, speed, power)) return false;
       t.recoil = 1;
       fx.muzzle(t.x + DIR_X[t.dir] * 0.66, 0.37, t.z + DIR_Z[t.dir] * 0.66);
+      if (tanks.onFire) tanks.onFire(t);
       return true;
     },
 
-    // o: { frozen, demo, speedMul, shellMul, fireMin, fireRange, coreBias, blast }.
+    // o: { frozen, demo, speedMul, shellMul, fireMin, fireRange, coreBias, hunt, aim, blast }.
     update(dt, o) {
       clock += dt;
       for (let i = 0; i < MAX; i++) {

@@ -480,8 +480,82 @@ body.handheld #legend {
   color: #d8e2d6;
 }
 
-.panel .choice {
+/* Menu rows: the chosen one is lit and marked with arrows at both ends. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 2px;
+}
+
+.menu .item {
+  padding: 2px 14px;
+  border-radius: 8px;
+  font-size: 24px;
+  letter-spacing: 1px;
+  color: #cfd8c4;
+}
+
+.menu .item b {
+  display: inline-block;
+  min-width: 46px;
   color: #9fe8ff;
+}
+
+.menu .item.sel {
+  background: rgba(242, 197, 61, 0.26);
+  color: #fff;
+}
+
+.menu .item.sel::before {
+  content: '▶ ';
+  color: #ffd84a;
+}
+
+.menu .item.sel::after {
+  content: ' ◀';
+  color: #ffd84a;
+}
+
+.panel.title-panel {
+  gap: 8px;
+}
+
+.panel.title-panel .menu {
+  gap: 2px;
+}
+
+/* A button name, drawn like the button. */
+.key {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #b8862a;
+  color: #fff;
+  font-size: 0.9em;
+  line-height: 1.35;
+  text-shadow: none;
+}
+
+/* Button hints: big enough that the button caps stay readable. */
+.panel .small.keys,
+.tally #t-next {
+  font-size: 20px;
+}
+
+.panel .big-score {
+  font-size: 52px;
+  line-height: 1;
+  color: #fff;
+}
+
+.panel.record {
+  box-shadow: 0 0 0 3px #8dff86, 0 0 24px rgba(141, 255, 134, 0.45);
+}
+
+.panel.record .title {
+  color: #8dff86;
 }
 
 /* The stage tally: one row per enemy kind. */

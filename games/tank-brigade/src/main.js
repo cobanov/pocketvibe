@@ -4,15 +4,16 @@
 
 import * as THREE from 'three';
 import { createHandheld } from './handheld.js';
-import { BG, BRICK, DOWN, ENEMY_COLS, LEFT, PLAYER_COL, RIGHT, STEEL, TILES, UP, tileCenter } from './shared.js';
+import { BG, BRICK, DOWN, ENEMY_COLS, HALF, PLAYER_COL, STEEL, TILES, UP, tileCenter } from './shared.js';
 import { createWorld } from './world.js';
 import { HIT_BRICK, HIT_CLANK, HIT_CORE, HIT_STEEL, createField } from './field.js';
 import { createBullets } from './bullets.js';
 import { createFx } from './fx.js';
-import { ARMOUR, ARMOUR_HEX, KINDS, PLAYER, createTanks } from './tanks.js';
+import { ARMOUR, ARMOUR_HEX, KINDS, PLAYER, POWER, createTanks } from './tanks.js';
 import { BOMB, CLOCK, HELMET, POWERS, SHOVEL, STAR, TANK, createPowerups } from './powerups.js';
 import { createHud } from './hud.js';
 import { DEMO_STAGE, STAGES } from './stages.js';
+import { createSound } from './sound.js';
 
 const SAVE_KEY = 'tank-brigade';
 const WAVE = 20; // enemies per stage
@@ -33,6 +34,7 @@ const CLEAR_DELAY = 2.2; // after the last enemy, before the tally
 const LOST_DELAY = 2.8; // GAME OVER rises before the panel shows
 const TALLY_STEP = 0.07;
 const DEMO_RESET = 2.5;
+const ALARM_GAP = 4; // s between two core alarms
 // Gun levels (stars): shell speed, shells in flight, breaks steel at 3.
 const GUN_SPEED = [8, 12.5, 12.5, 12.5];
 const GUN_MAX = [1, 1, 2, 2];
@@ -70,6 +72,19 @@ const items = createPowerups(scene);
 const hud = createHud(hh.hud);
 const player = tanks.player;
 
+// Sound: every effect is a WAV in public/sfx/ made by tools/sfx/games/tank-brigade.py.
+const POWER_SOUNDS = ['star', 'helmet', 'clock', 'bomb', 'shovel', 'extra']; // by power-up kind
+const sound = createSound(hh, {
+  sfx: [
+    'engine', 'shot', 'enemy_shot', 'brick', 'steel', 'smash', 'edge', 'clash', 'armor', 'explode',
+    'player_boom', 'deflect', 'spawn', 'appear', ...POWER_SOUNDS, 'core', 'alarm', 'stage', 'clear',
+    'tick', 'bonus', 'over', 'record', 'move', 'select', 'back', 'pause',
+  ],
+  music: 'theme',
+});
+const engine = sound.loop('engine');
+let engineOn = false;
+
 let state = 'title'; // title | play | clear | tally | lost | over | paused
 let pausedFrom = 'play';
 let demo = true; // the title screen plays a battle by itself
@@ -90,6 +105,8 @@ let respawnT = 0;
 let freezeT = 0;
 let shovelT = 0;
 let wallKind = BRICK;
+let wallSeen = 0; // core wall cells standing, to notice a breach
+let alarmT = 0;
 let fireGap = 0;
 let holdA = 0;
 let demoT = 0;
@@ -100,6 +117,7 @@ let tallyCount = 0;
 let tallyT = 0;
 let tallyDone = false;
 let record = false;
+let menuSel = 0;
 const kills = new Int32Array(KINDS.length);
 const queue = new Int8Array(WAVE);
 const queueKey = new Float32Array(WAVE);
@@ -110,13 +128,23 @@ let wantDir = -1;
 const saved = hh.load(SAVE_KEY, null);
 let best = saved?.best || 0;
 // The furthest stage reached (1-based); the title lets you start from any
-// stage up to it.
+// stage up to it. bestStage is the furthest any game got, loops included.
 let reached = Math.max(1, Math.min(STAGES.length, Math.floor(saved?.stage) || 1));
-
-const HINT = 'D-pad move · A fire · START pause';
+let bestStage = Math.max(reached, Math.floor(saved?.bestStage) || 1);
 
 // Enemy AI settings, refreshed every stage.
-const ai = { frozen: false, demo: true, speedMul: 1, shellMul: 1, fireMin: 1, fireRange: 1.4, coreBias: 0.2, blast: 1 };
+const ai = {
+  frozen: false,
+  demo: true,
+  speedMul: 1,
+  shellMul: 1,
+  fireMin: 1,
+  fireRange: 1.4,
+  coreBias: 0.2,
+  hunt: 0.22,
+  aim: false,
+  blast: 1,
+};
 
 const screenPos = new THREE.Vector3();
 const spot = { x: 0, z: 0 };
@@ -135,8 +163,122 @@ function popAt(text, x, z, gold) {
 }
 
 function persist() {
-  hh.save(SAVE_KEY, { best, stage: reached });
+  hh.save(SAVE_KEY, { best, stage: reached, bestStage });
 }
+
+// A new best score (or stage) is kept even when the game is left from the
+// pause menu.
+function keepBest() {
+  if (demo) return false;
+  const isRecord = score > best;
+  if (isRecord) best = score;
+  bestStage = Math.max(bestStage, stage + 1);
+  persist();
+  return isRecord;
+}
+
+// ---------------------------------------------------------------- sound
+
+const wobble = () => 0.96 + Math.random() * 0.08;
+const panOf = (x) => (x / HALF) * 0.6;
+
+// A battle effect: silent behind the title, where only the music plays.
+function sfx(name, x, volume = 1, rate = wobble()) {
+  if (!demo) sound.play(name, { volume, rate, pan: panOf(x) });
+}
+
+// The player's engine idles while the tank stands and revs while it drives.
+function updateEngine() {
+  if (!demo && player.live && (state === 'play' || state === 'clear')) {
+    engine.set(player.moving ? 0.6 : 0.3, player.moving ? 1.12 : 0.88);
+    engineOn = true;
+  } else if (engineOn) {
+    engine.stop();
+    engineOn = false;
+  }
+}
+
+tanks.onFire = (t) => {
+  if (t.enemy) sfx('enemy_shot', t.x, 0.5, wobble() * (t.kind === POWER ? 1.12 : 1));
+};
+
+// ---------------------------------------------------------------- menus
+
+const ON_OFF = (on) => (on ? 'ON' : 'OFF');
+const KEY = (button) => `<span class="key">${button}</span>`;
+const PAUSE_ITEMS = ['resume', 'sound', 'music', 'quit'];
+const TITLE_ITEMS = ['play', 'sound', 'music'];
+const TITLE_STAGE_ITEMS = ['play', 'stage', 'sound', 'music'];
+const LABELS = {
+  play: () => 'PLAY',
+  stage: () => `STAGE <b>◀ ${startStage + 1} ▶</b>`,
+  resume: () => 'RESUME',
+  quit: () => 'QUIT TO TITLE',
+  sound: () => `SOUND <b>${ON_OFF(sound.sfxOn)}</b>`,
+  music: () => `MUSIC <b>${ON_OFF(sound.musicOn)}</b>`,
+};
+
+// The stage row shows once a later stage has been reached.
+function titleItems() {
+  return reached > 1 ? TITLE_STAGE_ITEMS : TITLE_ITEMS;
+}
+
+function menuRows(items) {
+  let html = '<div class="menu">';
+  for (let i = 0; i < items.length; i++) {
+    html += `<div class="item${i === menuSel ? ' sel' : ''}">${LABELS[items[i]]()}</div>`;
+  }
+  return html + '</div>';
+}
+
+function bestLine() {
+  return best > 0 ? `<div class="small">Best ${best} · Stage ${bestStage}</div>` : '';
+}
+
+function showTitle() {
+  hud.message(
+    `<div class="title">TANK BRIGADE</div>` +
+      menuRows(titleItems()) +
+      bestLine() +
+      `<div class="small keys">D-pad drive · ${KEY('A')} fire · ${KEY('START')} pause</div>`,
+    'title-panel',
+  );
+}
+
+function showPause() {
+  hud.message(
+    `<div class="title">PAUSED</div>` +
+      menuRows(PAUSE_ITEMS) +
+      `<div class="small keys">${KEY('A')} select · ${KEY('B')} or ${KEY('START')} resume</div>`,
+  );
+}
+
+// Up / down moves through the items; returns the item A chose, 'left' or
+// 'right' for the stage row, 'redraw' after a move, or null. Left / right
+// also flip a toggle.
+function menuInput(items) {
+  const dy = input.pressed('DOWN') ? 1 : input.pressed('UP') ? -1 : 0;
+  if (dy) {
+    menuSel = (menuSel + dy + items.length) % items.length;
+    sound.play('move');
+    return 'redraw';
+  }
+  const item = items[menuSel];
+  const left = input.pressed('LEFT');
+  const right = input.pressed('RIGHT');
+  if (item === 'stage' && (left || right)) return left ? 'left' : 'right';
+  if (((left || right) && (item === 'sound' || item === 'music')) || input.pressed('A')) return item;
+  return null;
+}
+
+function toggle(item) {
+  if (item === 'sound') sound.setSfx(!sound.sfxOn);
+  else sound.setMusic(!sound.musicOn);
+  // Heard only when effects are (still) on.
+  sound.play('select');
+}
+
+// ---------------------------------------------------------------- stages
 
 // Who comes in this stage, in order: mostly the easy ones first. Each loop
 // through the maps turns some basic and fast tanks into power and armoured.
@@ -180,7 +322,11 @@ function buildQueue() {
 }
 
 function setupAi() {
-  const s = demo ? 0 : stage % STAGES.length;
+  const def = stageDef();
+  const n = demo ? 0 : stage % STAGES.length;
+  // The first ten stages get harder a step at a time, the last five by half
+  // steps, so the final stages stay fair.
+  const s = n <= 9 ? n : 9 + (n - 9) * 0.5;
   const l = loopCount();
   ai.demo = demo;
   ai.frozen = false;
@@ -189,6 +335,8 @@ function setupAi() {
   ai.fireMin = Math.max(0.5, (1.7 - s * 0.1) * (1 - l * 0.12));
   ai.fireRange = Math.max(0.7, 2 - s * 0.12);
   ai.blast = Math.min(2.5, 0.8 + s * 0.15 + l * 0.4); // how keenly they shoot through bricks in their way
+  ai.hunt = def.hunt ?? 0.22;
+  ai.aim = Boolean(def.aim) || l > 0;
   spawnEvery = Math.max(1.1, 3.6 - s * 0.17 - l * 0.35);
 }
 
@@ -210,6 +358,8 @@ function loadStage(n) {
   freezeT = 0;
   shovelT = 0;
   wallKind = demo ? STEEL : BRICK;
+  wallSeen = field.wallLeft();
+  alarmT = 0;
   stageTime = 0;
   tookHit = false;
   demoT = 0;
@@ -218,7 +368,10 @@ function loadStage(n) {
   hud.callout('');
   if (!demo) {
     const def = stageDef();
-    hud.banner(`STAGE ${n + 1}`, loopCount() > 0 ? `${def.name} · tougher` : def.name);
+    const note = def.note ? ` · ${def.note}` : '';
+    hud.banner(`STAGE ${n + 1}`, loopCount() > 0 ? `${def.name} · tougher` : def.name + note);
+    sound.duck(false);
+    sound.play('stage', { delay: 0.15 });
     if (n + 1 > reached && n < STAGES.length) {
       reached = n + 1;
       persist();
@@ -226,26 +379,21 @@ function loadStage(n) {
   }
 }
 
-function showTitle() {
-  hud.message(
-    `<div class="title">TANK BRIGADE</div>` +
-      `<div>Press A to start</div>` +
-      (reached > 1 ? `<div class="choice">◀ STAGE ${startStage + 1} ▶</div>` : '') +
-      `<div class="small">${HINT}</div>` +
-      (best > 0 ? `<div class="small">Best ${best}</div>` : ''),
-  );
-}
+// ---------------------------------------------------------------- states
 
 function toTitle() {
   state = 'title';
   demo = true;
   titleTime = 0;
   shake = 0;
+  menuSel = 0;
   hud.paused(false);
   hud.showStats(false);
   hud.banner('');
   startStage = Math.min(startStage, reached - 1);
   loadStage(0);
+  sound.duck(false);
+  sound.startMusic();
   showTitle();
 }
 
@@ -259,19 +407,36 @@ function start() {
   shake = 0;
   hud.message('');
   hud.showStats(true);
+  sound.startMusic();
   loadStage(startStage);
 }
 
 function pause() {
   pausedFrom = state;
   state = 'paused';
+  menuSel = 0;
   hud.paused(true);
-  hud.message(`<div class="title">PAUSED</div><div>Press START to resume</div><div class="small">B quit to title</div>`);
+  sound.play('pause');
+  sound.duck(true);
+  showPause();
+}
+
+function resume() {
+  state = pausedFrom;
+  hud.paused(false);
+  hud.message('');
+  // Under GAME OVER the music stays down.
+  sound.duck(state === 'lost');
 }
 
 function spawnPlayer() {
-  const t = tanks.spawn(0, PLAYER, tileCenter(PLAYER_COL), tileCenter(TILES - 1), UP, false);
+  const x = tileCenter(PLAYER_COL);
+  const z = tileCenter(TILES - 1);
+  // Never on top of an enemy parked there: wait until it moves on.
+  if (!tanks.spotFree(x, z)) return;
+  const t = tanks.spawn(0, PLAYER, x, z, UP, false);
   t.shield = SPAWN_SHIELD;
+  sfx('spawn', x, 0.7, 1.25);
 }
 
 // Enemies come in one by one at the three spawn points, up to four at once.
@@ -285,6 +450,7 @@ function updateWave(dt) {
     const z = tileCenter(0);
     if (!tanks.spotFree(x, z)) continue;
     tanks.spawn(tanks.freeSlot(), queue[spawned], x, z, DOWN, CARRIERS.indexOf(spawned) >= 0);
+    sfx('spawn', x, 0.45);
     spawnPoint = (p + 1) % ENEMY_COLS.length;
     spawned++;
     // The first three come in quickly, the rest at the stage's pace.
@@ -301,6 +467,7 @@ function dropPower() {
   field.itemSpot(spot);
   items.spawn(kind, spot.x, spot.z);
   fx.ring(spot.x, spot.z, 0xffd25a, 1.4);
+  sfx('appear', spot.x, 0.8, 1);
 }
 
 function applyPower(kind) {
@@ -308,6 +475,7 @@ function applyPower(kind) {
   const z = items.z;
   fx.ring(x, z, 0xffe9a0, 1.6);
   fx.sparks(x, 0.5, z, 10, 0xffe45a);
+  sfx(POWER_SOUNDS[kind], x, 1, 1);
   if (!demo) {
     score += POWER_POINTS;
     popAt(`${POWER_POINTS}`, x, z, true);
@@ -328,6 +496,7 @@ function applyPower(kind) {
     shovelT = SHOVEL_TIME;
     wallKind = STEEL;
     field.setCoreWall(STEEL);
+    wallSeen = field.wallLeft();
   } else if (kind === TANK) {
     lives = Math.min(MAX_LIVES, lives + 1);
   }
@@ -342,6 +511,7 @@ function destroyEnemy(t, scored) {
   tanks.kill(t);
   destroyed++;
   shake = Math.max(shake, 0.18);
+  if (scored) sfx('explode', t.x, 0.9, wobble() * (t.kind === ARMOUR ? 0.85 : 1));
   if (scored && !demo) {
     const points = KINDS[t.kind].points;
     score += points;
@@ -361,6 +531,8 @@ function enemyHit(t) {
     fx.sparks(t.x, 0.45, t.z, 7, 0xffffff);
     fx.debris(t.x, 0.4, t.z, 3, tankHex(t), 3, 0.1);
     shake = Math.max(shake, 0.07);
+    // The armour rings lower as it cracks.
+    sfx('armor', t.x, 0.9, wobble() * (0.88 + t.hp * 0.06));
     return;
   }
   destroyEnemy(t, true);
@@ -369,11 +541,13 @@ function enemyHit(t) {
 function playerHit(t) {
   if (t.shield > 0) {
     fx.sparks(t.x, 0.45, t.z, 6, 0x9ff0ff);
+    sfx('deflect', t.x, 0.8);
     return;
   }
   fx.explode(t.x, t.z, 1.4, KINDS[PLAYER].color);
   tanks.kill(t);
   respawnT = RESPAWN_DELAY;
+  sfx('player_boom', t.x, 1, 1);
   if (demo || (state !== 'play' && state !== 'clear')) return;
   shake = 0.45;
   hud.hurt();
@@ -388,6 +562,7 @@ function coreHit() {
   fx.explode(field.coreX, field.coreZ, 2.2, 0x7ff0ff);
   fx.debris(field.coreX, 0.4, field.coreZ, 10, 0x9aa3ae, 5, 0.16);
   shake = 0.65;
+  sfx('core', field.coreX, 1, 1);
   if (demo) demoT = DEMO_RESET;
   else if (state === 'play' || state === 'clear') lose();
 }
@@ -397,22 +572,23 @@ function lose() {
   stateTime = 0;
   hud.callout('');
   hud.banner('GAME OVER', '', 'stay');
+  sound.duck(true);
+  sound.play('over', { delay: 0.9 });
 }
 
 function gameOver() {
   state = 'over';
   stateTime = 0;
-  record = score > best;
-  if (record) best = score;
-  persist();
+  record = keepBest();
   hud.banner('');
   hud.message(
     `<div class="title">${record ? 'NEW BEST!' : 'GAME OVER'}</div>` +
-      `<div>Score ${score}</div>` +
+      `<div class="big-score">${score}</div>` +
       `<div class="small">Stage ${stage + 1} · Best ${best}</div>` +
-      `<div>Press A to play again</div>` +
-      `<div class="small">B title</div>`,
+      `<div class="small keys">${KEY('A')} play again · ${KEY('B')} title</div>`,
+    record ? 'record' : '',
   );
+  if (record) sound.play('record');
 }
 
 function startTally() {
@@ -424,6 +600,7 @@ function startTally() {
   tallyDone = false;
   bullets.clear();
   items.clear();
+  sound.duck(true);
   hud.tally(stage + 1, POINTS);
 }
 
@@ -431,7 +608,8 @@ function finishTally() {
   for (let k = 1; k < KINDS.length; k++) hud.tallyRow(k - 1, kills[k], kills[k] * POINTS[k]);
   const bonus = tookHit ? 0 : NO_HIT_BONUS;
   score += bonus;
-  hud.tallyEnd(kills[1] + kills[2] + kills[3] + kills[4], bonus);
+  hud.tallyEnd(kills[1] + kills[2] + kills[3] + kills[4], bonus, `${KEY('A')} next stage`);
+  sound.play(bonus > 0 ? 'bonus' : 'tick', { rate: bonus > 0 ? 1 : 0.8 });
   tallyDone = true;
   stateTime = 0;
 }
@@ -457,6 +635,8 @@ function updateTally(dt) {
   if (tallyCount < kills[tallyKind]) {
     tallyCount++;
     hud.tallyRow(tallyKind - 1, tallyCount, tallyCount * POINTS[tallyKind]);
+    // Each row ticks a little higher than the one before.
+    sound.play('tick', { volume: 0.7, rate: 0.9 + tallyKind * 0.08 });
     return;
   }
   hud.tallyRow(tallyKind - 1, tallyCount, tallyCount * POINTS[tallyKind]);
@@ -491,32 +671,52 @@ function updatePlayer(dt) {
     if (tanks.fire(player, GUN_SPEED[gun], gun === 3, GUN_MAX[gun])) {
       fireGap = FIRE_GAP;
       holdA = 0;
+      // A bigger gun barks a little higher.
+      sfx('shot', player.x, 0.85, wobble() * (1 + gun * 0.05));
     }
   }
   const kind = items.pick(player.x, player.z);
   if (kind >= 0) applyPower(kind);
 }
 
-// Bullet results, reported by bullets.update.
+// A shell broke into the core's wall: an enemy one sounds the alarm.
+function checkWall(b) {
+  const left = field.wallLeft();
+  if (left < wallSeen && b.enemy && alarmT <= 0 && state === 'play') {
+    sfx('alarm', field.coreX, 0.8, 1);
+    alarmT = ALARM_GAP;
+  }
+  wallSeen = left;
+}
+
+// Bullet results, reported by bullets.update. Enemy shells sound a little
+// quieter than yours.
 const events = {
   cell(b, result) {
+    const loud = b.enemy ? 0.6 : 0.85;
     if (result === HIT_BRICK) {
       fx.debris(b.x, 0.38, b.z, 5, BRICK_HEX, 3.2, 0.12);
       fx.puff(b.x, 0.3, b.z, 0.32);
       fx.pop(b.x, 0.36, b.z);
+      sfx('brick', b.x, loud);
+      checkWall(b);
     } else if (result === HIT_STEEL) {
       fx.debris(b.x, 0.38, b.z, 5, STEEL_HEX, 3.6, 0.12);
       fx.sparks(b.x, 0.38, b.z, 6, 0xffffff);
       shake = Math.max(shake, 0.06);
+      sfx('smash', b.x, 0.9);
+      checkWall(b);
     } else if (result === HIT_CLANK) {
       fx.sparks(b.x, 0.38, b.z, 5, 0xfff0b0);
       fx.pop(b.x, 0.36, b.z);
+      sfx('steel', b.x, loud * 0.85);
     } else if (result === HIT_CORE) {
       coreHit();
     }
   },
   edge(b) {
     fx.sparks(b.x, 0.38, b.z, 4, 0xe0e0e0);
+    sfx('edge', b.x, b.enemy ? 0.35 : 0.55);
   },
   tank(b, t) {
     if (t.enemy) enemyHit(t);
@@ -525,6 +725,7 @@ const events = {
   clash(a, b) {
     fx.sparks((a.x + b.x) * 0.5, 0.38, (a.z + b.z) * 0.5, 7, 0xffffff);
     fx.pop((a.x + b.x) * 0.5, 0.38, (a.z + b.z) * 0.5);
+    sfx('clash', a.x, 0.7);
   },
 };
 
@@ -534,8 +735,12 @@ function updateBattle(dt, spawning) {
   field.update(dt);
   ai.frozen = freezeT > 0;
   // Early on the enemies mostly wander; the longer a stage lasts, the more
-  // of them head for the core.
-  ai.coreBias = Math.min(0.5, 0.05 + stageTime / 200 + (demo ? 0 : (stage % STAGES.length) * 0.02 + loopCount() * 0.08));
+  // of them head for the core. A siege stage starts keener.
+  const def = stageDef();
+  ai.coreBias = Math.min(
+    0.55,
+    0.05 + stageTime / 200 + (def.siege || 0) + (demo ? 0 : (stage % STAGES.length) * 0.02 + loopCount() * 0.08),
+  );
   if (spawning) updateWave(dt);
 
   // Out of play the player's tank stands still (its tracks stop, no dust).
@@ -549,6 +754,7 @@ function updateBattle(dt, spawning) {
   bullets.update(dt, tanks.list, events);
   items.update(dt);
 
+  alarmT = Math.max(0, alarmT - dt);
   if (freezeT > 0) freezeT = Math.max(0, freezeT - dt);
   if (shovelT > 0) {
     shovelT = Math.max(0, shovelT - dt);
@@ -556,18 +762,76 @@ function updateBattle(dt, spawning) {
     if (kind !== wallKind) {
       wallKind = kind;
       field.setCoreWall(kind);
+      wallSeen = field.wallLeft();
     }
+  }
+}
+
+function updateTitle(dt) {
+  titleTime += dt;
+  if (input.pressed('START')) {
+    sound.play('select');
+    start();
+    return;
+  }
+  const item = menuInput(titleItems());
+  if (item === 'play' || item === 'stage') {
+    sound.play('select');
+    start();
+    return;
+  }
+  if (item === 'left' || item === 'right') {
+    startStage = (startStage + (item === 'left' ? reached - 1 : 1)) % reached;
+    sound.play('move', { rate: item === 'left' ? 0.94 : 1.06 });
+    showTitle();
+  } else if (item === 'sound' || item === 'music') {
+    toggle(item);
+    showTitle();
+  } else if (item === 'redraw') {
+    showTitle();
+  }
+  updateBattle(dt, true);
+  // The demo starts over once its wave is beaten or its core falls.
+  if (demoT === 0 && (destroyed >= WAVE || !field.coreAlive)) demoT = DEMO_RESET;
+  if (demoT > 0) {
+    demoT -= dt;
+    if (demoT <= 0) loadStage(0);
+  }
+}
+
+function updatePaused() {
+  if (input.pressed('START') || input.pressed('B')) {
+    sound.play('back');
+    resume();
+    return;
+  }
+  const item = menuInput(PAUSE_ITEMS);
+  if (item === 'resume') {
+    sound.play('select');
+    resume();
+  } else if (item === 'quit') {
+    sound.play('back');
+    keepBest();
+    toTitle();
+  } else if (item === 'sound' || item === 'music') {
+    toggle(item);
+    showPause();
+  } else if (item === 'redraw') {
+    showPause();
   }
 }
 
 // Loading: put one of every kind of object on screen (every tank kind with
 // the shield, a spawn twinkle, shells, an explosion, a power-up and the
-// wrecked core), compile every material and upload every geometry now, so
-// nothing stalls the first time it appears in play. toTitle() clears them.
+// wrecked core), compile every material and upload every geometry and the
+// brick texture now, so nothing stalls the first time it appears in play.
+// toTitle() clears them.
 function warmUp() {
   camera.position.set(0, CAM_Y, CAM_Z);
   camera.lookAt(0, 0, LOOK_Z);
   loadStage(0);
+  field.update(10); // the whole field risen, so its blocks are drawn too
+  renderer.initTexture(field.brickMap);
   for (let k = 0; k < KINDS.length; k++) {
     const t = tanks.spawn(k, k, tileCenter(2 + k * 2), tileCenter(6), UP, false);
     t.spawnT = 0;
@@ -589,6 +853,12 @@ function warmUp() {
   tanks.list[1].spawnT = 0.5;
   tanks.draw(0, false);
   renderer.render(scene, camera);
+  // The other power-up icons.
+  for (let k = 0; k < POWERS.length; k++) {
+    if (k === STAR) continue;
+    items.spawn(k, 0, tileCenter(4));
+    renderer.render(scene, camera);
+  }
 }
 
 warmUp();
@@ -598,22 +868,7 @@ hh.run((dt) => {
   if (state !== 'paused') stateTime += dt;
 
   if (state === 'title') {
-    titleTime += dt;
-    if (input.pressed('A') || input.pressed('START')) {
-      start();
-    } else {
-      if (reached > 1 && (input.pressed('LEFT') || input.pressed('RIGHT'))) {
-        startStage = (startStage + (input.pressed('LEFT') ? reached - 1 : 1)) % reached;
-        showTitle();
-      }
-      updateBattle(dt, true);
-      // The demo starts over once its wave is beaten or its core falls.
-      if (demoT === 0 && (destroyed >= WAVE || !field.coreAlive)) demoT = DEMO_RESET;
-      if (demoT > 0) {
-        demoT -= dt;
-        if (demoT <= 0) loadStage(0);
-      }
-    }
+    updateTitle(dt);
   } else if (state === 'play' || state === 'clear') {
     if (input.pressed('START')) {
       pause();
@@ -623,6 +878,7 @@ hh.run((dt) => {
       if (state === 'play' && destroyed >= WAVE) {
         state = 'clear';
         stateTime = 0;
+        sound.play('clear', { delay: 0.5 });
       } else if (state === 'clear' && stateTime > CLEAR_DELAY) {
         startTally();
       }
@@ -635,18 +891,17 @@ hh.run((dt) => {
     field.update(dt);
     updateTally(dt);
   } else if (state === 'paused') {
-    if (input.pressed('START')) {
-      state = pausedFrom;
-      hud.paused(false);
-      hud.message('');
-    } else if (input.pressed('B')) {
-      toTitle();
-    }
+    updatePaused();
   } else if (state === 'over') {
     updateBattle(dt, false);
     // A short delay so a button mashed while losing does not restart at once.
-    if (stateTime > 0.6 && input.pressed('A')) start();
-    else if (stateTime > 0.6 && input.pressed('B')) toTitle();
+    if (stateTime > 0.6 && input.pressed('A')) {
+      sound.play('select');
+      start();
+    } else if (stateTime > 0.6 && input.pressed('B')) {
+      sound.play('back');
+      toTitle();
+    }
   }
 
   if (state !== 'paused') {
@@ -654,6 +909,7 @@ hh.run((dt) => {
     fx.update(dt);
     shake = Math.max(0, shake - dt);
   }
+  updateEngine();
 
   if (!demo) {
     hud.score(score);
@@ -675,3 +931,33 @@ hh.run((dt) => {
 
   renderer.render(scene, camera);
 });
+
+if (import.meta.env.DEV) {
+  // For headless checks: the scene, the game's parts and its state.
+  window.__tb = {
+    THREE, scene, camera, renderer, field, tanks, bullets, items, fx, sound, player, ai,
+    get state() { return state; },
+    get stage() { return stage; },
+    get lives() { return lives; },
+    get score() { return score; },
+    get gun() { return gun; },
+    get destroyed() { return destroyed; },
+    get spawned() { return spawned; },
+    get menuSel() { return menuSel; },
+    get engineOn() { return engineOn; },
+    set lives(n) { lives = n; },
+    // Starts a game at stage n (0-based).
+    go(n) { startStage = n; start(); },
+    // Destroys every enemy on the field and all still to come but one.
+    clearStage() {
+      for (let i = 1; i < tanks.list.length; i++) if (tanks.list[i].live) destroyEnemy(tanks.list[i], true);
+      spawned = Math.max(spawned, WAVE - 1);
+      destroyed = Math.max(destroyed, WAVE - 1 - tanks.enemies());
+    },
+    // Drops a power-up just ahead of the player.
+    drop(kind) { items.spawn(kind, player.x, player.z - 1.5); },
+    hitCore() { coreHit(); },
+    power(kind) { applyPower(kind); },
+    reach(n) { reached = n; persist(); },
+  };
+}

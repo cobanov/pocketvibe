@@ -128,9 +128,12 @@ export function tankGeometry(kind) {
   return merge(TANK_PARTS[kind]());
 }
 
-// One track cleat, run along the top of a tread.
+// One track cleat, run along the top of a tread: a flat bar, seen from above.
 export function cleatGeometry() {
-  return box(1, 0.035, 0.07, 0, 0, 0, 0x55585e);
+  const g = new THREE.PlaneGeometry(1, 0.07);
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, 0.0175, 0);
+  return paint(g, 0x55585e);
 }
 
 // A shell pointing along -z.
@@ -140,57 +143,142 @@ export function shellGeometry() {
   return g;
 }
 
-// The brickwork of one cell: two courses, each split into two bricks, the
-// top course turned across the lower one. The gaps read as mortar.
-export function brickGeometry() {
-  const low = 0xa8a8a8;
-  return merge([
-    box(0.23, 0.235, 0.47, -0.122, 0.118, 0, low, 0xc4c4c4),
-    box(0.23, 0.235, 0.47, 0.122, 0.118, 0, low, 0xc4c4c4),
-    box(0.47, 0.235, 0.23, 0, 0.372, -0.122, SIDE, DECK),
-    box(0.47, 0.235, 0.23, 0, 0.372, 0.122, SIDE, DECK),
-  ]);
+// Faces of a BoxGeometry, in its index order: +x, -x, top, bottom, front
+// (+z), back (-z), six indices each.
+const FACE_PX = 0;
+const FACE_NX = 1;
+const FACE_TOP = 2;
+const FACE_FRONT = 4;
+
+// A box with only the faces the camera can see. Field blocks are never
+// turned, and the camera always looks at them from the front and above, so
+// their bottom and back never show.
+function openBox(w, h, d, x, y, z, hex, topHex, faces = [FACE_PX, FACE_NX, FACE_TOP, FACE_FRONT]) {
+  const g = box(w, h, d, x, y, z, hex, topHex);
+  const index = [];
+  for (const f of faces) for (let k = 0; k < 6; k++) index.push(g.index.getX(f * 6 + k));
+  g.setIndex(index);
+  return g;
+}
+
+// The brickwork of one cell: two courses of two bricks each, the top course
+// turned across the lower one, drawn as one block with the mortar joints in
+// a texture (brickTexture). Variant 1 is the same block turned a quarter, so
+// neighbouring cells alternate like laid brickwork. The gaps between cells
+// are real.
+const BRICK_W = 0.474;
+const BRICK_H = 0.49;
+
+export function brickGeometry(variant) {
+  const g = openBox(BRICK_W, BRICK_H, BRICK_W, 0, BRICK_H / 2, 0, SIDE, DECK);
+  // Each face shows one 32 x 32 quarter of the texture; a small inset keeps
+  // the neighbouring quarter from bleeding in.
+  const front = variant ? [0.5, 0.5] : [0, 0.5]; // lower course split, upper whole, or the other way
+  const sides = variant ? [0, 0.5] : [0.5, 0.5];
+  const top = variant ? [0.5, 0] : [0, 0]; // the joint along x, or along z
+  const regions = [sides, sides, top, null, front, null];
+  const uv = g.attributes.uv;
+  const inset = 0.6 / 64;
+  for (let f = 0; f < 6; f++) {
+    const r = regions[f];
+    if (!r) continue;
+    for (let k = 0; k < 4; k++) {
+      const i = f * 4 + k;
+      uv.setXY(i, r[0] + inset + uv.getX(i) * (0.5 - 2 * inset), r[1] + inset + uv.getY(i) * (0.5 - 2 * inset));
+    }
+  }
+  return g;
+}
+
+// The mortar for brickGeometry, as a 64 x 64 grey map that darkens the
+// joints (the brick colour comes from the instance). Quarters: lower course
+// split / upper whole (u 0..0.5, v 0.5..1), lower whole / upper split
+// (u 0.5..1, v 0.5..1), top joint along x (u 0..0.5, v 0..0.5), top joint
+// along z (u 0.5..1, v 0..0.5).
+export function brickTexture() {
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+  const MORTAR = 40;
+  const EDGE = 176;
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      const qx = col >> 5;
+      const qy = row >> 5;
+      const x = col & 31;
+      const y = row & 31;
+      let v = 255;
+      if (qy === 1) {
+        // A side face: two courses, the lower a little darker.
+        const lower = y < 16;
+        const split = lower === (qx === 0);
+        if (lower) v = 238;
+        if (y === 15 || y === 16) v = y === 16 ? MORTAR : 130;
+        else if (split && (x === 15 || x === 16)) v = x === 16 ? MORTAR : 130;
+        // A slight variation between the two bricks of a split course.
+        else if (split && x > 16) v -= 14;
+      } else {
+        // The top: two bricks side by side.
+        const across = qx === 0 ? y : x;
+        if (across === 15 || across === 16) v = across === 16 ? MORTAR : 130;
+        else if (across > 16) v -= 12;
+      }
+      // Rounded-off brick edges at the block's rim.
+      if (x === 0 || y === 0 || x === 31 || y === 31) v = Math.min(v, EDGE);
+      const o = (row * size + col) * 4;
+      data[o] = data[o + 1] = data[o + 2] = v;
+      data[o + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, size, size);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 // A steel block with a raised plate and a bolt.
 export function steelGeometry() {
   return merge([
-    box(0.48, 0.44, 0.48, 0, 0.22, 0, 0x9c9c9c, 0xcfcfcf),
-    box(0.34, 0.05, 0.34, 0, 0.465, 0, 0xc8c8c8, DECK),
-    box(0.1, 0.03, 0.1, 0, 0.5, 0, 0x8a8a8a),
+    openBox(0.48, 0.44, 0.48, 0, 0.22, 0, 0x9c9c9c, 0xcfcfcf),
+    openBox(0.34, 0.05, 0.34, 0, 0.465, 0, 0xc8c8c8, DECK),
+    openBox(0.1, 0.03, 0.1, 0, 0.5, 0, 0x8a8a8a, undefined, [FACE_TOP, FACE_FRONT]),
   ]);
 }
 
-// A floor tile: a slab with its top at y = 0.
+// A floor tile: a slab with its top at y = 0. Only its top and its front
+// show (the front where water lies in front of it).
 export function floorGeometry() {
-  const g = new THREE.BoxGeometry(1, FLOOR_H, 1);
-  g.translate(0, -FLOOR_H / 2, 0);
-  return paintTop(g, DECK, 0x6a6a6a);
+  return openBox(1, FLOOR_H, 1, 0, -FLOOR_H / 2, 0, 0x6a6a6a, DECK, [FACE_TOP, FACE_FRONT]);
 }
 
-// A tile of trees: a clump over every cell and two on top, high enough to
-// hide a tank driving under them.
+// A tile of trees: a clump over every cell, of different heights, high
+// enough to hide a tank driving under them.
 export function treesGeometry() {
   const greens = [0x2f8c3c, 0x3ea34a, 0x4fb653, 0x5cc35a];
+  const lift = [0.04, 0.12, 0.0, 0.08];
   const parts = [];
   for (let k = 0; k < 4; k++) {
     const x = k % 2 ? 0.25 : -0.25;
     const z = k < 2 ? -0.25 : 0.25;
-    parts.push(blob(0.32, 1, 0.72, 1, x, 0.66, z, greens[k]));
+    const g = blob(0.35, 1, 0.78, 1, 0, 0, 0, greens[k]);
+    g.rotateY(k * 1.3); // the clumps' facets point different ways
+    g.translate(x, 0.68 + lift[k], z);
+    parts.push(g);
   }
-  parts.push(blob(0.26, 1, 0.8, 1, -0.1, 0.86, -0.06, greens[3]));
-  parts.push(blob(0.22, 1, 0.8, 1, 0.16, 0.84, 0.14, greens[2]));
   return merge(parts);
 }
 
-// Glints scratched into an ice tile.
+// Glints scratched into an ice tile: two flat strokes.
 export function glintGeometry() {
-  const a = new THREE.BoxGeometry(0.5, 0.01, 0.045);
+  const a = new THREE.PlaneGeometry(0.5, 0.045);
+  a.rotateX(-Math.PI / 2);
   a.rotateY(0.7);
-  a.translate(-0.12, 0.006, 0.12);
-  const b = new THREE.BoxGeometry(0.26, 0.01, 0.04);
+  a.translate(-0.12, 0.011, 0.12);
+  const b = new THREE.PlaneGeometry(0.26, 0.04);
+  b.rotateX(-Math.PI / 2);
   b.rotateY(0.7);
-  b.translate(0.22, 0.006, -0.2);
+  b.translate(0.22, 0.011, -0.2);
   return merge([paint(a, 0xffffff), paint(b, 0xffffff)]);
 }
 
@@ -305,8 +393,16 @@ function shovelIcon() {
   return parts;
 }
 
+// A little player tank: tracks, hull, turret and gun.
 function tankIcon() {
-  const parts = playerTank();
+  const t = TREADS[0];
+  const parts = [
+    box(t.w, t.h, t.len, -t.x, t.h / 2, 0, TREAD),
+    box(t.w, t.h, t.len, t.x, t.h / 2, 0, TREAD),
+    box(0.48, 0.18, 0.84, 0, 0.2, 0.02, SIDE, DECK),
+    cylinder(0.2, 0.23, 0.14, 8, 0, 0.29, 0.06, SIDE, DECK),
+    barrel(0.05, 0.42, 0, 0.36, -0.1, GUN),
+  ];
   for (let i = 0; i < parts.length; i++) {
     parts[i].scale(0.52, 0.52, 0.52);
     tint(parts[i], 0xf2c53d);

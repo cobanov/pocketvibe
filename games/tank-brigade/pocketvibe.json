@@ -2,14 +2,14 @@
   "id": "tank-brigade",
   "title": "Tank Brigade",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Guard your energy core in a top-down tank battle: blast through brick walls, grab power-ups from flashing tanks and hold out against twenty enemy tanks on each of ten stages.",
+  "version": "1.2.0",
+  "description": "Guard your energy core in a top-down tank battle: blast through brick walls, grab power-ups from flashing tanks and hold out against twenty enemy tanks on each of fifteen stages, some of them hunters or sharpshooters.",
   "genre": "Shooter",
   "controls": {
-    "D-pad": "Drive (on the title: choose a stage)",
-    "A": "Fire (hold for auto fire); start / play again",
-    "B": "Back to title (paused or game over)",
-    "START": "Pause / resume"
+    "D-pad": "Drive (menus: choose; on the title, ◀ ▶ pick the start stage)",
+    "A": "Fire (hold for auto fire) / select",
+    "B": "Resume (paused) / back to title (game over)",
+    "START": "Pause menu / resume"
   },
   "responsive": true
 }

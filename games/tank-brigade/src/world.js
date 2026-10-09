@@ -41,10 +41,19 @@ function sandbags(len) {
     const n = Math.round(len / 0.5) - row;
     for (let i = 0; i < n; i++) {
       const x = -len / 2 + 0.25 + i * 0.5 + row * 0.25;
-      parts.push(blob(0.3, 0.85, 0.42, 0.55, x, 0.12 + row * 0.22, 0, row ? 0xc9b07a : 0xb59c66));
+      // The lower row hides behind the upper one: plain pillows will do there.
+      if (row) parts.push(blob(0.3, 0.85, 0.42, 0.55, x, 0.34, 0, 0xc9b07a));
+      else parts.push(pillow(x, 0xb59c66));
     }
   }
   return parts;
+}
+
+function pillow(x, hex) {
+  const g = new THREE.OctahedronGeometry(0.3, 0);
+  g.scale(0.85, 0.42, 0.55);
+  g.translate(x, 0.12, 0);
+  return paint(g, hex);
 }
 
 function crate(s) {
@@ -55,12 +64,14 @@ function crate(s) {
   ];
 }
 
+function band(y) {
+  const g = new THREE.CylinderGeometry(0.235, 0.235, 0.06, 8, 1, true);
+  g.translate(0, y + 0.03, 0);
+  return paint(g, 0x2a2a2a);
+}
+
 function barrel(hex) {
-  return [
-    cylinder(0.22, 0.22, 0.6, 8, 0, 0, 0, hex, 0xdedede),
-    cylinder(0.235, 0.235, 0.06, 8, 0, 0.16, 0, 0x2a2a2a),
-    cylinder(0.235, 0.235, 0.06, 8, 0, 0.42, 0, 0x2a2a2a),
-  ];
+  return [cylinder(0.22, 0.22, 0.6, 8, 0, 0, 0, hex, 0xdedede), band(0.16), band(0.42)];
 }
 
 // A Czech hedgehog: three crossed steel beams.
@@ -86,10 +97,12 @@ function tent() {
 }
 
 function pine(s) {
+  const trunk = new THREE.CylinderGeometry(0.1, 0.14, 0.4, 4, 1, true);
+  trunk.translate(0, 0.2, 0);
   return [
-    cylinder(0.1, 0.14, 0.4, 5, 0, 0, 0, 0x6b4a2e),
-    cylinder(0, 0.62, 0.9, 7, 0, 0.3, 0, 0x2f7a3c),
-    cylinder(0, 0.45, 0.75, 7, 0, 0.8, 0, 0x3c9149),
+    paint(trunk, 0x6b4a2e),
+    cylinder(0, 0.62, 0.9, 6, 0, 0.3, 0, 0x2f7a3c),
+    cylinder(0, 0.45, 0.75, 6, 0, 0.8, 0, 0x3c9149),
   ].map((g) => g.scale(s, s, s));
 }
 
@@ -99,6 +112,14 @@ function bush() {
 
 function rock() {
   return [blob(0.32, 1.3, 0.6, 1, 0, 0.1, 0, rand() < 0.5 ? 0x8a8c86 : 0x9c9e96)];
+}
+
+// A hazard stripe painted on top of the rim.
+function stripe(w, d, x, z, hex) {
+  const g = new THREE.PlaneGeometry(w, d);
+  g.rotateX(-Math.PI / 2);
+  g.translate(x, RIM_H + 0.004, z);
+  return paint(g, hex);
 }
 
 export function createWorld(scene) {
@@ -111,7 +132,7 @@ export function createWorld(scene) {
   parts.push(paint(ground, GROUND));
 
   // Darker patches of trodden earth.
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < 12; i++) {
     const x = (rand() < 0.5 ? -1 : 1) * (8 + rand() * 7);
     const z = -14 + rand() * 24;
     const g = new THREE.CircleGeometry(0.8 + rand() * 1.4, 7);
@@ -134,10 +155,10 @@ export function createWorld(scene) {
   for (let i = 0; i < stripes; i++) {
     const hex = i % 2 ? STRIPE_B : STRIPE_A;
     const a = -outer + (i + 0.5) * step;
-    parts.push(box(step, 0.03, RIM_W * 0.5, a, RIM_H + 0.015, -HALF - RIM_W / 2, hex));
-    parts.push(box(step, 0.03, RIM_W * 0.5, a, RIM_H + 0.015, HALF + RIM_W / 2, hex));
-    parts.push(box(RIM_W * 0.5, 0.03, step, -HALF - RIM_W / 2, RIM_H + 0.015, a, hex));
-    parts.push(box(RIM_W * 0.5, 0.03, step, HALF + RIM_W / 2, RIM_H + 0.015, a, hex));
+    parts.push(stripe(step, RIM_W * 0.5, a, -HALF - RIM_W / 2, hex));
+    parts.push(stripe(step, RIM_W * 0.5, a, HALF + RIM_W / 2, hex));
+    parts.push(stripe(RIM_W * 0.5, step, -HALF - RIM_W / 2, a, hex));
+    parts.push(stripe(RIM_W * 0.5, step, HALF + RIM_W / 2, a, hex));
   }
   // Corner posts with lamps.
   for (let k = 0; k < 4; k++) {
@@ -179,10 +200,10 @@ export function createWorld(scene) {
   }
 
   // Pines, bushes and rocks scattered further out.
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 44; i++) {
     let x;
     let z;
-    if (i < 30) {
+    if (i < 16) {
       x = -16 + rand() * 32;
       z = -15 + rand() * 6;
     } else {

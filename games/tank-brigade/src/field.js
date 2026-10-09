@@ -1,9 +1,10 @@
 // The battlefield: 26 x 26 cells (four per tile) holding bricks, steel,
 // water, trees and ice, and the core the player defends in the middle of the
-// bottom row. Bricks and steel are one InstancedMesh each with one instance
-// per standing cell, rewritten only when a cell changes; the floor, trees and
-// ice glints are instanced per tile and change only when a stage loads.
-// Water is one plane under the floor slab, seen where floor tiles are missing.
+// bottom row. Bricks (two InstancedMeshes, for the two ways a cell's bricks
+// are laid) and steel have one instance per standing cell, rewritten only
+// when a cell changes; the floor, trees and ice glints are instanced per tile
+// and change only when a stage loads. Water is one plane under the floor
+// slab, seen where floor tiles are missing.
 
 import * as THREE from 'three';
 import {
@@ -28,6 +29,7 @@ import {
 } from './shared.js';
 import {
   brickGeometry,
+  brickTexture,
   coreGeometry,
   crystalGeometry,
   floorGeometry,
@@ -85,7 +87,9 @@ export function createField(scene) {
   }
 
   const floor = instanced(floorGeometry(), material, TILE_COUNT);
-  const bricks = instanced(brickGeometry(), material, CELLS);
+  const brickMap = brickTexture();
+  const brickMaterial = new THREE.MeshLambertMaterial({ vertexColors: true, map: brickMap });
+  const bricks = [instanced(brickGeometry(0), brickMaterial, CELLS), instanced(brickGeometry(1), brickMaterial, CELLS)];
   const steel = instanced(steelGeometry(), material, CELLS);
   const trees = instanced(treesGeometry(), material, TILE_COUNT);
   const glints = instanced(glintGeometry(), new THREE.MeshBasicMaterial({ color: 0xf2feff }), TILE_COUNT);
@@ -153,6 +157,7 @@ export function createField(scene) {
   // Rewrites the brick and steel instances from the cells.
   function writeSolids() {
     const intro = introT < introEnd;
+    let na = 0;
     let nb = 0;
     let ns = 0;
     for (let i = 0; i < CELLS; i++) {
@@ -162,15 +167,20 @@ export function createField(scene) {
       if (s === 0) continue;
       const cx = i % N;
       const cz = (i - cx) / N;
-      // Bricks alternate their direction cell by cell, like laid brickwork.
-      m.makeRotationY(k === BRICK && (cx + cz) & 1 ? Math.PI / 2 : 0);
-      m.scale(v.set(1, s, 1));
+      m.makeScale(1, s, 1);
       m.setPosition(cellCenter(cx), 0, cellCenter(cz));
       if (k === BRICK) {
+        // Bricks alternate their direction cell by cell, like laid brickwork.
         c.setHex(BRICK_COLOR).multiplyScalar(shade[i]);
-        bricks.setMatrixAt(nb, m);
-        bricks.setColorAt(nb, c);
-        nb++;
+        if ((cx + cz) & 1) {
+          bricks[1].setMatrixAt(nb, m);
+          bricks[1].setColorAt(nb, c);
+          nb++;
+        } else {
+          bricks[0].setMatrixAt(na, m);
+          bricks[0].setColorAt(na, c);
+          na++;
+        }
       } else {
         c.setHex(STEEL_COLOR).multiplyScalar(0.9 + (shade[i] - 0.84) * 0.5);
         steel.setMatrixAt(ns, m);
@@ -178,10 +188,13 @@ export function createField(scene) {
         ns++;
       }
     }
-    bricks.count = nb;
+    bricks[0].count = na;
+    bricks[1].count = nb;
+    for (let j = 0; j < 2; j++) {
+      bricks[j].instanceMatrix.needsUpdate = true;
+      bricks[j].instanceColor.needsUpdate = true;
+    }
     steel.count = ns;
-    bricks.instanceMatrix.needsUpdate = true;
-    bricks.instanceColor.needsUpdate = true;
     steel.instanceMatrix.needsUpdate = true;
     steel.instanceColor.needsUpdate = true;
   }
@@ -269,6 +282,7 @@ export function createField(scene) {
     coreX,
     coreZ,
     coreAlive: true,
+    brickMap, // for the renderer to upload while loading
 
     // Loads a stage. steelWall gives the core a steel wall (the title demo).
     load(stage, steelWall) {
@@ -353,6 +367,16 @@ export function createField(scene) {
     setCoreWall(kind) {
       for (let k = 0; k < CORE_WALL.length; k += 2) setCell(CORE_WALL[k], CORE_WALL[k + 1], kind);
       solidDirty = true;
+    },
+
+    // How many cells of the core's wall still stand.
+    wallLeft() {
+      let n = 0;
+      for (let k = 0; k < CORE_WALL.length; k += 2) {
+        const kind = cells[CORE_WALL[k + 1] * N + CORE_WALL[k]];
+        if (kind === BRICK || kind === STEEL) n++;
+      }
+      return n;
     },
 
     destroyCore() {

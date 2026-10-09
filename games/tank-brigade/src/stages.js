@@ -1,4 +1,4 @@
-// Ten hand-made stages, 13 x 13 tiles each. Row 0 is the top, where the
+// Fifteen hand-made stages, 13 x 13 tiles each. Row 0 is the top, where the
 // enemies come in; the core sits in the middle of the bottom row.
 //
 //   .  empty        #  brick        @  steel        ~  water
@@ -10,7 +10,10 @@
 // tiles, so whatever a map has there is ignored.
 //
 // mix: how many basic, fast, power and armoured tanks come in this stage
-// (20 in all).
+// (20 in all). Some stages give the enemy a tactic, named under the stage's
+// title: hunt (how often a tank heads for you, 0.22 if not given), siege
+// (how much keener they are on the core from the start) and aim (they fire
+// as soon as you line up in front of them).
 
 export const STAGES = [
   {
@@ -54,13 +57,15 @@ export const STAGES = [
   {
     name: 'Greenwood',
     mix: [12, 4, 2, 2],
+    hunt: 0.36,
+    note: 'ambush in the trees',
     map: [
       '..%%.....%%..',
       '.#%%.#.#.%%#.',
       '.#...#.#...#.',
       '.#.%%%.%%%.#.',
       '...%%#.#%%...',
-      '##.........##',
+      '##....#....##',
       '%%%.##.##.%%%',
       '%%%.......%%%',
       '...#.%%%.#...',
@@ -73,6 +78,8 @@ export const STAGES = [
   {
     name: 'Steel Yard',
     mix: [10, 4, 4, 2],
+    aim: true,
+    note: 'sharpshooters',
     map: [
       '.............',
       '.@@.#...#.@@.',
@@ -111,6 +118,8 @@ export const STAGES = [
   {
     name: 'Fortress',
     mix: [8, 4, 4, 4],
+    siege: 0.15,
+    note: 'they go for the core',
     map: [
       '.............',
       '.#.#.#.#.#.#.',
@@ -130,6 +139,8 @@ export const STAGES = [
   {
     name: 'Canals',
     mix: [6, 6, 4, 4],
+    hunt: 0.36,
+    note: 'they hunt you',
     map: [
       '.............',
       '.#.~.#.#.~.#.',
@@ -149,6 +160,8 @@ export const STAGES = [
   {
     name: 'Checkers',
     mix: [6, 4, 6, 4],
+    aim: true,
+    note: 'sharpshooters',
     map: [
       '.............',
       '.#.@.#.#.@.#.',
@@ -158,7 +171,7 @@ export const STAGES = [
       '.#.@.#.#.@.#.',
       '.%%.......%%.',
       '.@.#.@.@.#.@.',
-      '.............',
+      '......#......',
       '.#.@.#.#.@.#.',
       '.............',
       '.@.#.....#.@.',
@@ -168,6 +181,8 @@ export const STAGES = [
   {
     name: 'Islands',
     mix: [4, 6, 4, 6],
+    siege: 0.15,
+    note: 'they go for the core',
     map: [
       '.............',
       '.~~~.#.#.~~~.',
@@ -187,6 +202,9 @@ export const STAGES = [
   {
     name: 'Last Stand',
     mix: [2, 6, 6, 6],
+    hunt: 0.32,
+    aim: true,
+    note: 'hunters and sharpshooters',
     map: [
       '.............',
       '.#@#.#.#.#@#.',
@@ -200,6 +218,113 @@ export const STAGES = [
       '.#.#=====#.#.',
       '.#..=====..#.',
       '..#.......#..',
+      '.............',
+    ],
+  },
+  {
+    name: 'Crossroads',
+    mix: [4, 6, 6, 4],
+    hunt: 0.36,
+    note: 'they hunt you',
+    map: [
+      '.............',
+      '.##.##.##.##.',
+      '.............',
+      '.@.##...##.@.',
+      '.....###.....',
+      '##.~.....~.##',
+      '...~.@.@.~...',
+      '##.~.....~.##',
+      '.....#.#.....',
+      '.@.##...##.@.',
+      '.............',
+      '.##.#...#.##.',
+      '.............',
+    ],
+  },
+  {
+    name: 'Ice Rink',
+    mix: [2, 8, 4, 6],
+    siege: 0.15,
+    note: 'they go for the core',
+    map: [
+      '.............',
+      '.===.###.===.',
+      '.=#=.....=#=.',
+      '.===.=@=.===.',
+      '.....===.....',
+      '##.==...==.##',
+      '...=.#.#.=...',
+      '.@.==...==.@.',
+      '.....===.....',
+      '.#.#=====#.#.',
+      '.#.#.....#.#.',
+      '.#.........#.',
+      '.............',
+    ],
+  },
+  {
+    name: 'Marsh',
+    mix: [2, 6, 6, 6],
+    aim: true,
+    note: 'sharpshooters',
+    map: [
+      '.............',
+      '.%%.~~.~~.%%.',
+      '.%#.~...~.#%.',
+      '....~.#.~....',
+      '.~~...#...~~.',
+      '.~%.#%%%#.%~.',
+      '..#..%@%..#..',
+      '.~%.#%%%#.%~.',
+      '.~~.......~~.',
+      '....#.~.#....',
+      '.##.#.~.#.##.',
+      '.%%.......%%.',
+      '.............',
+    ],
+  },
+  {
+    name: 'Labyrinth',
+    mix: [0, 6, 6, 8],
+    hunt: 0.32,
+    aim: true,
+    note: 'hunters and sharpshooters',
+    map: [
+      '.............',
+      '.#####.#####.',
+      '.#.........#.',
+      '.#.###.###.#.',
+      '...#.....#...',
+      '.#.#.#@#.#.#.',
+      '.#...#.#...#.',
+      '.###.#.#.###.',
+      '.....#.#.....',
+      '.#.#.....#.#.',
+      '.#.#######.#.',
+      '.#.........#.',
+      '.............',
+    ],
+  },
+  {
+    name: 'Citadel',
+    mix: [0, 4, 6, 10],
+    siege: 0.15,
+    aim: true,
+    note: 'the final siege',
+    map: [
+      '.............',
+      '.@@.#...#.@@.',
+      '.@..#.@.#..@.',
+      '....##.##....',
+      '.#.........#.',
+      '.#.@@###@@.#.',
+      '.#.#.....#.#.',
+      '...#.~~~.#...',
+      '.@.#.....#.@.',
+      '.#...#.#...#.',
+      '.#.###.###.#.',
+      '.#.........#.',
       '.............',
     ],
   },

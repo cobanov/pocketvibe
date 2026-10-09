@@ -1,6 +1,8 @@
 // Pooled effects: fireballs and smoke puffs (one InstancedMesh), debris and
 // sparks (another), flat shock rings and scorch marks left on the floor.
-// Every pool is a ring of slots; a new particle takes the oldest slot.
+// Every pool is a ring of slots; a new particle takes the oldest slot. Only
+// live particles are drawn: each frame they are packed to the front of their
+// mesh and its count set to them, so idle pools cost no triangles.
 
 import * as THREE from 'three';
 
@@ -18,7 +20,6 @@ const SMOKE_HEX = [0x9a948c, 0x7c7670, 0x5e5a56, 0x47444a];
 export function createFx(scene) {
   const ramp = RAMP_HEX.map((h) => new THREE.Color(h));
   const smokeRamp = SMOKE_HEX.map((h) => new THREE.Color(h));
-  const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
   const white = new THREE.Color(0xffffff);
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
@@ -26,10 +27,8 @@ export function createFx(scene) {
   function pool(geometry, material, max) {
     const mesh = new THREE.InstancedMesh(geometry, material, max);
     mesh.frustumCulled = false; // instances move, so the cached bounds would be wrong
-    for (let i = 0; i < max; i++) {
-      mesh.setMatrixAt(i, ZERO);
-      mesh.setColorAt(i, white);
-    }
+    for (let i = 0; i < max; i++) mesh.setColorAt(i, white);
+    mesh.count = 0;
     scene.add(mesh);
     return mesh;
   }
@@ -49,9 +48,9 @@ export function createFx(scene) {
   let fireNext = 0;
   let fireLive = 0;
 
-  // Debris and sparks.
+  // Debris and sparks: little tumbling shards.
   const debris = pool(
-    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.TetrahedronGeometry(0.8, 0),
     new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x262626 }),
     DEBRIS_MAX,
   );
@@ -66,12 +65,12 @@ export function createFx(scene) {
   const dsize = new Float32Array(DEBRIS_MAX);
   const dlife = new Float32Array(DEBRIS_MAX);
   const dmax = new Float32Array(DEBRIS_MAX);
+  const dhex = new Uint32Array(DEBRIS_MAX);
   let debrisNext = 0;
   let debrisLive = 0;
-  let debrisColors = false;
 
   // Shock rings: additive, so fading the colour to black fades them out.
-  const ringGeometry = new THREE.RingGeometry(0.82, 1, 28);
+  const ringGeometry = new THREE.RingGeometry(0.82, 1, 20);
   ringGeometry.rotateX(-Math.PI / 2);
   const rings = pool(
     ringGeometry,
@@ -128,9 +127,7 @@ export function createFx(scene) {
     dsize[i] = size;
     dlife[i] = life;
     dmax[i] = life;
-    color.setHex(hex);
-    debris.setColorAt(i, color);
-    debrisColors = true;
+    dhex[i] = hex;
     debrisLive++;
   }
 
@@ -228,12 +225,9 @@ export function createFx(scene) {
       flife.fill(0);
       dlife.fill(0);
       rage.fill(RING_TIME);
-      for (let i = 0; i < FIRE_MAX; i++) fire.setMatrixAt(i, ZERO);
-      for (let i = 0; i < DEBRIS_MAX; i++) debris.setMatrixAt(i, ZERO);
-      for (let i = 0; i < RING_MAX; i++) rings.setMatrixAt(i, ZERO);
-      fire.instanceMatrix.needsUpdate = true;
-      debris.instanceMatrix.needsUpdate = true;
-      rings.instanceMatrix.needsUpdate = true;
+      fire.count = 0;
+      debris.count = 0;
+      rings.count = 0;
       fireLive = 0;
       debrisLive = 0;
       scorch.count = 0;
@@ -246,11 +240,8 @@ export function createFx(scene) {
         for (let i = 0; i < FIRE_MAX; i++) {
           if (flife[i] <= 0) continue;
           flife[i] -= dt;
-          if (flife[i] <= 0) {
-            fire.setMatrixAt(i, ZERO);
-            continue;
-          }
-          fireLive++;
+          if (flife[i] <= 0) continue;
+          const n = fireLive++;
           const k = 1 - flife[i] / fmax[i];
           fx[i] += fvx[i] * dt;
           fy[i] += fvy[i] * dt;
@@ -270,13 +261,14 @@ export function createFx(scene) {
             const j = Math.min(ramp.length - 2, Math.floor(f));
             color.copy(ramp[j]).lerp(ramp[j + 1], f - j);
           }
-          fire.setColorAt(i, color);
+          fire.setColorAt(n, color);
           dummy.position.set(fx[i], fy[i], fz[i]);
           dummy.rotation.set(k * 3 + i, k * 2, 0);
           dummy.scale.set(s, s, s);
           dummy.updateMatrix();
-          fire.setMatrixAt(i, dummy.matrix);
+          fire.setMatrixAt(n, dummy.matrix);
         }
+        fire.count = fireLive;
         fire.instanceMatrix.needsUpdate = true;
         fire.instanceColor.needsUpdate = true;
       }
@@ -286,11 +278,8 @@ export function createFx(scene) {
         for (let i = 0; i < DEBRIS_MAX; i++) {
           if (dlife[i] <= 0) continue;
           dlife[i] -= dt;
-          if (dlife[i] <= 0) {
-            debris.setMatrixAt(i, ZERO);
-            continue;
-          }
-          debrisLive++;
+          if (dlife[i] <= 0) continue;
+          const n = debrisLive++;
           dvy[i] -= GRAVITY * dt;
           dx[i] += dvx[i] * dt;
           dy[i] += dvy[i] * dt;
@@ -309,34 +298,33 @@ export function createFx(scene) {
           dummy.rotation.set(drot[i], drot[i] * 0.7, 0);
           dummy.scale.set(s, s, s);
           dummy.updateMatrix();
-          debris.setMatrixAt(i, dummy.matrix);
+          debris.setMatrixAt(n, dummy.matrix);
+          debris.setColorAt(n, color.setHex(dhex[i]));
         }
+        debris.count = debrisLive;
         debris.instanceMatrix.needsUpdate = true;
-        if (debrisColors) {
-          debris.instanceColor.needsUpdate = true;
-          debrisColors = false;
-        }
+        debris.instanceColor.needsUpdate = true;
       }
 
-      let ringsMoved = false;
+      let ringsMoved = rings.count > 0;
+      let nr = 0;
       for (let i = 0; i < RING_MAX; i++) {
         if (rage[i] >= RING_TIME) continue;
         rage[i] += dt;
         ringsMoved = true;
-        if (rage[i] >= RING_TIME) {
-          rings.setMatrixAt(i, ZERO);
-          continue;
-        }
+        if (rage[i] >= RING_TIME) continue;
         const k = rage[i] / RING_TIME;
         const s = rsize[i] * (0.3 + (1 - (1 - k) * (1 - k)) * 0.9);
         dummy.position.set(rx[i], 0.04, rz[i]);
         dummy.rotation.set(0, 0, 0);
         dummy.scale.set(s, 1, s);
         dummy.updateMatrix();
-        rings.setMatrixAt(i, dummy.matrix);
+        rings.setMatrixAt(nr, dummy.matrix);
         color.setHex(rhex[i]).multiplyScalar(1 - k);
-        rings.setColorAt(i, color);
+        rings.setColorAt(nr, color);
+        nr++;
       }
+      rings.count = nr;
       if (ringsMoved) {
         rings.instanceMatrix.needsUpdate = true;
         rings.instanceColor.needsUpdate = true;
