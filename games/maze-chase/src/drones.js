@@ -26,10 +26,10 @@ import {
   UP,
   ball,
   box,
-  cylinder,
   glowDisc,
   glowMaterial,
   opposite,
+  paint,
   worldX,
   worldZ,
   wrapDX,
@@ -60,16 +60,19 @@ export const WISP = 3;
 export const ENTERING = 4;
 
 const BODY_Y = 0.12; // hover height
-const SIZE = 1.12;
+const SIZE = 1.3; // as wide as a corridor allows, so drones read on a 3.4" screen
 const EYE_X = 0.12 * SIZE;
 const EYE_Y = 0.6 * SIZE;
 const EYE_Z = 0.2 * SIZE;
+const EYE_R = 0.112 * SIZE;
+const PUPIL_R = 0.061 * SIZE;
 // The camera looks down at 65 degrees: pupils sit on the side of the eye
 // facing it, and "up the screen" is this direction in the world.
 const VIEW_Y = Math.sin((65 * Math.PI) / 180);
 const VIEW_Z = Math.cos((65 * Math.PI) / 180);
 
-// A small quadcopter: white parts take the instance color.
+// A small quadcopter: white parts take the instance color. Seen only from
+// above, so it has no underside and its rotors are flat discs.
 function droneGeometry() {
   const arm = new THREE.BoxGeometry(0.98, 0.05, 0.07);
   const arms = [arm.clone().rotateY(Math.PI / 4), arm.rotateY(-Math.PI / 4)];
@@ -79,17 +82,21 @@ function droneGeometry() {
     const c = new Float32Array(n * 3).fill(0.22);
     g.setAttribute('color', new THREE.BufferAttribute(c, 3));
   }
+  const band = new THREE.CylinderGeometry(0.3, 0.22, 0.1, 10, 1, true);
+  band.translate(0, 0.35, 0);
   const parts = [
     ball(0.3, 1, 0.74, 1, 0, 0.46, 0, 0xffffff, 10), // body
-    cylinder(0.3, 0.22, 0.1, 10, 0, 0.3, 0, 0x5a5f70), // dark belly band
-    ball(0.13, 1, 0.7, 1, 0, 0.66, 0, 0xffffff, 8), // top cap
-    ball(0.08, 1, 0.7, 1, 0, 0.27, 0, 0xffffff, 6), // underside light
+    paint(band, 0x5a5f70), // dark belly band
+    ball(0.13, 1, 0.7, 1, 0, 0.66, 0, 0xffffff, 6), // top cap
     ...arms,
   ];
   for (let i = 0; i < 4; i++) {
     const x = (i & 1 ? 1 : -1) * 0.34;
     const z = (i & 2 ? 1 : -1) * 0.34;
-    parts.push(cylinder(0.15, 0.15, 0.025, 10, x, 0.5, z, 0xdde3ee)); // rotor disc
+    const rotor = new THREE.CircleGeometry(0.15, 10);
+    rotor.rotateX(-Math.PI / 2);
+    rotor.translate(x, 0.51, z);
+    parts.push(paint(rotor, 0xdde3ee)); // rotor disc
     parts.push(box(0.05, 0.06, 0.05, x, 0.47, z, 0x2a2f3c)); // hub
   }
   return mergeGeometries(parts).scale(SIZE, SIZE, SIZE);
@@ -102,17 +109,17 @@ export function createDrones(scene, maze) {
     COUNT,
   );
   const eyeMesh = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.125, 8, 6),
+    new THREE.SphereGeometry(EYE_R, 8, 5),
     new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x808080 }),
     COUNT * 2,
   );
   const pupilMesh = new THREE.InstancedMesh(
-    new THREE.SphereGeometry(0.068, 6, 4),
+    new THREE.SphereGeometry(PUPIL_R, 6, 4),
     new THREE.MeshBasicMaterial({ color: 0xffffff }),
     COUNT * 2,
   );
   const wispMesh = new THREE.InstancedMesh(
-    new THREE.IcosahedronGeometry(0.17, 1),
+    new THREE.IcosahedronGeometry(0.2, 0),
     new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
@@ -228,7 +235,10 @@ export function createDrones(scene, maze) {
       const c = Math.round(m);
       const next = Math.abs(m - c) < 1e-6 ? c + s : s > 0 ? Math.ceil(m) : Math.floor(m);
       const step = Math.abs(next - m);
-      if (step > dist) {
+      // A move ending a hair short of a centre snaps onto it and decides
+      // there; left short, the next frame would take it for a centre already
+      // decided and carry on straight, even into a wall.
+      if (step > dist + 1e-6) {
         if (horizontal) d.x = m + s * dist;
         else d.y = m + s * dist;
         d.dist += dist;
@@ -273,6 +283,7 @@ export function createDrones(scene, maze) {
   const drones = {
     list,
     hidden: false,
+    revived: 0, // counts drones that got home and came back to life
 
     // Puts every drone back home. releaseScale shortens the waits on later levels.
     reset(releaseScale) {
@@ -315,6 +326,7 @@ export function createDrones(scene, maze) {
             d.mode = LEAVING;
             d.fright = false;
             d.pop = 1;
+            this.revived++;
           }
         } else {
           let speed = ctx.wispSpeed;
@@ -355,6 +367,12 @@ export function createDrones(scene, maze) {
 
     anyFrightened() {
       for (let i = 0; i < COUNT; i++) if (list[i].fright) return true;
+      return false;
+    },
+
+    // True while an eaten drone is flying home.
+    anyWisp() {
+      for (let i = 0; i < COUNT; i++) if (list[i].mode === WISP || list[i].mode === ENTERING) return true;
       return false;
     },
 
@@ -429,9 +447,9 @@ export function createDrones(scene, maze) {
         }
 
         // Eyes and pupils; a wisp keeps its eyes, a little lower.
-        const eyeY = ghost ? 0.42 : BODY_Y + EYE_Y * s + bob;
+        const eyeY = ghost ? 0.46 : BODY_Y + EYE_Y * s + bob;
         const eyeS = hidden ? 0 : (scared ? 0.72 : 1) * (ghost ? edge : s);
-        const look = 0.055 * eyeS;
+        const look = 0.049 * SIZE * eyeS;
         const lx = d.lookX * look;
         const up = -d.lookY * look; // moving up the maze looks up the screen
         for (let e = 0; e < 2; e++) {
@@ -444,8 +462,8 @@ export function createDrones(scene, maze) {
           eyeMesh.setMatrixAt(i * 2 + e, dummy.matrix);
           dummy.position.set(
             ex + lx,
-            eyeY + 0.085 * eyeS * VIEW_Y + up * VIEW_Z,
-            ez + 0.085 * eyeS * VIEW_Z - up * VIEW_Y,
+            eyeY + 0.076 * SIZE * eyeS * VIEW_Y + up * VIEW_Z,
+            ez + 0.076 * SIZE * eyeS * VIEW_Z - up * VIEW_Y,
           );
           dummy.scale.setScalar(eyeS);
           dummy.updateMatrix();
@@ -467,7 +485,7 @@ export function createDrones(scene, maze) {
         if (hidden) glowMesh.setMatrixAt(i, ZERO);
         else {
           dummy.position.set(x, 0.02, z);
-          dummy.scale.setScalar((ghost ? 0.45 : 0.85 + bob) * edge);
+          dummy.scale.setScalar((ghost ? 0.5 : 0.98 + bob) * edge);
           dummy.updateMatrix();
           glowMesh.setMatrixAt(i, dummy.matrix);
         }

@@ -1,6 +1,7 @@
-// Cheap juice: a pool of glowing cube particles (one InstancedMesh, a ring of
-// slots where a new particle takes the oldest one) and a single expanding
-// ring on the floor.
+// Cheap juice: a pool of glowing cube particles (one InstancedMesh; a new
+// particle takes the lowest free slot, so only as many instances as there
+// are live particles get drawn, or the oldest slot when all are busy) and a
+// single expanding ring on the floor.
 
 import * as THREE from 'three';
 
@@ -52,8 +53,12 @@ export function createFx(scene) {
   const dummy = new THREE.Object3D();
 
   function spawn(x, y, z, sx, sy, sz, g, s, t) {
-    const i = next;
-    next = (next + 1) % MAX;
+    let i = 0;
+    while (i < MAX && life[i] > 0) i++;
+    if (i === MAX) {
+      i = next;
+      next = (next + 1) % MAX;
+    }
     px[i] = x;
     py[i] = y;
     pz[i] = z;

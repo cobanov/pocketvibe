@@ -2,14 +2,14 @@
   "id": "maze-chase",
   "title": "Maze Chase",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Eat every dot in three neon mazes while four drones with their own minds hunt you; grab a power core and turn the chase around.",
+  "version": "1.2.0",
+  "description": "Eat every dot in five neon mazes while four drones with their own minds hunt you; grab a power core and turn the chase around.",
   "genre": "Arcade",
   "controls": {
-    "D-pad": "Move (turns wait for the next junction)",
-    "A": "Start / play again",
-    "B": "Back to title (paused or game over)",
-    "START": "Pause / resume"
+    "D-pad": "Move (a turn pressed early is taken at the next junction); choose in menus",
+    "A": "Select; play again",
+    "B": "Resume (pause menu); back to title (game over)",
+    "START": "Pause menu / resume"
   },
   "responsive": true
 }

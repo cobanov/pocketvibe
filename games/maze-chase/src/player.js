@@ -1,7 +1,9 @@
 // The player: a small round robot that rolls along the maze grid. Turns are
 // buffered (main.js keeps the wanted direction) and taken at the next junction
 // that allows them; near a junction the turn cuts the corner, so steering
-// feels smooth rather than snapping cell by cell.
+// feels smooth rather than snapping cell by cell. A D-pad held on a diagonal
+// gives a second direction, taken where the robot would otherwise stop at a
+// wall, so a held direction is never ignored when it is the only way on.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -24,6 +26,7 @@ import {
 } from './shared.js';
 
 const CORNER = 0.45; // a turn is accepted this close to a junction (cells)
+const SIZE = 1.3; // as wide as a corridor allows, so the robot reads on a 3.4" screen
 const BODY = 0xf3f6ff;
 const VISOR = 0x161d38;
 const EYE = 0x56f2ff;
@@ -39,8 +42,8 @@ function botGeometry() {
   const stalk = new THREE.CylinderGeometry(0.018, 0.026, 0.22, 5);
   stalk.translate(0, 0.86, -0.12);
   return mergeGeometries([
-    ball(0.37, 1, 0.95, 1, 0, 0.4, 0, BODY, 12), // body
-    ball(0.3, 1.04, 0.56, 0.62, 0, 0.5, 0.17, VISOR, 12), // visor wrapping the upper front
+    ball(0.37, 1, 0.95, 1, 0, 0.4, 0, BODY, 11), // body
+    ball(0.3, 1.04, 0.56, 0.62, 0, 0.5, 0.17, VISOR, 10), // visor wrapping the upper front
     ball(0.075, 1, 1.25, 0.7, -0.115, 0.55, 0.33, EYE, 6), // eyes
     ball(0.075, 1, 1.25, 0.7, 0.115, 0.55, 0.33, EYE, 6),
     box(0.07, 0.07, 0.42, 0, 0.76, -0.06, FIN), // fin along the top
@@ -50,7 +53,7 @@ function botGeometry() {
     ball(0.07, 1, 1, 1, 0, 0.99, -0.12, 0xff7a5c, 6),
     box(0.14, 0.08, 0.18, -0.15, 0.04, 0.05, VISOR), // feet
     box(0.14, 0.08, 0.18, 0.15, 0.04, 0.05, VISOR),
-  ]).scale(1.12, 1.12, 1.12);
+  ]).scale(SIZE, SIZE, SIZE);
 }
 
 function approach(v, target, step) {
@@ -62,7 +65,7 @@ export function createPlayer(scene, maze) {
   const mesh = new THREE.Mesh(botGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true }));
   mesh.rotation.order = 'YXZ';
   scene.add(mesh);
-  const glow = new THREE.Mesh(glowDisc(0.85), glowMaterial(0x3fd8ff, 0.55));
+  const glow = new THREE.Mesh(glowDisc(1), glowMaterial(0x3fd8ff, 0.6));
   glow.position.y = 0.02;
   scene.add(glow);
 
@@ -102,22 +105,11 @@ export function createPlayer(scene, maze) {
     },
 
     // Moves along the grid at `speed` cells per second, turning towards
-    // `want` (a direction or NONE) as soon as the maze allows it.
-    update(dt, want, speed) {
+    // `want` (a direction or NONE) as soon as the maze allows it. `alt` (the
+    // other half of a diagonal) is taken only instead of stopping at a wall.
+    update(dt, want, speed, alt = NONE) {
       if (!this.alive) return;
-      if (want !== NONE && want !== this.dir) {
-        if (this.moving && want === opposite(this.dir)) {
-          this.dir = want; // reversing is always allowed, at once
-        } else {
-          const cx = Math.round(this.x);
-          const cy = Math.round(this.y);
-          const off = Math.abs(this.x - cx) + Math.abs(this.y - cy);
-          if (off <= CORNER && maze.open(cx + DX[want], cy + DY[want])) {
-            this.dir = want;
-            this.moving = true;
-          }
-        }
-      }
+      if (!this.turn(want, true) && !this.moving) this.turn(alt, false);
       if (!this.moving) {
         if (!maze.open(Math.round(this.x) + DX[this.dir], Math.round(this.y) + DY[this.dir])) return;
         this.moving = true;
@@ -144,6 +136,10 @@ export function createPlayer(scene, maze) {
             continue;
           }
           if (!maze.open(cx + DX[this.dir], cy + DY[this.dir])) {
+            if (alt !== NONE && (alt & 1) !== (this.dir & 1) && maze.open(cx + DX[alt], cy + DY[alt])) {
+              this.dir = alt;
+              continue;
+            }
             this.moving = false;
             break;
           }
@@ -162,6 +158,23 @@ export function createPlayer(scene, maze) {
           this.y = move;
         }
       }
+    },
+
+    // Turns towards d now if it may: a reversal at once (when allowed), any
+    // other turn within CORNER of a junction that opens that way.
+    turn(d, reverse) {
+      if (d === NONE || d === this.dir) return false;
+      if (this.moving && d === opposite(this.dir)) {
+        if (reverse) this.dir = d;
+        return reverse;
+      }
+      const cx = Math.round(this.x);
+      const cy = Math.round(this.y);
+      const off = Math.abs(this.x - cx) + Math.abs(this.y - cy);
+      if (off > CORNER || !maze.open(cx + DX[d], cy + DY[d])) return false;
+      this.dir = d;
+      this.moving = true;
+      return true;
     },
 
     // A quick squash when something is eaten.

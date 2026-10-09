@@ -1,9 +1,11 @@
 // HUD and menus as HTML on top of the canvas: score, level and lives in a
-// row above the maze, banners and panels in the middle. The DOM is touched
-// only when a value changes or an event happens, never every frame.
+// row above the maze, banners and panels in the middle, and small arrows at
+// the screen's edges pointing at drones the close view does not show. The
+// DOM is touched only when a value changes or an event happens.
 
 const POPUPS = 5;
 const MAX_LIVES = 5;
+const MARKERS = 4;
 
 export function createHud(root) {
   root.innerHTML = `
@@ -12,6 +14,7 @@ export function createHud(root) {
       <span class="stat mid"><small>LEVEL</small><b id="level"></b></span>
       <span class="stat right" id="lives">${'<i class="life"></i>'.repeat(MAX_LIVES)}</span>
     </div>
+    <div id="markers">${'<div class="marker"><i></i></div>'.repeat(MARKERS)}</div>
     <div id="flash"></div>
     <div id="banner"></div>
     <div id="ready"></div>
@@ -28,12 +31,21 @@ export function createHud(root) {
   const calloutEl = root.querySelector('#callout');
   const messageEl = root.querySelector('#message');
   const popups = root.querySelectorAll('.popup');
+  const markers = root.querySelectorAll('.marker');
 
   let shownScore = -1;
   let shownLevel = -1;
   let shownLives = -1;
   let shownReady = null;
+  let shownReadyY = -1;
+  let shownMessage = null;
   let nextPopup = 0;
+  // Per marker: shown or not, last position and angle, frightened look.
+  const markerOn = new Int8Array(MARKERS);
+  const markerX = new Int16Array(MARKERS);
+  const markerY = new Int16Array(MARKERS);
+  const markerA = new Int16Array(MARKERS);
+  const markerScared = new Int8Array(MARKERS).fill(-1);
 
   // Restarts a CSS animation class on an element.
   function replay(el, cls) {
@@ -69,18 +81,37 @@ export function createHud(root) {
       row.hidden = !visible;
     },
 
-    // A big animated banner ("LEVEL 2"); a new element restarts the animation.
+    // A big animated banner; a new element restarts the animation.
     banner(title, sub) {
       bannerEl.innerHTML = title
         ? `<div class="pop"><div class="big">${title}</div><div class="sub">${sub}</div></div>`
         : '';
     },
 
-    // "READY!" over the maze while a round is about to start.
-    ready(text) {
-      if (text === shownReady) return;
-      shownReady = text;
-      readyEl.textContent = text;
+    // The card when a level comes up: its number, the maze's name and a pip
+    // per maze (done, this one, still to come); after the last maze the
+    // mazes come round again, faster.
+    levelCard(number, name, index, total, loop) {
+      let pips = '';
+      for (let i = 0; i < total; i++) pips += `<i class="${i < index ? 'done' : i === index ? 'now' : ''}"></i>`;
+      bannerEl.innerHTML =
+        `<div class="pop card"><div class="big">LEVEL ${number}</div>` +
+        `<div class="sub">${name}${loop > 0 ? ` <span class="loop">ROUND ${loop + 1} · FASTER</span>` : ''}</div>` +
+        `<div class="pips">${pips}</div></div>`;
+    },
+
+    // "READY!" over the maze while a round is about to start, y px from the
+    // top of the screen.
+    ready(text, y = shownReadyY) {
+      if (text !== shownReady) {
+        shownReady = text;
+        readyEl.textContent = text;
+      }
+      const top = Math.round(y);
+      if (text && top !== shownReadyY) {
+        shownReadyY = top;
+        readyEl.style.top = `${top}px`;
+      }
     },
 
     callout(text, color) {
@@ -103,9 +134,43 @@ export function createHud(root) {
       replay(el, 'show');
     },
 
-    // html is a fixed string from main.js; '' hides the message.
-    message(html) {
-      messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
+    // An arrow at the screen's edge for drone i, at (x, y) px, pointing
+    // `angle` degrees (0 = right); on = false hides it.
+    marker(i, on, x = 0, y = 0, angle = 0, scared = false) {
+      const el = markers[i];
+      if (!on) {
+        if (markerOn[i]) {
+          markerOn[i] = 0;
+          el.classList.remove('on');
+        }
+        return;
+      }
+      if (!markerOn[i]) {
+        markerOn[i] = 1;
+        el.classList.add('on');
+      }
+      const s = scared ? 1 : 0;
+      if (s !== markerScared[i]) {
+        markerScared[i] = s;
+        el.classList.toggle('scared', scared);
+      }
+      const px = Math.round(x);
+      const py = Math.round(y);
+      const pa = Math.round(angle / 5) * 5;
+      if (Math.abs(px - markerX[i]) < 2 && Math.abs(py - markerY[i]) < 2 && pa === markerA[i]) return;
+      markerX[i] = px;
+      markerY[i] = py;
+      markerA[i] = pa;
+      el.style.transform = `translate(${px}px, ${py}px) rotate(${pa}deg)`;
+    },
+
+    // html is built from fixed strings in main.js; '' hides the message.
+    // Unchanged html leaves the DOM alone.
+    message(html, kind = '') {
+      const key = kind + html;
+      if (key === shownMessage) return;
+      shownMessage = key;
+      messageEl.innerHTML = html ? `<div class="panel ${kind}">${html}</div>` : '';
     },
   };
 }

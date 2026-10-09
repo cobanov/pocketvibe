@@ -1,7 +1,7 @@
 // The maze: the grid the game logic asks about, and its look. Each layout is
-// built once into two meshes (walls with glowing edges, and a floor with the
-// glow of the walls baked into its vertex colors) and swapped in when that
-// maze comes up. Dots and power cores are one InstancedMesh each.
+// built once into a wall mesh (walls with glowing edges) and a small floor
+// texture with the glow of the walls baked in, and swapped in when that maze
+// comes up. Dots and power cores are one InstancedMesh each.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -18,15 +18,18 @@ const T = 0.44; // wall thickness: corridors look wider than one cell
 const WALL_H = 0.5;
 const RIM_W = 0.08; // the glowing strip along every wall edge
 const RIM_H = 0.035;
-const FLOOR_STEP = 0.5; // floor vertex spacing, for the baked glow
+const FLOOR_TW = 256; // floor texture size, for the baked glow
+const FLOOR_TH = 128;
+const GLOW_REACH = 2; // cells: every floor texel is closer to a wall than this
 const PLATFORM_MARGIN = 0.75; // floor beyond the outer wall centres
 const PLATFORM_H = 0.9;
 const GROUND_Y = -3.2; // the grid far below the platform
 const GRID_STEP = 2;
 const MAX_DOTS = 320;
-const DOT_Y = 0.32;
+const DOT_Y = 0.34;
+const DOT_R = 0.17; // bigger than the corridors need, so dots read on a 3.4" screen
 const CORES = 4;
-const CORE_Y = 0.42;
+const CORE_Y = 0.46;
 
 const FLOOR = new THREE.Color(0x080b1e);
 const WHITE = new THREE.Color(0xffffff);
@@ -38,9 +41,20 @@ const tmpColor = new THREE.Color();
 // A box from (x0, z0) to (x1, z1) in cell coordinates, y0 to y1 high, with
 // lighting baked into its vertex colors (the walls use an unlit material):
 // tops get `top`, sides fade from `lo` at the floor to `hi` at the top, and
-// faces turned away from the camera are a little darker.
+// faces turned away from the camera are a little darker. The bottom and the
+// face looking up the maze are left out: the camera is always above the
+// maze and in front of it, so it never sees them.
 function slab(x0, z0, x1, z1, y0, y1, top, lo, hi) {
   const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+  // BoxGeometry's faces are +x, -x, +y, -y, +z, -z, six indices each.
+  const index = g.index.array;
+  const kept = [];
+  for (let f = 0; f < 6; f++) {
+    if (f === 3 || f === 5) continue;
+    for (let k = 0; k < 6; k++) kept.push(index[f * 6 + k]);
+  }
+  g.setIndex(kept);
+  g.clearGroups();
   g.translate(worldX((x0 + x1) / 2), (y0 + y1) / 2, worldZ((z0 + z1) / 2));
   const pos = g.attributes.position;
   const nor = g.attributes.normal;
@@ -178,34 +192,59 @@ function buildLayout(layout) {
   merged.dispose();
   for (const g of parts) g.dispose();
 
-  // Floor: a grid of vertices colored by how close they are to a wall, so
-  // the walls cast a soft neon glow on it.
+  return { walls, floor: floorTexture(rects, hue) };
+}
+
+// The floor's look: dark, with the glow of the walls baked into a small
+// texture (texel colors by distance to the nearest wall), so the walls cast
+// a soft neon light on it. Two triangles draw it.
+function floorTexture(rects, hue) {
+  const m = PLATFORM_MARGIN;
   const fw = W - 1 + m * 2;
   const fd = H - 1 + m * 2;
-  const floor = new THREE.PlaneGeometry(fw, fd, fw / FLOOR_STEP, fd / FLOOR_STEP);
-  floor.rotateX(-Math.PI / 2);
-  const pos = floor.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    const cx = pos.getX(i) + (W - 1) / 2;
-    const cy = pos.getZ(i) + (H - 1) / 2;
-    let d = 99;
-    for (let k = 0; k < rects.length; k++) {
-      const r = rects[k];
-      const dx = Math.max(r[0] - cx, 0, cx - r[2]);
-      const dy = Math.max(r[1] - cy, 0, cy - r[3]);
-      d = Math.min(d, Math.hypot(dx, dy));
+  // The walls near each cell, so a texel only measures against a few.
+  const near = [];
+  for (let cy = 0; cy < H; cy++) {
+    for (let cx = 0; cx < W; cx++) {
+      const list = [];
+      for (let k = 0; k < rects.length; k++) {
+        const r = rects[k];
+        const dx = Math.max(r[0] - cx - 0.5, 0, cx - 0.5 - r[2]);
+        const dy = Math.max(r[1] - cy - 0.5, 0, cy - 0.5 - r[3]);
+        if (dx < GLOW_REACH && dy < GLOW_REACH) list.push(r);
+      }
+      near.push(list);
     }
-    const glow = 0.42 * Math.exp(-d * 3.6) + 0.045 * Math.exp(-d * 0.9);
-    colors[i * 3] = FLOOR.r + hue.r * glow;
-    colors[i * 3 + 1] = FLOOR.g + hue.g * glow;
-    colors[i * 3 + 2] = FLOOR.b + hue.b * glow;
   }
-  floor.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  floor.translate(0, -0.01, 0);
-  const flat = floor.toNonIndexed(); // thousands of triangles too
-  floor.dispose();
-  return { walls, floor: flat };
+  const data = new Uint8Array(FLOOR_TW * FLOOR_TH * 4);
+  for (let j = 0; j < FLOOR_TH; j++) {
+    // Row 0 is the near edge of the floor (v = 0).
+    const cy = H - 1 + m - ((j + 0.5) / FLOOR_TH) * fd;
+    for (let i = 0; i < FLOOR_TW; i++) {
+      const cx = -m + ((i + 0.5) / FLOOR_TW) * fw;
+      const list = near[Math.min(H - 1, Math.max(0, Math.round(cy))) * W + Math.min(W - 1, Math.max(0, Math.round(cx)))];
+      let d = GLOW_REACH;
+      for (let k = 0; k < list.length; k++) {
+        const r = list[k];
+        const dx = Math.max(r[0] - cx, 0, cx - r[2]);
+        const dy = Math.max(r[1] - cy, 0, cy - r[3]);
+        d = Math.min(d, Math.hypot(dx, dy));
+      }
+      const glow = 0.42 * Math.exp(-d * 3.6) + 0.045 * Math.exp(-d * 0.9);
+      tmpColor.setRGB(FLOOR.r + hue.r * glow, FLOOR.g + hue.g * glow, FLOOR.b + hue.b * glow).convertLinearToSRGB();
+      const o = (j * FLOOR_TW + i) * 4;
+      data[o] = Math.round(Math.min(1, tmpColor.r) * 255);
+      data[o + 1] = Math.round(Math.min(1, tmpColor.g) * 255);
+      data[o + 2] = Math.round(Math.min(1, tmpColor.b) * 255);
+      data[o + 3] = 255;
+    }
+  }
+  const texture = new THREE.DataTexture(data, FLOOR_TW, FLOOR_TH);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
 }
 
 // ---- Dots and cores -------------------------------------------------------
@@ -213,8 +252,8 @@ function buildLayout(layout) {
 function coreGeometry() {
   // Polyhedra come without an index and the torus with one; mergeGeometries
   // needs them alike, so the torus is flattened.
-  const gem = paint(new THREE.IcosahedronGeometry(0.26, 0), 0xfff6d8);
-  const ringIndexed = new THREE.TorusGeometry(0.42, 0.045, 3, 16);
+  const gem = paint(new THREE.IcosahedronGeometry(0.31, 0), 0xfff6d8);
+  const ringIndexed = new THREE.TorusGeometry(0.5, 0.055, 3, 16);
   ringIndexed.rotateX(Math.PI / 2 - 0.5);
   const ring = paint(ringIndexed.toNonIndexed(), 0xffb347);
   const g = mergeGeometries([gem, ring]);
@@ -256,13 +295,17 @@ export function createMaze(scene) {
 
   const wallMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
   const walls = new THREE.Mesh(new THREE.BufferGeometry(), wallMaterial);
-  const floor = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true }));
+  const floorGeometry = new THREE.PlaneGeometry(W - 1 + PLATFORM_MARGIN * 2, H - 1 + PLATFORM_MARGIN * 2);
+  floorGeometry.rotateX(-Math.PI / 2);
+  floorGeometry.translate(0, -0.01, 0);
+  const floorMaterial = new THREE.MeshBasicMaterial({ map: built[0].floor });
+  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
   const gridMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
   scene.add(new THREE.Mesh(groundGrid(), gridMaterial), floor, walls);
 
   const dotMesh = new THREE.InstancedMesh(
-    new THREE.OctahedronGeometry(0.13, 0),
-    new THREE.MeshLambertMaterial({ color: 0xffe0b3, emissive: 0xb07a40 }),
+    new THREE.OctahedronGeometry(DOT_R, 0),
+    new THREE.MeshLambertMaterial({ color: 0xffe6c0, emissive: 0xc8904e }),
     MAX_DOTS,
   );
   dotMesh.count = 0;
@@ -275,7 +318,7 @@ export function createMaze(scene) {
   );
   coreMesh.frustumCulled = false;
   scene.add(coreMesh);
-  const coreGlow = new THREE.InstancedMesh(glowDisc(0.9), glowMaterial(0xff9a2e, 0.8), CORES);
+  const coreGlow = new THREE.InstancedMesh(glowDisc(1.05), glowMaterial(0xff9a2e, 0.85), CORES);
   coreGlow.frustumCulled = false;
   scene.add(coreGlow);
   const coreCell = new Int16Array(CORES);
@@ -320,7 +363,7 @@ export function createMaze(scene) {
       this.name = layout.name;
       this.hue = layout.hue;
       walls.geometry = built[this.index].walls;
-      floor.geometry = built[this.index].floor;
+      floorMaterial.map = built[this.index].floor;
       gridMaterial.color.setHex(layout.hue).multiplyScalar(0.32);
 
       const rows = layout.rows;
@@ -356,7 +399,7 @@ export function createMaze(scene) {
             slot[c] = n;
             dummy.position.set(worldX(x), DOT_Y, worldZ(y));
             dummy.rotation.set(0, 0.6, 0);
-            dummy.scale.set(1, 1.25, 1);
+            dummy.scale.set(1, 1.2, 1);
             dummy.updateMatrix();
             dotMesh.setMatrixAt(n++, dummy.matrix);
           } else if (ch === 'o' && cores < CORES) {
