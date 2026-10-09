@@ -8,6 +8,7 @@
 //   swift scripts/asc.swift listing <json> <shots>  the App Store page: texts, categories, age rating,
 //                                           review notes (AppStore/listing.json) and screenshots (*.png)
 //   swift scripts/asc.swift free-everywhere free, in every territory (and new ones as they come)
+//   swift scripts/asc.swift version <v> <n> the version being prepared becomes <v>, with build <n> (not submitted)
 //   swift scripts/asc.swift builds          the latest builds and their processing state
 //   swift scripts/asc.swift tester <email>  add a team member to the internal group that gets every build
 //
@@ -340,6 +341,19 @@ func freeEverywhere() {
     } catch { die("setting availability failed: \(error)") }
 }
 
+func prepareVersion(_ versionString: String, _ buildNumber: String) {
+    guard let appID = app()?["id"] as? String else { die("no app record") }
+    guard let version = list("/v1/apps/\(appID)/appStoreVersions?filter[platform]=IOS").first(where: {
+        ["PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED"].contains(attributes($0)["appStoreState"] as? String ?? "")
+    }), let versionID = version["id"] as? String else { die("no version being prepared") }
+    guard let build = list("/v1/builds?filter[app]=\(appID)&filter[version]=\(buildNumber)").first, let buildID = build["id"] as? String else {
+        die("no build \(buildNumber)")
+    }
+    patch("appStoreVersions", versionID, attributes: ["versionString": versionString],
+          relationships: ["build": ["data": ["type": "builds", "id": buildID]]])
+    print("version \(versionString) with build \(buildNumber), ready to submit")
+}
+
 func builds() {
     guard let id = app()?["id"] as? String else { die("no app record") }
     for build in list("/v1/builds?filter[app]=\(id)&sort=-uploadedDate&limit=5") {
@@ -395,6 +409,9 @@ case "listing":
     guard args.count == 3 else { die("usage: listing <listing.json> <screenshots folder>") }
     listing(args[args.startIndex + 1], args[args.startIndex + 2])
 case "free-everywhere": freeEverywhere()
+case "version":
+    guard args.count == 3 else { die("usage: version <version string> <build number>") }
+    prepareVersion(args[args.startIndex + 1], args[args.startIndex + 2])
 case "builds": builds()
 case "tester":
     guard args.count == 2 else { die("usage: tester <email>") }
