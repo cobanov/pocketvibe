@@ -15,6 +15,14 @@ geçmişinde (`git log -- docs/handoff.md`).
 - **Handheld ve Android 0.7.1** (`v0.7.1` "Latest", `android-v0.7.1`, 2026-10-09): Kütüphane'de mağazada
   yenisi olan oyunda rozet; A önce günceller sonra açar ("Güncelle ve oyna", güncelleme alınamazsa kurulu
   sürüm açılır). Ayarlar > Oyunlar > Tüm oyunları güncelle (tek toast). Sadece launcher değişti.
+- **İlk topluluk oyunları (2026-10-09 öğlen):** doom 0.1.0 (fatihguzeldev, PR #3, shareware
+  `doom1.wad` lisansıyla paketli) ve Flappy Bird 1.0.0 (thecsa, PR #25, arayüzü Türkçe) birleşti;
+  mağazada 23 oyun var. İkisi de cihazda denenmedi. İlk kez katkı yapanların check'i onay bekler
+  (`gh api -X POST repos/cobanov/pocketvibe-store/actions/runs/<id>/approve`). Sitenin demosu oyunları
+  yalnızca deploy sırasında çeker: birleştirmeden sonra `site/`'de `npm run deploy` (başka bir ajanın
+  commit'lenmemiş işi gitmesin diye temiz bir worktree'den). Katalog sahibi `ADMIN_LOGIN` olan oyunlara
+  `"official": true` yazıyor; launcher bunlara Store kapağında logo, sayfasında "PocketVibe" etiketi
+  koyuyor (`2b1b44c`, cihazlara bir sonraki uygulama sürümüyle gider).
 - **21 oyunun hepsi yenilendi ve mağazada** (2026-10-09 gece, pocketvibe-store PR #4-#24): Turbo Circuit
   1.3.0, diğer 20'si 1.2.0. Hepsinde ses (Pulse Dash ve Pole Star kendi sentez motorlarıyla, diğerleri
   `src/sound.js` + `public/sfx` + ACE-Step `public/music/theme.ogg`), Sound/Music seçenekli başlık ve
