@@ -1,11 +1,13 @@
 // The warehouse: the level's board (a plinth with floor tiles and wall
 // blocks) and the props around it, merged into one mesh that is rebuilt
 // whenever a level loads; the concrete floor of the hall; and the spots,
-// one InstancedMesh that pulses while a spot is still empty.
+// one InstancedMesh that pulses while a spot is still empty. Faces buried
+// between blocks, faces turned away from the camera and props outside the
+// view are left out, so a big level stays well inside the triangle budget.
 
 import * as THREE from 'three';
-import { PLINTH_H, WALL_H, box, paint, rand, reseed } from './shared.js';
-import { barrelGeometry, coneGeometry, merge, palletGeometry, rackGeometry, spotGeometry } from './models.js';
+import { NX, NZ, PLINTH_H, PX, PY, PZ, SIDES, WALL_H, boxFaces, paint, rand, reseed } from './shared.js';
+import { barrelGeometry, coneGeometry, cullHidden, merge, palletGeometry, rackGeometry, spotGeometry } from './models.js';
 
 const MAX_SPOTS = 8;
 const TILE_A = 0xf6e7c8;
@@ -48,8 +50,8 @@ function groundGeometry() {
   plane.rotateX(-Math.PI / 2);
   parts.push(paint(plane, GROUND));
   for (let i = -15; i <= 15; i++) {
-    parts.push(box(90, 0.01, 0.06, 0, 0.005, i * 3 + 0.5, SEAM));
-    parts.push(box(0.06, 0.01, 90, i * 3 + 0.5, 0.005, 0, SEAM));
+    parts.push(boxFaces(90, 0.01, 0.06, 0, 0.005, i * 3 + 0.5, SEAM, undefined, PY));
+    parts.push(boxFaces(0.06, 0.01, 90, i * 3 + 0.5, 0.005, 0, SEAM, undefined, PY));
   }
   return merge(parts);
 }
@@ -72,8 +74,9 @@ export function createWorld(scene) {
   const spotCell = new Int32Array(MAX_SPOTS);
   const dummy = new THREE.Object3D();
 
-  // Builds the board and the props for a freshly loaded puzzle.
-  function build(p) {
+  // Builds the board and the props for a freshly loaded puzzle, for the
+  // camera positions and views the view module says it may be seen from.
+  function build(p, view) {
     if (board) {
       scene.remove(board);
       board.geometry.dispose();
@@ -99,6 +102,17 @@ export function createWorld(scene) {
       }
     }
 
+    // The side faces of a cell whose neighbour is none of the kinds in the
+    // mask (bit 1 << kind; kinds are 0 nothing, 1 floor, 2 wall).
+    const kindAt = (gx, gy) => (gx >= 0 && gy >= 0 && gx < W && gy < H ? solid[gy * W + gx] : 0);
+    const open = (gx, gy, kinds) =>
+      (kinds & (1 << kindAt(gx + 1, gy)) ? 0 : PX) |
+      (kinds & (1 << kindAt(gx - 1, gy)) ? 0 : NX) |
+      (kinds & (1 << kindAt(gx, gy + 1)) ? 0 : PZ) |
+      (kinds & (1 << kindAt(gx, gy - 1)) ? 0 : NZ);
+    const SOLID = 6; // bits for kinds 1 and 2
+    const WALLS = 4; // bit for kind 2
+
     const parts = [];
     for (let c = 0; c < size; c++) {
       if (!solid[c]) continue;
@@ -107,15 +121,18 @@ export function createWorld(scene) {
       const gx = c % W;
       const gy = (c - gx) / W;
       // The plinth under the board; its top shows between the tiles as grout.
-      parts.push(box(1, PLINTH_H - 0.16, 1, x, -0.02 - (PLINTH_H - 0.16) / 2, z, PLINTH, GROUT));
-      parts.push(box(1, 0.14, 1, x, -PLINTH_H + 0.07, z, PLINTH_BAND));
+      // Only its outer sides show.
+      const outside = open(gx, gy, SOLID);
+      const grout = solid[c] === 1 ? PY : 0;
+      if (outside | grout) parts.push(boxFaces(1, PLINTH_H - 0.16, 1, x, -0.02 - (PLINTH_H - 0.16) / 2, z, PLINTH, GROUT, outside | grout));
+      if (outside) parts.push(boxFaces(1, 0.14, 1, x, -PLINTH_H + 0.07, z, PLINTH_BAND, undefined, outside));
       if (solid[c] === 1) {
         const top = (gx + gy) % 2 ? TILE_A : TILE_B;
-        parts.push(box(0.94, 0.05, 0.94, x, -0.025, z, TILE_SIDE, top));
+        parts.push(boxFaces(0.94, 0.05, 0.94, x, -0.025, z, TILE_SIDE, top, PY | SIDES));
       } else {
         const side = (gx + gy) % 2 ? WALL : WALL_ALT;
-        parts.push(box(1, WALL_H, 1, x, WALL_H / 2, z, side, WALL_RIM));
-        parts.push(box(0.8, 0.06, 0.8, x, WALL_H + 0.03, z, WALL_RIM, WALL_TOP));
+        parts.push(boxFaces(1, WALL_H, 1, x, WALL_H / 2, z, side, WALL_RIM, PY | open(gx, gy, WALLS)));
+        parts.push(boxFaces(0.8, 0.06, 0.8, x, WALL_H + 0.03, z, WALL_RIM, WALL_TOP, PY | SIDES));
       }
     }
 
@@ -143,29 +160,39 @@ export function createWorld(scene) {
         const z = gy - oz + (rand() - 0.5) * 0.3;
         const r = rand();
         const rot = (rand() - 0.5) * 0.6;
+        // Every random number is drawn either way, so the scenery stays the
+        // same whatever part of it is in view.
         if (front || r < 0.25) {
-          parts.push(place(coneGeometry(), x, gy0, z, rot));
+          if (view.sees(x, gy0 + 0.25, z, 0.9)) parts.push(place(coneGeometry(), x, gy0, z, rot));
         } else if (r < 0.55) {
           const [hex, top] = BARRELS[Math.floor(rand() * BARRELS.length)];
-          parts.push(place(barrelGeometry(hex, top), x, gy0, z, rot));
-          if (rand() < 0.5) parts.push(place(barrelGeometry(hex, top), x + 0.62, gy0, z + 0.1, rot));
+          const pair = rand() < 0.5;
+          if (view.sees(x + 0.3, gy0 + 0.4, z, 1.4)) {
+            parts.push(place(barrelGeometry(hex, top), x, gy0, z, rot));
+            if (pair) parts.push(place(barrelGeometry(hex, top), x + 0.62, gy0, z + 0.1, rot));
+          }
         } else {
-          parts.push(place(palletGeometry(Math.floor(rand() * 3)), x, gy0, z, rot * 0.3));
+          const load = Math.floor(rand() * 3);
+          if (view.sees(x, gy0 + 0.5, z, 1.3)) parts.push(place(palletGeometry(load), x, gy0, z, rot * 0.3));
         }
       }
     }
     // Racks along the back wall of the hall.
     const backZ = -oz - 3.6;
-    for (let x = -ox - 7; x <= ox + 7; x += 2.4) parts.push(place(rackGeometry(rand), x, gy0, backZ, 0));
+    for (let x = -ox - 7; x <= ox + 7; x += 2.4) {
+      const rack = rackGeometry(rand);
+      if (view.sees(x, gy0 + 1.2, backZ, 2)) parts.push(place(rack, x, gy0, backZ, 0));
+      else rack.dispose();
+    }
     // A yellow safety line around the board.
     const lw = W + 1.6;
     const lh = H + 1.6;
-    parts.push(box(lw, 0.012, 0.1, 0, gy0 + 0.006, -lh / 2, LINE));
-    parts.push(box(lw, 0.012, 0.1, 0, gy0 + 0.006, lh / 2, LINE));
-    parts.push(box(0.1, 0.012, lh, -lw / 2, gy0 + 0.006, 0, LINE));
-    parts.push(box(0.1, 0.012, lh, lw / 2, gy0 + 0.006, 0, LINE));
+    parts.push(boxFaces(lw, 0.012, 0.1, 0, gy0 + 0.006, -lh / 2, LINE, undefined, PY));
+    parts.push(boxFaces(lw, 0.012, 0.1, 0, gy0 + 0.006, lh / 2, LINE, undefined, PY));
+    parts.push(boxFaces(0.1, 0.012, lh, -lw / 2, gy0 + 0.006, 0, LINE, undefined, PY));
+    parts.push(boxFaces(0.1, 0.012, lh, lw / 2, gy0 + 0.006, 0, LINE, undefined, PY));
 
-    board = new THREE.Mesh(merge(parts), material);
+    board = new THREE.Mesh(cullHidden(merge(parts), view.eyes), material);
     scene.add(board);
 
     spots.count = Math.min(MAX_SPOTS, p.goals.length);

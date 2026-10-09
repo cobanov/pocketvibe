@@ -1,5 +1,6 @@
 // Particles from one pooled InstancedMesh: dust puffs behind pushed crates,
 // sparkles when a crate lands on a spot, and confetti when a level is done.
+// Each is a little octahedron (8 triangles; a flattened one is a flake).
 
 import * as THREE from 'three';
 
@@ -7,7 +8,7 @@ const MAX = 160;
 const CONFETTI = [0xff5c8a, 0xffc93c, 0x5ad1c4, 0x6fa8ff, 0xb98cff, 0x8ee06a, 0xff8a3d];
 
 export function createFx(scene) {
-  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial(), MAX);
+  const mesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.7), new THREE.MeshLambertMaterial(), MAX);
   mesh.frustumCulled = false;
   mesh.count = 0;
   const white = new THREE.Color(0xffffff);

@@ -2,16 +2,16 @@
   "id": "crate-pusher",
   "title": "Crate Pusher",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "A cosy 3D warehouse puzzle: push every crate onto its spot in 30 original levels, from tiny tutorials to real brain-teasers, and try to match each level's par.",
+  "version": "1.2.0",
+  "description": "A cosy 3D warehouse puzzle: push every crate onto its spot in 45 original levels, from tiny tutorials to real brain-teasers, and try to match each level's par.",
   "genre": "Puzzle",
   "controls": {
-    "D-pad": "Walk and push (hold to keep going); choose a level",
-    "A": "Play the chosen level; next level",
-    "B": "Undo (hold to rewind); back to level select (paused or level clear)",
+    "D-pad": "Walk and push (hold to keep going); choose a level or a menu item",
+    "A": "Play the chosen level; next level; select in menus",
+    "B": "Undo (hold to rewind); resume (paused); level select (level clear)",
     "X": "Restart the level",
     "L / R": "Previous / next open level",
-    "START": "Pause / resume"
+    "START": "Pause menu / resume"
   },
   "responsive": true
 }

@@ -237,10 +237,56 @@ body.handheld #legend {
   }
 }
 
+/* The grid shows a few rows at a time; the track on its right says where. */
+.grid-box {
+  display: flex;
+  gap: 8px;
+}
+
+.grid-wrap {
+  flex: 1;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
   gap: 5px;
+}
+
+.track {
+  display: none;
+}
+
+.grid-box.scrolls .track {
+  display: block;
+  position: relative;
+  width: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.thumb {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  border-radius: 3px;
+  background: #5ad1c4;
+}
+
+.tile.off {
+  visibility: hidden;
+}
+
+.tile.options {
+  background: #24305e;
+  box-shadow: inset 0 0 0 2px rgba(90, 209, 196, 0.6);
+  color: #bfe9e2;
+}
+
+.tile.options b {
+  font-size: 20px;
+  letter-spacing: 3px;
 }
 
 .tile {
@@ -322,7 +368,8 @@ body.handheld #legend {
   order: 0;
 }
 
-.tile.sel {
+.tile.sel,
+.tile.options.sel {
   box-shadow: 0 0 0 3px #fff, 0 0 12px 3px rgba(255, 255, 255, 0.6);
   animation: sel 0.9s ease-in-out infinite;
   z-index: 1;
@@ -433,9 +480,10 @@ body.handheld #legend {
   color: #fff;
 }
 
-/* On the title screen callouts sit just above the menu. */
+/* On the title screen callouts sit just above the menu (its height is set
+   from the game, as it grows with the rows of tiles in view). */
 #menu:not([hidden]) ~ #callout {
-  bottom: 273px;
+  bottom: calc(var(--menu-h, 272px) + 1px);
 }
 
 #callout .warn {
@@ -565,6 +613,28 @@ body.handheld #legend {
 .panel .star {
   font-size: 34px;
   color: #ffc93c;
+}
+
+/* Menus in a panel: pause and options. */
+.panel .menu {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  margin: 2px 0;
+}
+
+.panel .menu .item {
+  min-width: 240px;
+  padding: 2px 18px;
+  border-radius: 10px;
+  color: #cfd8f5;
+}
+
+.panel .menu .item.sel {
+  background: #ffc93c;
+  color: #2c2210;
+  text-shadow: none;
 }
 
 /* The play bar fills the top, so the perf overlay goes bottom right. */

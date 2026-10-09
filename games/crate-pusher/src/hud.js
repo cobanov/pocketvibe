@@ -3,11 +3,18 @@
 // when a value changes or an event happens, never every frame.
 
 export const COLUMNS = 10; // level grid columns on the title screen
+export const TILE_ROW = 49; // px from one row of tiles to the next
 const POPUPS = 4;
 
-export function createHud(root, count) {
+// count levels, then an Options tile filling the rest of the last row; rows
+// is how many rows of tiles show at once (the grid scrolls through the rest).
+export function createHud(root, count, rows) {
   let tiles = '';
   for (let i = 0; i < count; i++) tiles += `<div class="tile"><b>${i + 1}</b><span></span></div>`;
+  const span = COLUMNS - (count % COLUMNS);
+  tiles += `<div class="tile options" style="grid-column: span ${span}"><b>OPTIONS</b></div>`;
+  const totalRows = Math.ceil((count + span) / COLUMNS);
+  const shown = Math.min(rows, totalRows);
   root.innerHTML = `
     <div id="bar">
       <div class="left"><div><small>LEVEL</small> <b id="level"></b></div><div id="name"></div></div>
@@ -17,9 +24,12 @@ export function createHud(root, count) {
     <div id="menu">
       <div class="menu-head">
         <div class="logo">CRATE<span>PUSHER</span></div>
-        <div class="menu-press"><div class="blink">Press A to play</div><div class="small">D-pad choose · A play</div></div>
+        <div class="menu-press"><div class="blink" id="press">Press A to play</div><div class="small" id="press-hint">D-pad choose · A play</div></div>
       </div>
-      <div class="grid">${tiles}</div>
+      <div class="grid-box${shown < totalRows ? ' scrolls' : ''}">
+        <div class="grid-wrap" style="height: ${shown * TILE_ROW - 5}px"><div class="grid">${tiles}</div></div>
+        <div class="track"><div class="thumb" style="height: ${(100 * shown) / totalRows}%"></div></div>
+      </div>
       <div class="menu-foot"><div id="info"></div><div id="summary"></div></div>
     </div>
     <div id="popups">${'<div class="popup"></div>'.repeat(POPUPS)}</div>
@@ -34,6 +44,10 @@ export function createHud(root, count) {
   const parEl = root.querySelector('#par');
   const menu = root.querySelector('#menu');
   const tileEls = root.querySelectorAll('.tile');
+  const gridEl = root.querySelector('.grid');
+  const thumbEl = root.querySelector('.thumb');
+  const pressEl = root.querySelector('#press');
+  const pressHintEl = root.querySelector('#press-hint');
   const infoEl = root.querySelector('#info');
   const summaryEl = root.querySelector('#summary');
   const bannerEl = root.querySelector('#banner');
@@ -45,6 +59,8 @@ export function createHud(root, count) {
   let nextPopup = 0;
   let movesPop = false;
   let selected = -1;
+  let top = 0; // the first grid row in view
+  let laidOut = false;
 
   // Restarts a CSS animation class on an element.
   function replay(el, cls) {
@@ -80,11 +96,15 @@ export function createHud(root, count) {
       menu.hidden = !visible;
     },
 
+    // Rows of tiles in view, and in all.
+    rows: shown,
+    totalRows,
+
     // Redraws every tile: locked, open, solved (best moves) or solved at par (star).
     tiles(best, pars, isOpen) {
       let solved = 0;
       let stars = 0;
-      for (let i = 0; i < tileEls.length; i++) {
+      for (let i = 0; i < count; i++) {
         const el = tileEls[i];
         const open = isOpen(i);
         const done = best[i] > 0;
@@ -96,14 +116,31 @@ export function createHud(root, count) {
         el.classList.toggle('star', star);
         el.lastChild.textContent = done ? `${best[i]}${star ? '★' : ''}` : '';
       }
-      summaryEl.textContent = `Solved ${solved}/${tileEls.length} · ★ ${stars}`;
+      summaryEl.textContent = `Solved ${solved}/${count} · ★ ${stars}`;
     },
 
-    select(i, html) {
+    // Highlights tile i (count is the Options tile), scrolling it into view.
+    select(i, html, press) {
       if (selected >= 0) tileEls[selected].classList.remove('sel');
       selected = i;
       tileEls[i].classList.add('sel');
       infoEl.innerHTML = html;
+      pressEl.textContent = press;
+      pressHintEl.textContent = i < count ? 'D-pad choose · A play' : 'D-pad choose · A open';
+      const row = Math.floor(i / COLUMNS);
+      const was = top;
+      if (row < top) top = row;
+      if (row >= top + shown) top = row - shown + 1;
+      if (top === was && laidOut) return;
+      laidOut = true;
+      // Rows out of view are hidden rather than clipped, so the selected
+      // tile's glow is never cut off.
+      gridEl.style.transform = `translateY(${-top * TILE_ROW}px)`;
+      thumbEl.style.top = `${(100 * top) / totalRows}%`;
+      for (let k = 0; k < tileEls.length; k++) {
+        const r = Math.floor(k / COLUMNS);
+        tileEls[k].classList.toggle('off', r < top || r >= top + shown);
+      }
     },
 
     // A locked tile shakes its head.
@@ -135,6 +172,13 @@ export function createHud(root, count) {
     // html is a fixed string from main.js; '' hides the message.
     message(html) {
       messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
+    },
+
+    // A panel with a list of items, the selected one highlighted.
+    menu(head, items, sel, foot) {
+      let list = '';
+      for (let i = 0; i < items.length; i++) list += `<div class="item${i === sel ? ' sel' : ''}">${items[i]}</div>`;
+      this.message(`${head}<div class="menu">${list}</div>${foot}`);
     },
   };
 }

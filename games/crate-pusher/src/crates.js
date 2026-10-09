@@ -56,6 +56,7 @@ export function createCrates(scene) {
 
   const crates = {
     count: 0,
+    dropped: 0, // crates that landed from their fall in the last update
 
     // Puts every crate on its cell. With fall set they drop in one by one.
     load(p, fall) {
@@ -98,6 +99,11 @@ export function createCrates(scene) {
       return landed[i] === 1;
     },
 
+    // True when crate i is at rest on its cell.
+    settled(i) {
+      return prog[i] >= 1;
+    },
+
     x(i) {
       return toX[i];
     },
@@ -111,6 +117,7 @@ export function createCrates(scene) {
     },
 
     update(dt, p, time) {
+      this.dropped = 0;
       for (let i = 0; i < this.count; i++) {
         landed[i] = 0;
         if (prog[i] < 1) {
@@ -133,7 +140,10 @@ export function createCrates(scene) {
           drop[i] = Math.min(1, drop[i] + dt / DROP_TIME);
           const k = Math.max(0, drop[i]);
           y = (1 - k * k) * 4;
-          if (drop[i] >= 1) squash[i] = 1;
+          if (drop[i] >= 1) {
+            squash[i] = 1;
+            this.dropped++;
+          }
         }
 
         const k = easeOut(prog[i]);

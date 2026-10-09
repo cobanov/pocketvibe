@@ -60,6 +60,63 @@ export function cylinder(r, h, x, y, z, hex, topHex, sides = 8) {
   return topHex === undefined ? paint(g, hex) : paintTop(g, topHex, hex);
 }
 
+// Faces of a box, for a mask of which to keep: a face buried against a
+// neighbour is never seen, so it is better not drawn (or counted) at all.
+export const PX = 1;
+export const NX = 2;
+export const PY = 4; // top
+export const NY = 8; // bottom
+export const PZ = 16; // towards the camera
+export const NZ = 32;
+export const SIDES = PX | NX | PZ | NZ;
+
+// Each face of a box: its normal and two edges (u x v = normal), in the
+// order BoxGeometry uses (+x, -x, +y, -y, +z, -z).
+const FACES = [
+  [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  [-1, 0, 0, 0, 0, 1, 0, 1, 0],
+  [0, 1, 0, 0, 0, 1, 1, 0, 0],
+  [0, -1, 0, 1, 0, 0, 0, 0, 1],
+  [0, 0, 1, 1, 0, 0, 0, 1, 0],
+  [0, 0, -1, 0, 1, 0, 1, 0, 0],
+];
+const CORNERS = [-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]; // two triangles, (u, v) signs
+
+// Like box, with only the faces in mask, written straight out as flat
+// triangles (position, normal, color) for merging.
+export function boxFaces(w, h, d, x, y, z, hex, topHex, mask) {
+  const size = [w / 2, h / 2, d / 2];
+  const count = 6 * ((mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1) + ((mask >> 3) & 1) + ((mask >> 4) & 1) + ((mask >> 5) & 1));
+  const pos = new Float32Array(count * 3);
+  const nor = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  let o = 0;
+  for (let f = 0; f < 6; f++) {
+    if (!(mask & (1 << f))) continue;
+    const [nx, ny, nz, ux, uy, uz, vx, vy, vz] = FACES[f];
+    tmpColor.setHex(f === 2 && topHex !== undefined ? topHex : hex);
+    for (let k = 0; k < 6; k++) {
+      const su = CORNERS[k * 2];
+      const sv = CORNERS[k * 2 + 1];
+      pos[o] = x + (nx + ux * su + vx * sv) * size[0];
+      pos[o + 1] = y + (ny + uy * su + vy * sv) * size[1];
+      pos[o + 2] = z + (nz + uz * su + vz * sv) * size[2];
+      nor[o] = nx;
+      nor[o + 1] = ny;
+      nor[o + 2] = nz;
+      col[o] = tmpColor.r;
+      col[o + 1] = tmpColor.g;
+      col[o + 2] = tmpColor.b;
+      o += 3;
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+
 // A soft round blob (white in the middle, clear at the edge) drawn on a
 // small canvas: used for fake shadows and the glow under finished crates.
 // Drawn once and shared.

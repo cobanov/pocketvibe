@@ -3,12 +3,14 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CRATE, box, cylinder, paint, paintTop } from './shared.js';
+import { CRATE, PY, box, boxFaces, cylinder, paint, paintTop } from './shared.js';
 
 // Polyhedra come without an index and boxes with one; mergeGeometries needs
-// them all alike, so everything is flattened first.
+// them all alike, so everything is flattened first (and texture coordinates,
+// which nothing here uses, are dropped).
 export function merge(parts) {
   const flat = parts.map((g) => (g.index ? g.toNonIndexed() : g));
+  for (const g of flat) g.deleteAttribute('uv');
   const geometry = mergeGeometries(flat);
   for (let i = 0; i < parts.length; i++) {
     parts[i].dispose();
@@ -17,8 +19,49 @@ export function merge(parts) {
   return geometry;
 }
 
+const ea = new THREE.Vector3();
+const eb = new THREE.Vector3();
+const ec = new THREE.Vector3();
+const en = new THREE.Vector3();
+const eye = new THREE.Vector3();
+
+// Keeps only the triangles of a flat (non-indexed) geometry whose front
+// faces at least one of the eye positions, or, with no eyes, those that do
+// not face down or away from the camera (which is always above, in front).
+// The rest are never on screen, but would still be drawn and counted.
+export function cullHidden(geometry, eyes = null) {
+  const pos = geometry.attributes.position;
+  const keep = [];
+  for (let t = 0; t < pos.count; t += 3) {
+    ea.fromBufferAttribute(pos, t);
+    eb.fromBufferAttribute(pos, t + 1).sub(ea);
+    ec.fromBufferAttribute(pos, t + 2).sub(ea);
+    en.crossVectors(eb, ec).normalize();
+    let seen = false;
+    if (!eyes) {
+      seen = en.y > -0.5 && en.z > -0.5;
+    } else {
+      // Measured from the triangle's middle.
+      ea.addScaledVector(eb, 1 / 3).addScaledVector(ec, 1 / 3);
+      for (let i = 0; i < eyes.length && !seen; i++) seen = en.dot(eye.subVectors(eyes[i], ea)) > -0.05;
+    }
+    if (seen) keep.push(t);
+  }
+  const g = new THREE.BufferGeometry();
+  for (const name of Object.keys(geometry.attributes)) {
+    const src = geometry.attributes[name];
+    const size = src.itemSize;
+    const out = new Float32Array(keep.length * 3 * size);
+    let o = 0;
+    for (const t of keep) for (let v = t; v < t + 3; v++) for (let k = 0; k < size; k++) out[o++] = src.array[v * size + k];
+    g.setAttribute(name, new THREE.BufferAttribute(out, size));
+  }
+  geometry.dispose();
+  return g;
+}
+
 // A wooden crate standing on y = 0: planks inside a darker frame, with a
-// diagonal brace on every side.
+// diagonal brace on every side the camera can see.
 export function crateGeometry() {
   const s = CRATE;
   const h = s / 2;
@@ -36,9 +79,10 @@ export function crateGeometry() {
       parts.push(box(t, t, s, a * (h - t / 2), h + b * (h - t / 2), 0, frame, frameTop));
     }
   }
-  // Braces across the four sides.
+  // Braces across the sides (the back one is never seen).
   const len = (s - 2 * t) * Math.SQRT2;
   for (let i = 0; i < 4; i++) {
+    if (i === 2) continue;
     const g = new THREE.BoxGeometry(len, 0.09, 0.04);
     g.rotateZ(i % 2 ? Math.PI / 4 : -Math.PI / 4);
     g.translate(0, h, h - 0.012);
@@ -46,24 +90,25 @@ export function crateGeometry() {
     parts.push(paint(g, frame));
   }
   // Plank seams on the lid.
-  parts.push(box(s - 2 * t, 0.012, 0.025, 0, s + 0.001, -0.12, frame));
-  parts.push(box(s - 2 * t, 0.012, 0.025, 0, s + 0.001, 0.12, frame));
-  return merge(parts);
+  parts.push(boxFaces(s - 2 * t, 0.012, 0.025, 0, s + 0.001, -0.12, frame, undefined, PY));
+  parts.push(boxFaces(s - 2 * t, 0.012, 0.025, 0, s + 0.001, 0.12, frame, undefined, PY));
+  return cullHidden(merge(parts));
 }
 
-// A spot on the floor: a square frame with a diamond in the middle.
+// A spot on the floor: a square frame with a diamond in the middle. Only
+// the tops: the sides are too thin to see.
 export function spotGeometry() {
   const c = 0xffffff; // tinted by the material
   const parts = [
-    box(0.7, 0.03, 0.09, 0, 0.015, -0.31, c),
-    box(0.7, 0.03, 0.09, 0, 0.015, 0.31, c),
-    box(0.09, 0.03, 0.53, -0.31, 0.015, 0, c),
-    box(0.09, 0.03, 0.53, 0.31, 0.015, 0, c),
+    boxFaces(0.7, 0.03, 0.09, 0, 0.015, -0.31, c, undefined, PY),
+    boxFaces(0.7, 0.03, 0.09, 0, 0.015, 0.31, c, undefined, PY),
+    boxFaces(0.09, 0.03, 0.53, -0.31, 0.015, 0, c, undefined, PY),
+    boxFaces(0.09, 0.03, 0.53, 0.31, 0.015, 0, c, undefined, PY),
   ];
-  const d = new THREE.BoxGeometry(0.24, 0.03, 0.24);
+  const d = boxFaces(0.24, 0.03, 0.24, 0, 0, 0, c, undefined, PY);
   d.rotateY(Math.PI / 4);
   d.translate(0, 0.015, 0);
-  parts.push(paint(d, c));
+  parts.push(d);
   return merge(parts);
 }
 

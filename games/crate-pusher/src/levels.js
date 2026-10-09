@@ -1,12 +1,14 @@
-// The 30 levels, easiest first. All are original designs for this game.
+// The levels, easiest first. All are original designs for this game.
 // One character per cell:
 //   #  wall          .  spot          $  crate         *  crate on a spot
 //   @  worker        +  worker on a spot                (space) floor
 // par is the fewest moves that solve the level (pushes count as moves),
-// found and checked by tools/solve.mjs.
+// found and checked by tools/solve.mjs. id is the level's save slot: it
+// never changes, so new levels can go anywhere in the list.
 
 export const LEVELS = [
   {
+    id: 1,
     name: 'First Push',
     par: 3,
     map: [
@@ -18,6 +20,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 2,
     name: 'Round the Bend',
     par: 5,
     map: [
@@ -30,6 +33,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 3,
     name: "Two's Company",
     par: 11,
     map: [
@@ -42,6 +46,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 4,
     name: 'Side Step',
     par: 17,
     map: [
@@ -55,6 +60,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 5,
     name: 'Loading Bay',
     par: 16,
     map: [
@@ -68,6 +74,21 @@ export const LEVELS = [
     ],
   },
   {
+    id: 31,
+    name: 'Clock In',
+    par: 21,
+    map: [
+      '##########',
+      '#@$     .#',
+      '# ## $## #',
+      '# #.   # #',
+      '#   ##   #',
+      '###    ###',
+      '  ######',
+    ],
+  },
+  {
+    id: 6,
     name: 'Twin Shelves',
     par: 25,
     map: [
@@ -80,6 +101,20 @@ export const LEVELS = [
     ],
   },
   {
+    id: 32,
+    name: 'Box Room',
+    par: 13,
+    map: [
+      '######',
+      '#.   #',
+      '#.$ $#',
+      '#$##.#',
+      '#@$ .#',
+      '######',
+    ],
+  },
+  {
+    id: 7,
     name: 'The Pocket',
     par: 25,
     map: [
@@ -94,6 +129,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 8,
     name: 'Back Door',
     par: 16,
     map: [
@@ -107,6 +143,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 9,
     name: 'Pillar Talk',
     par: 24,
     map: [
@@ -120,6 +157,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 10,
     name: 'Staircase',
     par: 30,
     map: [
@@ -133,6 +171,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 11,
     name: 'Tight Squeeze',
     par: 27,
     map: [
@@ -146,6 +185,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 12,
     name: 'Long Hall',
     par: 25,
     map: [
@@ -159,6 +199,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 13,
     name: 'Crossroads',
     par: 29,
     map: [
@@ -172,6 +213,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 14,
     name: 'Rush Hour',
     par: 29,
     map: [
@@ -185,6 +227,22 @@ export const LEVELS = [
     ],
   },
   {
+    id: 33,
+    name: 'Courtyard',
+    par: 33,
+    map: [
+      '   #####',
+      '   #@  #',
+      '####   ####',
+      '#       ..#',
+      '# $       #',
+      '####$  ####',
+      '   #   #',
+      '   #####',
+    ],
+  },
+  {
+    id: 15,
     name: 'Narrow Aisle',
     par: 40,
     map: [
@@ -199,6 +257,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 16,
     name: 'Dock Four',
     par: 45,
     map: [
@@ -212,6 +271,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 17,
     name: 'Center Stage',
     par: 46,
     map: [
@@ -225,6 +285,21 @@ export const LEVELS = [
     ],
   },
   {
+    id: 34,
+    name: 'Ring Road',
+    par: 37,
+    map: [
+      '#########',
+      '#..   $@#',
+      '# ##### #',
+      '# #   # #',
+      '#$# $ # #',
+      '#    .$.#',
+      '#########',
+    ],
+  },
+  {
+    id: 18,
     name: 'Hairpin',
     par: 46,
     map: [
@@ -238,6 +313,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 19,
     name: 'Forklift Lane',
     par: 45,
     map: [
@@ -251,6 +327,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 20,
     name: 'Night Shift',
     par: 51,
     map: [
@@ -264,6 +341,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 21,
     name: 'Overtime',
     par: 43,
     map: [
@@ -277,6 +355,21 @@ export const LEVELS = [
     ],
   },
   {
+    id: 35,
+    name: 'Tea Break',
+    par: 56,
+    map: [
+      '#########',
+      '# $@  . #',
+      '# $     #',
+      '#  ###  #',
+      '# $###. #',
+      '#.    $.#',
+      '#########',
+    ],
+  },
+  {
+    id: 22,
     name: 'Stockroom',
     par: 64,
     map: [
@@ -290,6 +383,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 23,
     name: 'Bottleneck',
     par: 66,
     map: [
@@ -303,6 +397,20 @@ export const LEVELS = [
     ],
   },
   {
+    id: 36,
+    name: 'Bay Doors',
+    par: 52,
+    map: [
+      '###########',
+      '#@# # # # #',
+      '# $ $  . .#',
+      '#.$   $   #',
+      '#.# # # # #',
+      '###########',
+    ],
+  },
+  {
+    id: 24,
     name: 'Plus Sign',
     par: 69,
     map: [
@@ -317,6 +425,21 @@ export const LEVELS = [
     ],
   },
   {
+    id: 37,
+    name: 'Shelf Life',
+    par: 49,
+    map: [
+      '##########',
+      '#@$     .#',
+      '# ###### #',
+      '# $    . #',
+      '# ##$ ## #',
+      '# $    ..#',
+      '##########',
+    ],
+  },
+  {
+    id: 25,
     name: 'Sorting Floor',
     par: 77,
     map: [
@@ -330,6 +453,21 @@ export const LEVELS = [
     ],
   },
   {
+    id: 38,
+    name: 'Mezzanine',
+    par: 70,
+    map: [
+      '#######',
+      '#@.   #',
+      '#    $#',
+      '# .#  ####',
+      '#. # $ $ #',
+      '#        #',
+      '##########',
+    ],
+  },
+  {
+    id: 26,
     name: 'Freight Lift',
     par: 85,
     map: [
@@ -343,6 +481,7 @@ export const LEVELS = [
     ],
   },
   {
+    id: 27,
     name: 'Cold Storage',
     par: 84,
     map: [
@@ -358,6 +497,36 @@ export const LEVELS = [
     ],
   },
   {
+    id: 39,
+    name: 'Spare Parts',
+    par: 78,
+    map: [
+      '  #####',
+      '###.  ##',
+      '#@$$ $ #',
+      '# # ## #',
+      '#   .  #',
+      '## # $.#',
+      ' #.   ##',
+      ' ######',
+    ],
+  },
+  {
+    id: 40,
+    name: 'Double Doors',
+    par: 73,
+    map: [
+      '#########',
+      '#   #@. #',
+      '# $ #$. #',
+      '#    $ .#',
+      '#   #$  #',
+      '#   #  .#',
+      '#########',
+    ],
+  },
+  {
+    id: 28,
     name: 'Pallet Maze',
     par: 90,
     map: [
@@ -372,6 +541,37 @@ export const LEVELS = [
     ],
   },
   {
+    id: 41,
+    name: 'Pick and Pack',
+    par: 73,
+    map: [
+      '###########',
+      '#@$      .#',
+      '# ### ###.#',
+      '# $.      #',
+      '# ###$### #',
+      '# .     $ #',
+      '###########',
+    ],
+  },
+  {
+    id: 42,
+    name: 'Conveyor',
+    par: 95,
+    map: [
+      '#####',
+      '#@  #####',
+      '# $$$ $ #',
+      '### # # #',
+      '#      .#',
+      '# # # ###',
+      '# .   ..#',
+      '#####   #',
+      '    #####',
+    ],
+  },
+  {
+    id: 29,
     name: 'Inventory Day',
     par: 115,
     map: [
@@ -385,6 +585,36 @@ export const LEVELS = [
     ],
   },
   {
+    id: 43,
+    name: 'Basement',
+    par: 126,
+    map: [
+      '  #####',
+      '###   ###',
+      '#  .. . #',
+      '# # # # #',
+      '# $  $  #',
+      '###$#$###',
+      '  #.@ #',
+      '  #####',
+    ],
+  },
+  {
+    id: 44,
+    name: 'Big Delivery',
+    par: 127,
+    map: [
+      '#######',
+      '# ..  #',
+      '#     #',
+      '# .# $####',
+      '# .#$$ $@#',
+      '#    . $ #',
+      '##########',
+    ],
+  },
+  {
+    id: 30,
     name: 'Grand Warehouse',
     par: 131,
     map: [
@@ -396,6 +626,22 @@ export const LEVELS = [
       '#   #$$.$ #',
       '#  .  $@###',
       '#########',
+    ],
+  },
+  {
+    id: 45,
+    name: 'Closing Time',
+    par: 126,
+    map: [
+      '###########',
+      '#   .#@   #',
+      '# ##. $## #',
+      '#    #  $ #',
+      '## # # #$##',
+      '#    ..   #',
+      '# ## #$## #',
+      '#       $.#',
+      '###########',
     ],
   },
 ];
