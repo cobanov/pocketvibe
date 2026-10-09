@@ -37,8 +37,9 @@ background, while the WAV would be 19 MB.
 
 ## The games' sounds
 
-The five games PocketVibe ships with (Brick Breaker, Turbo Circuit, Jet Rush, Tower Stack, Road
-Hopper) get their sound from here too.
+The games in `games/` get their sound from here too, starting with the five PocketVibe ships with
+(Brick Breaker, Turbo Circuit, Jet Rush, Tower Stack, Road Hopper). Pulse Dash and Pole Star
+synthesise their own music in the game, in time with play.
 
 - `sound.js` is the games' sound module: each game has an unchanged copy in `src/sound.js`. It loads
   the effects and the music, plays them through Web Audio, saves the player's Sound and Music
@@ -64,6 +65,20 @@ Hopper) get their sound from here too.
 | Brick Breaker | seed 7103 | 1980s arcade electro, D minor, 118 BPM | 24 bars, 49.0 s |
 | Tower Stack | seed 7103 | dreamy lo-fi, F major, 86 BPM | 16 bars, 44.7 s |
 | Road Hopper | seed 7102 | bouncy cartoon (marimba, pizzicato, ukulele), C major, 112 BPM | 24 bars, 51.4 s |
+| Block Drop | seed 7101 | focused electronic puzzle, B minor, 124 BPM | 24 bars, 46.1 s |
+| Cloud Climber | seed 7103 | airy happy platformer (glockenspiel, flute synth), D major, 120 BPM | 24 bars, 48.0 s |
+| Crate Pusher | seed 7102 | cosy puzzle (electric piano, vibraphone), B-flat major, 92 BPM | 16 bars, 41.7 s |
+| Maze Chase | seed 7101 | arcade synthwave with a chiptune lead, C minor, 132 BPM | 24 bars, 43.3 s |
+| Mini Golf | seed 7102 | relaxed bossa nova, G major, 100 BPM | 16 bars, 38.4 s |
+| Neon Pinball | seed 7101 | neon synth funk, E minor, 126 BPM | 24 bars, 46.5 s |
+| Rock Blaster | seed 7101 | dark spacey electronic, F minor, 120 BPM | 24 bars, 48.0 s |
+| Lane Runner | seed 7103 | high-energy electronic dance, F-sharp minor, 140 BPM | 24 bars, 41.1 s |
+| Sky Hopper | seed 7101 | light chiptune pop, E-flat major, 110 BPM | 16 bars, 34.6 s |
+| Snake | seed 7102 | playful jazzy funk, G minor, 116 BPM | 24 bars, 50.1 s |
+| Snow Slalom | seed 7101 | winter downhill electronic, C-sharp minor, 128 BPM | 24 bars, 45.0 s |
+| Star Defender | seed 7103 | 1980s sci-fi synth march, A minor, 118 BPM | 24 bars, 48.8 s |
+| Tank Brigade | seed 7101 | electronic military march, D minor, 112 BPM | 16 bars, 34.9 s |
+| Tile Merge | seed 7103 | calm minimalist (piano, kalimba), A-flat major, 84 BPM | 16 bars, 45.2 s |
 
 ```sh
 uv run --no-project --with numpy --with scipy --with soundfile --with librosa --with pyloudnorm \
