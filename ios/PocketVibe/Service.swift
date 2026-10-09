@@ -22,6 +22,10 @@ final class Service {
     private static let active: Set = ["queued", "downloading", "installing"]
     private static let maxCatalog = 4 << 20
     private static let maxCover = 2 << 20
+    // The app's App Store age rating. Games rated above it (or not rated) are
+    // left out of the store here, as guideline 4.7.5 asks; their age comes
+    // from the store's catalog (the pocketvibe-store repository).
+    private static let maxAge = 9
 
     // The handheld's typeface, so text takes the same room as there; a phone's
     // viewport, unzoomable; and no text selection or callouts under a thumb.
@@ -273,6 +277,7 @@ final class Service {
         var entries: [[String: Any]] = []
         for case let game as [String: Any] in list {
             guard let id = game["id"] as? String, isGameID(id), game["title"] is String, game["download"] is String else { continue }
+            guard let age = game["age"] as? Int, age <= Self.maxAge else { continue }
             var entry: [String: Any] = [:]
             for (key, value) in game where !(Self.textFields.contains(key) && !(value is String)) { entry[key] = value }
             if entry["controls"] != nil && !(entry["controls"] is [String: Any]) { entry["controls"] = nil }
