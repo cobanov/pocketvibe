@@ -26,6 +26,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.cobanov.pocketvibe
         SWIFT_OBJC_BRIDGING_HEADER: PocketVibe/BridgingHeader.h
+        CODE_SIGN_ENTITLEMENTS: PocketVibe/PocketVibe.entitlements
         PRODUCT_NAME: PocketVibe
         INFOPLIST_FILE: PocketVibe/Info.plist
         GENERATE_INFOPLIST_FILE: NO

@@ -4,6 +4,7 @@
 //   swift scripts/asc.swift probe           what exists: app record, bundle id, certificates
 //   swift scripts/asc.swift ensure-app      register the bundle id; create the app record if the API allows
 //   swift scripts/asc.swift profile <sha1>  App Store profile for the distribution certificate with that SHA-1
+//   swift scripts/asc.swift capability <T>  turn on a capability (ASSOCIATED_DOMAINS, ...) for the bundle id
 //   swift scripts/asc.swift builds          the latest builds and their processing state
 //   swift scripts/asc.swift tester <email>  add a team member to the internal group that gets every build
 //
@@ -125,7 +126,8 @@ func profile(certSHA1: String) {
     guard let bundle = bundle(), let bid = bundle["id"] as? String else { die("register the bundle id first (ensure-app)") }
     guard let cert = list("/v1/certificates?limit=200").first(where: { sha1(of: $0) == certSHA1.uppercased() }),
           let certID = cert["id"] as? String else { die("no certificate with SHA-1 \(certSHA1)") }
-    for old in list("/v1/profiles?filter[name]=\(profileName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)") {
+    // The old profile goes first: two of the same name are refused.
+    for old in list("/v1/profiles?limit=200") where attributes(old)["name"] as? String == profileName {
         if let id = old["id"] as? String { _ = try? call("DELETE", "/v1/profiles/\(id)") }
     }
     do {
@@ -146,6 +148,22 @@ func profile(certSHA1: String) {
         try file.write(to: URL(fileURLWithPath: path))
         print("profile \"\(profileName)\" written to \(path)")
     } catch { die("creating the profile failed: \(error)") }
+}
+
+func capability(_ type: String) {
+    guard let bid = bundle()?["id"] as? String else { die("register the bundle id first (ensure-app)") }
+    do {
+        try call("POST", "/v1/bundleIdCapabilities", ["data": [
+            "type": "bundleIdCapabilities",
+            "attributes": ["capabilityType": type],
+            "relationships": ["bundleId": ["data": ["type": "bundleIds", "id": bid]]],
+        ]])
+        print("\(type) turned on; make the profile again (profile <sha1>)")
+    } catch let error as APIError where error.status == 409 {
+        print("\(type) was already on")
+    } catch {
+        die("turning on \(type) failed: \(error)")
+    }
 }
 
 func builds() {
@@ -196,6 +214,9 @@ case "ensure-app": ensureApp()
 case "profile":
     guard args.count == 2 else { die("usage: profile <certificate sha1>") }
     profile(certSHA1: args[args.startIndex + 1])
+case "capability":
+    guard args.count == 2 else { die("usage: capability <type>") }
+    capability(args[args.startIndex + 1])
 case "builds": builds()
 case "tester":
     guard args.count == 2 else { die("usage: tester <email>") }

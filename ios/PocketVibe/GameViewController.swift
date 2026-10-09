@@ -14,6 +14,7 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
     private var web: WKWebView!
     private var combo = Set<Key>() // Start and Select, while held on the screen
     private var leaveTimer: Timer?
+    private var linkedGame: String? // a game a link asked for, opened with the launcher
     private var gamepadLink: CADisplayLink?
     private var gamepadHeld = Set<Key>()
 
@@ -120,7 +121,8 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
 
     // The game's fps counter averages half a second, so one slow frame does
     // not show in it; its PERF line (with Show FPS) has the slowest of the
-    // last two seconds, shown here at the game's top left.
+    // last two seconds, shown here at the game's top left. Debug builds only,
+    // as it comes through the console's message handler.
     private lazy var slowest: UILabel = {
         let label = UILabel()
         label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .bold)
@@ -198,9 +200,11 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
         config.userContentController.addUserScript(WKUserScript(source: Self.audioScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.addUserScript(WKUserScript(source: Self.layerScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.addUserScript(WKUserScript(source: Self.noGamepadScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
+        #if DEBUG
+        // Only in debug builds: a message handler is a native API every frame
+        // could reach, and the App Store's guideline 4.7.2 keeps those from games.
         config.userContentController.addUserScript(WKUserScript(source: Self.consoleScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         config.userContentController.add(WeakHandler(self), name: "console")
-        #if DEBUG
         // Frame timing tests: each slow frame in the game, with what WebGL and Web Audio did in it.
         if ProcessInfo.processInfo.environment["POCKETVIBE_FRAMELOG"] == "1" {
             config.userContentController.addUserScript(WKUserScript(source: Self.frameLogScript, injectionTime: .atDocumentStart, forMainFrameOnly: false))
@@ -226,7 +230,18 @@ final class GameViewController: UIViewController, WKNavigationDelegate, WKScript
         service.leftGame()
         root.gameAspect = nil
         slowest.isHidden = true
-        web.load(URLRequest(url: service.launcherUrl))
+        var url = service.launcherUrl
+        if let game = linkedGame, game.range(of: "^[a-z0-9][a-z0-9-]{0,63}$", options: .regularExpression) != nil {
+            url = URL(string: url.absoluteString + "&game=\(game)")!
+        }
+        linkedGame = nil
+        web.load(URLRequest(url: url))
+    }
+
+    /// From a link: the game's page in the launcher (?game=<id>), leaving a game if one is open.
+    func openGame(_ id: String) {
+        linkedGame = id
+        if isViewLoaded { openLauncher() }
     }
 
     // The launcher and games are on this device; nothing navigates away.

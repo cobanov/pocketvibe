@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Links to a game's page (pocketvibe.dev/game/<id>/) open the game here;
+	     the site's /.well-known/apple-app-site-association says so too. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:pocketvibe.dev</string>
+		<string>applinks:www.pocketvibe.dev</string>
+	</array>
+</dict>
+</plist>
