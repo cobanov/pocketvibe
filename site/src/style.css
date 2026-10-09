@@ -842,6 +842,25 @@ h1 span {
   font-size: 15px;
 }
 
+/* A mouse cannot hold Start and Select at once, so a game has this way out too. */
+.leave {
+  height: 34px;
+  margin: 12px 0 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.leave:hover {
+  background: #2d3142;
+}
+
 #keys {
   display: flex;
   flex-wrap: wrap;

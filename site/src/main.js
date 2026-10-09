@@ -14,6 +14,7 @@ const off = screen.querySelector('.off');
 const status = document.getElementById('status');
 const keyList = document.getElementById('keys');
 const covers = document.querySelector('.covers');
+const leave = document.querySelector('.help .leave');
 // On a phone the handheld's own buttons are the controls; elsewhere, the keyboard.
 const touch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 const calm = matchMedia('(prefers-reduced-motion: reduce)');
@@ -124,7 +125,9 @@ for (const button of handheld.querySelectorAll('[data-key]')) {
 // With the handheld focused, the keyboard plays it without scrolling the page.
 for (const type of ['keydown', 'keyup']) {
   handheld.addEventListener(type, (e) => {
-    if (e.target !== handheld || !(e.code in KEY_NAMES)) return;
+    if (e.target !== handheld) return;
+    if (e.code === 'Escape' && type === 'keydown') return goHome();
+    if (!(e.code in KEY_NAMES)) return;
     e.preventDefault();
     wake();
     if (!e.repeat) send(e.code, type === 'keydown');
@@ -188,7 +191,9 @@ frame.addEventListener('load', () => {
   // Keys typed into the screen itself light the buttons too.
   for (const type of ['keydown', 'keyup']) {
     win.addEventListener(type, (e) => {
-      if (!e.isTrusted || !(e.code in KEY_NAMES)) return;
+      if (!e.isTrusted) return;
+      if (e.code === 'Escape' && type === 'keydown') return goHome();
+      if (!(e.code in KEY_NAMES)) return;
       wake();
       show(e.code, type === 'keydown');
     });
@@ -212,6 +217,12 @@ function goHome() {
   for (const code of [...held]) show(code, false);
   frame.src = LAUNCHER;
 }
+
+// Esc and the button under the handheld leave a game in one press.
+leave.addEventListener('click', () => {
+  goHome();
+  handheld.focus({ preventScroll: true });
+});
 
 // Quit in the launcher switches the handheld off.
 new BroadcastChannel('pocketvibe-demo').addEventListener('message', (e) => {
@@ -294,7 +305,8 @@ function statusLine() {
   if (mode === 'off') return ['PocketVibe is closed.'];
   if (mode === 'game') {
     const title = games.find((g) => g.id === gameId)?.title ?? 'a game';
-    return ['Playing ', el('b', '', title), '. Hold ', ...caps('START'), ' and ', ...caps('SELECT'), ' to go back to the launcher.'];
+    const esc = touch ? [] : [', or press ', el('kbd', '', 'Esc'), ','];
+    return ['Playing ', el('b', '', title), '. Hold ', ...caps('START'), ' and ', ...caps('SELECT'), ...esc, ' to go back to the launcher.'];
   }
   if (!woke) return ["The real launcher, with every game in the store."];
   if (touch) return ["Tap the handheld's buttons to play."];
@@ -316,6 +328,7 @@ function keyRows() {
 
 function render() {
   status.replaceChildren(...statusLine());
+  leave.hidden = mode !== 'game';
   keyList.className = mode === 'game' ? 'controls' : '';
   keyList.replaceChildren(...keyRows().map(([keys, does]) => el('div', '', el('dt', '', ...keys), el('dd', '', ...[does].flat()))));
 }
