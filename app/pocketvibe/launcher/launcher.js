@@ -358,6 +358,15 @@ function stateHtml(game) {
   return `<div class="state">${sizeText(game.size) || t('get')}</div>`;
 }
 
+// PocketVibe's own games carry its logo on their covers in the store; the
+// community's carry nothing, and their author's name says who made them.
+const LOGO = `<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="3" width="44" height="30" rx="6" fill="#ffc83d"/><rect x="15" y="8" width="34" height="20" rx="2" fill="#0f1016"/><rect x="10" y="35" width="44" height="26" rx="6" fill="#ffc83d"/><path d="M19 42h4v4h4v4h-4v4h-4v-4h-4v-4h4z" fill="#232634"/><circle cx="41" cy="45" r="3" fill="#232634"/><circle cx="47" cy="50" r="3" fill="#232634"/></svg>`;
+
+function officialHtml(game, label = false) {
+  if (!game.official) return '';
+  return `<div class="official${label ? ' labeled' : ''}">${LOGO}${label ? '<span>PocketVibe</span>' : ''}</div>`;
+}
+
 // Small label over a store card's cover: download progress or install state.
 function badgeHtml(game) {
   if (downloading(game.id)) return `<div class="downloading">${ringHtml(game.id)}</div>`;
@@ -373,7 +382,7 @@ function cardHtml(game, index, focused) {
   const meta = store ? [game.author, sizeText(game.size)] : [game.author, game.version && `v${game.version}`];
   return `
     <div class="card${focused ? ' focus' : ''}" data-id="${game.id}" data-index="${index}">
-      <div class="cover-wrap">${coverHtml(game)}${store || game.update || downloading(game.id) ? badgeHtml(game) : ''}</div>
+      <div class="cover-wrap">${coverHtml(game)}${store ? officialHtml(game) : ''}${store || game.update || downloading(game.id) ? badgeHtml(game) : ''}</div>
       <div class="title">${escapeHtml(game.title)}</div>
       <div class="meta">${escapeHtml(meta.filter(Boolean).join(' · '))}</div>
     </div>`;
@@ -421,7 +430,7 @@ function detailHtml(game) {
   return `
     <div class="detail" data-id="${game.id}">
       <div class="detail-top">
-        <div class="cover-wrap">${coverHtml(game)}${detailBadgeHtml(game, installed)}</div>
+        <div class="cover-wrap">${coverHtml(game)}${officialHtml(game, true)}${detailBadgeHtml(game, installed)}</div>
         <div class="detail-info">
           <div class="detail-title">${escapeHtml(game.title)}</div>
           <div class="meta">${meta.map(escapeHtml).join(' · ')}</div>

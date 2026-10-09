@@ -110,7 +110,7 @@ async function requireAdmin(request: Request, env: Env) {
   return login;
 }
 
-function catalogEntry(game: GameRow, origin: string) {
+function catalogEntry(game: GameRow, origin: string, env: Env) {
   return {
     id: game.id,
     title: game.title,
@@ -126,12 +126,14 @@ function catalogEntry(game: GameRow, origin: string) {
     ...(game.cover_key && { cover: `${origin}/files/${game.cover_key}` }),
     downloads: game.downloads,
     updated: game.updated_at,
+    // Made by PocketVibe itself, not by the community.
+    ...(game.owner === env.ADMIN_LOGIN && { official: true }),
   };
 }
 
 async function catalog(env: Env, origin: string) {
   const { results } = await env.DB.prepare('SELECT * FROM games ORDER BY updated_at DESC').all<GameRow>();
-  return json({ name: env.STORE_NAME, games: results.map((g) => catalogEntry(g, origin)) }, 200, {
+  return json({ name: env.STORE_NAME, games: results.map((g) => catalogEntry(g, origin, env)) }, 200, {
     'Cache-Control': 'public, max-age=60',
   });
 }

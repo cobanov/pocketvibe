@@ -287,6 +287,32 @@ main {
   color: var(--bad);
 }
 
+/* PocketVibe's own games: its logo in the cover's other corner */
+
+.official {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.official svg {
+  width: 18px;
+  height: 18px;
+}
+
+.official.labeled {
+  padding: 2px 8px 2px 4px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffc83d;
+}
+
 /* Download progress: a ring over the cover, or beside a label */
 
 .downloading {
