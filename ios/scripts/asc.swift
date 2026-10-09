@@ -5,7 +5,7 @@
 //   swift scripts/asc.swift ensure-app      register the bundle id; create the app record if the API allows
 //   swift scripts/asc.swift profile <sha1>  App Store profile for the distribution certificate with that SHA-1
 //   swift scripts/asc.swift builds          the latest builds and their processing state
-//   swift scripts/asc.swift testers         an internal group with every build, holding every team member
+//   swift scripts/asc.swift tester <email>  add a team member to the internal group that gets every build
 //
 // Environment: ASC_KEY_ID, ASC_ISSUER_ID, APPLE_TEAM_ID (the key is read from
 // ~/.appstoreconnect/private_keys/AuthKey_<ASC_KEY_ID>.p8).
@@ -156,7 +156,7 @@ func builds() {
     }
 }
 
-func testers() {
+func tester(_ email: String) {
     guard let id = app()?["id"] as? String else { die("no app record") }
     let groups = list("/v1/apps/\(id)/betaGroups?limit=200")
     var group = groups.first { attributes($0)["isInternalGroup"] as? Bool == true }
@@ -171,22 +171,21 @@ func testers() {
         } catch { die("creating the internal group failed: \(error)") }
     }
     guard let gid = group?["id"] as? String else { die("no internal group") }
-    let users = list("/v1/users?limit=200")
-    for user in users {
-        let a = attributes(user)
-        guard let email = a["username"] as? String else { continue }
-        do {
-            try call("POST", "/v1/betaTesters", ["data": [
-                "type": "betaTesters",
-                "attributes": ["email": email, "firstName": a["firstName"] ?? "", "lastName": a["lastName"] ?? ""],
-                "relationships": ["betaGroups": ["data": [["type": "betaGroups", "id": gid]]]],
-            ]])
-            print("tester added: \(email)")
-        } catch let error as APIError where error.status == 409 {
-            print("tester already there: \(email)")
-        } catch {
-            print("could not add \(email): \(error)")
-        }
+    // Only the one asked for: everyone on the team would get an invitation.
+    guard let user = list("/v1/users?limit=200").first(where: { (attributes($0)["username"] as? String)?.lowercased() == email.lowercased() })
+    else { die("\(email) is not on the App Store Connect team") }
+    let a = attributes(user)
+    do {
+        try call("POST", "/v1/betaTesters", ["data": [
+            "type": "betaTesters",
+            "attributes": ["email": email, "firstName": a["firstName"] ?? "", "lastName": a["lastName"] ?? ""],
+            "relationships": ["betaGroups": ["data": [["type": "betaGroups", "id": gid]]]],
+        ]])
+        print("tester added: \(email)")
+    } catch let error as APIError where error.status == 409 {
+        print("tester already there: \(email)")
+    } catch {
+        die("could not add \(email): \(error)")
     }
 }
 
@@ -198,6 +197,8 @@ case "profile":
     guard args.count == 2 else { die("usage: profile <certificate sha1>") }
     profile(certSHA1: args[args.startIndex + 1])
 case "builds": builds()
-case "testers": testers()
-default: die("usage: swift scripts/asc.swift probe|ensure-app|profile <sha1>|builds|testers")
+case "tester":
+    guard args.count == 2 else { die("usage: tester <email>") }
+    tester(args[args.startIndex + 1])
+default: die("usage: swift scripts/asc.swift probe|ensure-app|profile <sha1>|builds|tester <email>")
 }
