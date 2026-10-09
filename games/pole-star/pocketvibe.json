@@ -2,12 +2,14 @@
   "id": "pole-star",
   "title": "Pole Star",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Sit back at the Pole Star Lounge and watch Stella dance her pole routine to a disco loop. Throw her a dollar whenever you like; make it rain and she breaks into her showpiece spin.",
+  "version": "1.2.0",
+  "description": "Sit back at the Pole Star Lounge and watch Stella dance her pole routine to a disco loop. Throw her a dollar whenever you like and she waves or blows you a kiss; make it rain and she breaks into her showpiece spin.",
   "genre": "Arcade",
   "controls": {
-    "A": "Throw a dollar",
-    "START": "Pause / resume"
+    "D-pad": "Choose in menus",
+    "A": "Throw a dollar; pick a menu entry",
+    "B": "Back in menus, resume",
+    "START": "Pause menu / resume"
   },
   "responsive": true
 }

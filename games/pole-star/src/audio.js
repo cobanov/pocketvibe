@@ -5,6 +5,18 @@
 // looped. All three play from the same moment, so they stay locked
 // together, and the lead joins when the club gets lively. The game reads
 // the beat from the audio clock, so the dancer moves to what you hear.
+// Until sound may play (or if it never may) the beat runs on the wall
+// clock, and the music then comes in on the next bar line, at the place in
+// the loop where the dance is: she never jumps.
+//
+// The browser only starts audio after a key press, and the handheld's
+// gamepad buttons do not count. Inside PocketVibe the game asks the app for
+// one (POST /__pocketvibe__/unlock-audio taps a virtual key, which arrives
+// here as a real key press); in a desktop browser the first key does it.
+// The same as tools/sfx/sound.js, which the other games use.
+//
+// The player's choices (sound effects and music on or off) are saved with
+// hh.save, under the same keys as in the other games.
 
 import { BPM } from './shared.js';
 
@@ -14,7 +26,13 @@ const BAR_SEC = BEAT_SEC * 4;
 const LOOP_BARS = 4;
 const LOOP_SEC = BAR_SEC * LOOP_BARS;
 const TAIL = 0.8; // what rings past the loop's end is folded back onto its start
-const LEAD_IN = 0.08; // the music starts this long after play(), so nothing is cut
+const LEAD_IN = 0.08; // the music starts at least this long after it is asked to
+const MUSIC_VOLUME = 0.7;
+const DUCKED = 0.35; // of the music's volume, under the pause menu
+const SFX_VOLUME = 0.85;
+const MIN_GAP = 0.03; // s: the same sound does not start twice within this
+const MAX_STEP = 0.25; // s: the wall clock never jumps further than this
+const UNLOCK_URL = '/__pocketvibe__/unlock-audio';
 
 const midiToHz = (note) => 440 * 2 ** ((note - 69) / 12);
 
@@ -25,7 +43,9 @@ const CHORDS = [
   [57, 60, 64, 65],
   [56, 59, 62, 64],
 ];
-const ROOTS = [33, 38, 41, 40]; // A1, D2, F2, E2
+// A2, D3, F3, E3: an octave above a club bass, where a small speaker can
+// still play it.
+const ROOTS = [45, 50, 53, 52];
 const LEAD = [
   [76, -1, -1, 74, 76, -1, 79, -1, 76, -1, 74, -1, 72, -1, 69, -1],
   [74, -1, -1, 72, 74, -1, 78, -1, 81, -1, 78, -1, 74, -1, -1, -1],
@@ -47,18 +67,20 @@ function noiseBuffer(ctx) {
 
 // ---------------------------------------------------------------- voices
 
-function kick(ctx, out, t, level) {
+// A kick with a click on top: the click is what a small speaker plays.
+function kick(ctx, out, noise, t, level) {
   const osc = ctx.createOscillator();
   const env = ctx.createGain();
-  osc.frequency.setValueAtTime(160, t);
-  osc.frequency.exponentialRampToValueAtTime(52, t + 0.07);
-  osc.frequency.exponentialRampToValueAtTime(40, t + 0.28);
+  osc.frequency.setValueAtTime(190, t);
+  osc.frequency.exponentialRampToValueAtTime(62, t + 0.06);
+  osc.frequency.exponentialRampToValueAtTime(48, t + 0.22);
   env.gain.setValueAtTime(0, t);
   env.gain.linearRampToValueAtTime(level, t + 0.003);
-  env.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+  env.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
   osc.connect(env).connect(out);
   osc.start(t);
-  osc.stop(t + 0.3);
+  osc.stop(t + 0.24);
+  noiseHit(ctx, out, noise, t, 'bandpass', 2400, 1.2, level * 0.5, 0.014);
 }
 
 function noiseHit(ctx, out, noise, t, type, freq, q, level, decay) {
@@ -105,9 +127,9 @@ function bassNote(ctx, out, t, freq, len, level) {
   osc.type = 'sawtooth';
   osc.frequency.value = freq;
   filter.type = 'lowpass';
-  filter.Q.value = 6;
-  filter.frequency.setValueAtTime(1300, t);
-  filter.frequency.exponentialRampToValueAtTime(220, t + len);
+  filter.Q.value = 5;
+  filter.frequency.setValueAtTime(1800, t);
+  filter.frequency.exponentialRampToValueAtTime(320, t + len);
   env.gain.setValueAtTime(0, t);
   env.gain.linearRampToValueAtTime(level, t + 0.004);
   env.gain.setValueAtTime(level, t + len * 0.6);
@@ -150,13 +172,13 @@ function groove(ctx, out, step) {
     const root = midiToHz(ROOTS[bar]);
     for (let i = 0; i < 16; i++) {
       const t = (bar * 16 + i) * step;
-      if (i % 4 === 0) kick(ctx, out, t, 0.85);
-      if (i === 4 || i === 12) clap(ctx, out, noise, t, 0.6);
+      if (i % 4 === 0) kick(ctx, out, noise, t, 0.62);
+      if (i === 4 || i === 12) clap(ctx, out, noise, t, 0.55);
       // Open hat on every offbeat, quiet closed ones between.
-      if (i % 4 === 2) noiseHit(ctx, out, noise, t, 'highpass', 7000, 0.7, 0.2, 0.16);
-      else noiseHit(ctx, out, noise, t, 'highpass', 8000, 0.7, 0.07, 0.03);
+      if (i % 4 === 2) noiseHit(ctx, out, noise, t, 'bandpass', 7000, 0.9, 0.17, 0.14);
+      else noiseHit(ctx, out, noise, t, 'bandpass', 7500, 0.9, 0.06, 0.03);
       // Disco octave bass: root, octave, root, octave on the eighths.
-      if (i % 2 === 0) bassNote(ctx, out, t, i % 4 === 0 ? root : root * 2, step * 1.7, 0.3);
+      if (i % 2 === 0) bassNote(ctx, out, t, i % 4 === 0 ? root : root * 2, step * 1.7, 0.2);
     }
   }
 }
@@ -164,7 +186,7 @@ function groove(ctx, out, step) {
 function stabs(ctx, out, step) {
   for (let bar = 0; bar < LOOP_BARS; bar++) {
     const chord = CHORDS[bar];
-    for (const [i, len, level] of [[3, 0.18, 0.05], [6, 0.32, 0.075], [11, 0.18, 0.05], [14, 0.32, 0.075]]) {
+    for (const [i, len, level] of [[3, 0.18, 0.09], [6, 0.32, 0.13], [11, 0.18, 0.09], [14, 0.32, 0.13]]) {
       stab(ctx, out, (bar * 16 + i) * step, chord, len, level);
     }
   }
@@ -187,16 +209,23 @@ function lead(ctx, out, step) {
     LEAD[bar].forEach((note, i) => {
       if (note < 0) return;
       const t = (bar * 16 + i) * step;
-      tone(ctx, dry, t, midiToHz(note), step * 1.8, 'square', 0.07);
-      tone(ctx, dry, t, midiToHz(note + 12), step * 1.2, 'triangle', 0.05);
+      tone(ctx, dry, t, midiToHz(note), step * 1.8, 'square', 0.12);
+      tone(ctx, dry, t, midiToHz(note + 12), step * 1.2, 'triangle', 0.08);
     });
   }
 }
 
-// Renders a layer and folds its tail back onto the start, for a seamless loop.
+// Renders a layer and folds its tail back onto the start, for a seamless
+// loop. A high-pass takes out the rumble a handheld's speaker cannot play
+// anyway, which would only push the rest down in the compressor.
 async function renderLayer(build) {
   const ctx = new OfflineAudioContext(1, Math.ceil((LOOP_SEC + TAIL) * RATE), RATE);
-  build(ctx, ctx.destination, BAR_SEC / 16);
+  const highpass = ctx.createBiquadFilter();
+  highpass.type = 'highpass';
+  highpass.frequency.value = 90;
+  highpass.Q.value = 0.7;
+  highpass.connect(ctx.destination);
+  build(ctx, highpass, BAR_SEC / 16);
   const rendered = await ctx.startRendering();
   const data = rendered.getChannelData(0);
   const length = Math.round(LOOP_SEC * RATE);
@@ -217,34 +246,55 @@ function renderSound(seconds, build) {
 }
 
 // Applause and cheering, written sample by sample: hundreds of claps would
-// be hundreds of nodes.
-function crowdSound(seconds, claps, roar) {
+// be hundreds of nodes. Claps are noise between about 600 Hz and 4 kHz, the
+// roar of voices between 300 Hz and 2 kHz: nothing a small speaker loses.
+function crowdSound(seconds, claps, roar, peakLevel) {
   const n = Math.ceil(seconds * RATE);
   const data = new Float32Array(n);
   for (let k = 0; k < claps; k++) {
     // Claps thin out towards the end.
     const at = Math.floor(Math.pow(Math.random(), 1.6) * (n - 400));
     const level = 0.15 + Math.random() * 0.25;
-    let lp = 0;
+    let hi = 0;
+    let hi2 = 0;
+    let lo = 0;
     for (let j = 0; j < 300; j++) {
       const white = Math.random() * 2 - 1;
-      lp += (white - lp) * 0.55; // a little duller than white noise
-      data[at + j] += (white - lp) * level * Math.exp(-j / 45);
+      hi += (white - hi) * 0.68;
+      hi2 += (hi - hi2) * 0.68;
+      lo += (white - lo) * 0.16;
+      data[at + j] += (hi2 - lo) * level * Math.exp(-j / 45);
     }
   }
-  let lp = 0;
+  let hi = 0;
+  let lo = 0;
   for (let j = 0; j < n; j++) {
-    lp += (Math.random() * 2 - 1 - lp) * 0.08;
+    const white = Math.random() * 2 - 1;
+    hi += (white - hi) * 0.43;
+    lo += (white - lo) * 0.082;
     const env = Math.min(1, j / (0.15 * RATE)) * Math.exp((-j / n) * 2.2);
-    data[j] += lp * roar * env;
+    data[j] += (hi - lo) * roar * env;
   }
+  // A short fade at the end, so it never stops with a click.
+  const fade = Math.floor(0.05 * RATE);
+  for (let j = 0; j < fade; j++) data[n - 1 - j] *= j / fade;
   let peak = 0;
   for (let j = 0; j < n; j++) peak = Math.max(peak, Math.abs(data[j]));
-  const gain = peak > 0 ? 0.8 / peak : 1;
+  const gain = peak > 0 ? peakLevel / peak : 1;
   for (let j = 0; j < n; j++) data[j] *= gain;
   const buffer = new AudioBuffer({ length: n, numberOfChannels: 1, sampleRate: RATE });
   buffer.copyToChannel(data, 0);
   return Promise.resolve(buffer);
+}
+
+// A menu blip: one or two soft notes in A minor, like the music.
+function blip(notes, level) {
+  return renderSound(0.05 + notes.length * 0.07, (ctx, out) => {
+    notes.forEach((note, i) => {
+      tone(ctx, out, i * 0.06, midiToHz(note), 0.11, 'triangle', level, 0.003);
+      tone(ctx, out, i * 0.06, midiToHz(note + 12), 0.05, 'sine', level * 0.3, 0.002);
+    });
+  });
 }
 
 const SOUNDS = {
@@ -266,38 +316,48 @@ const SOUNDS = {
       src.start(0);
       src.stop(0.16);
     }),
-  // A tip: ka-ching.
+  // A tip: ka-ching, a C major bell over the A minor loop (C and E are in
+  // both).
   ching: () =>
-    renderSound(0.6, (ctx, out) => {
-      noiseHit(ctx, out, noiseBuffer(ctx), 0, 'highpass', 3000, 0.8, 0.35, 0.03);
-      tone(ctx, out, 0.05, 2093, 0.5, 'sine', 0.22, 0.002);
-      tone(ctx, out, 0.05, 2637, 0.45, 'sine', 0.18, 0.002);
-      tone(ctx, out, 0.05, 4186, 0.2, 'sine', 0.06, 0.002);
+    renderSound(0.5, (ctx, out) => {
+      noiseHit(ctx, out, noiseBuffer(ctx), 0, 'bandpass', 4500, 0.9, 0.3, 0.025);
+      tone(ctx, out, 0.04, 2093, 0.42, 'sine', 0.3, 0.002);
+      tone(ctx, out, 0.04, 2637, 0.36, 'sine', 0.24, 0.002);
+      tone(ctx, out, 0.04, 1046.5, 0.3, 'triangle', 0.12, 0.002);
     }),
-  cheer: () => crowdSound(1.4, 110, 0.5),
-  applause: () => crowdSound(3.6, 520, 0.7),
+  cheer: () => crowdSound(1.4, 110, 0.5, 0.8),
+  applause: () => crowdSound(3.2, 480, 0.6, 0.8),
+  move: () => blip([88], 0.22),
+  select: () => blip([81, 88], 0.3),
+  back: () => blip([88, 81], 0.26),
+  pause: () => blip([84, 76], 0.3),
 };
 
 // ---------------------------------------------------------------- player
 
-export function createAudio() {
+export function createAudio(hh) {
   const Context = window.AudioContext || window.webkitAudioContext;
   const canRender = typeof OfflineAudioContext !== 'undefined';
+  const settings = { sfx: hh.load('sound.sfx', true), music: hh.load('sound.music', true) };
+  const sounds = {};
+  const lastStart = {};
   let ctx = null;
   let musicGain = null;
   let sfxGain = null;
   let layerGains = [];
   let sources = [];
-  let wanted = true; // false while paused: nothing may resume the context then
-  let audioClock = false; // the music playing now is timed by the audio clock
-  let startAt = 0; // context time of beat 0
-  let latency = 0;
-  let lastRaw = 0;
-  let lastWall = 0;
-  let songTime = 0;
   let layers = null; // [groove, stabs, lead] once rendered; [] if that failed
   let leadOn = false;
-  const sounds = {};
+  let ducked = false;
+  let hidden = false;
+  // The song's clock, in seconds since beat 0.
+  let songTime = 0;
+  let audioClock = false; // the music is playing and keeps the time
+  let startAt = 0; // context time at which song time 0 is rendered
+  let latency = 0;
+  let lastRaw = 0; // the audio clock moves in steps; when it last moved
+  let lastRawWall = 0;
+  let wallAt = -1; // the wall clock's last reading, while there is no music
 
   if (canRender) {
     for (const name of Object.keys(SOUNDS)) {
@@ -306,150 +366,231 @@ export function createAudio() {
         .catch(() => {});
     }
     Promise.all([renderLayer(groove), renderLayer(stabs), renderLayer(lead)])
-      .then((buffers) => {
-        layers = buffers;
-        ensure();
-      })
+      .then((buffers) => (layers = buffers))
       .catch(() => (layers = []));
   } else {
     layers = [];
   }
 
-  function ensure() {
-    if (!Context) return false;
-    if (!ctx) {
-      ctx = new Context();
-      // Music and sounds meet in a compressor, so together they never clip.
-      const output = ctx.createDynamicsCompressor();
-      output.threshold.value = -14;
-      output.ratio.value = 4;
-      output.connect(ctx.destination);
-      musicGain = ctx.createGain();
-      musicGain.gain.value = 0.75;
-      musicGain.connect(output);
-      sfxGain = ctx.createGain();
-      sfxGain.gain.value = 0.8;
-      sfxGain.connect(output);
-      layerGains = [1, 0.9, 0].map((v) => {
-        const g = ctx.createGain();
-        g.gain.value = v;
-        g.connect(musicGain);
-        return g;
-      });
+  if (Context) {
+    try {
+      ctx = new Context({ latencyHint: 'interactive' });
+    } catch {
+      ctx = null;
     }
-    if (wanted && ctx.state === 'suspended') ctx.resume().catch(() => {});
-    return true;
+  }
+  if (ctx) {
+    // Music and sounds meet in a compressor, so together they never clip.
+    const output = ctx.createDynamicsCompressor();
+    output.threshold.value = -10;
+    output.knee.value = 8;
+    output.ratio.value = 4;
+    output.attack.value = 0.003;
+    output.release.value = 0.2;
+    output.connect(ctx.destination);
+    musicGain = ctx.createGain();
+    musicGain.gain.value = 0;
+    musicGain.connect(output);
+    sfxGain = ctx.createGain();
+    sfxGain.gain.value = settings.sfx ? SFX_VOLUME : 0;
+    sfxGain.connect(output);
+    layerGains = [1, 1, 0].map((v) => {
+      const g = ctx.createGain();
+      g.gain.value = v;
+      g.connect(musicGain);
+      return g;
+    });
+    listenForUnlock();
   }
 
-  // The live context is made once the music is rendered (a running one
-  // slowed the rendering down badly in Chrome), or on the first press.
-  // Desktop browsers start audio only after a key press, so the context is
-  // also resumed on presses (see unlock()); the handheld allows it at once.
+  function resume() {
+    if (!ctx || hidden || ctx.state !== 'suspended') return;
+    ctx.resume().catch(() => {});
+  }
 
-  return {
-    // Called on button presses: lets desktop browsers start the sound.
-    unlock() {
-      wanted = true;
-      ensure();
-    },
-
-    get live() {
-      return !!ctx && ctx.state === 'running';
-    },
-
-    // True once the music is rendered (or failed: then the beat runs on the
-    // frame clock, silently).
-    get ready() {
-      return layers !== null;
-    },
-
-    // Starts the loop from the top; beat 0 is LEAD_IN from now.
-    play() {
-      this.stop(0);
-      songTime = -LEAD_IN;
-      lastRaw = songTime;
-      lastWall = performance.now();
-      audioClock = !!layers && layers.length === 3 && this.live;
-      if (!audioClock) return;
-      musicGain.gain.cancelScheduledValues(ctx.currentTime);
-      musicGain.gain.setValueAtTime(0.75, ctx.currentTime);
-      startAt = ctx.currentTime + LEAD_IN;
-      leadOn = false;
-      layerGains[2].gain.cancelScheduledValues(ctx.currentTime);
-      layerGains[2].gain.setValueAtTime(0, ctx.currentTime);
-      sources = layers.map((buffer, i) => {
-        const src = ctx.createBufferSource();
-        src.buffer = buffer;
-        src.loop = true;
-        src.connect(layerGains[i]);
-        src.start(startAt);
-        return src;
-      });
-      latency = Math.min(0.3, Math.max(0, (ctx.outputLatency || 0) + (ctx.baseLatency || 0)));
-    },
-
-    // How lively the club is, 0 to 1: the lead plays from 0.6 on.
-    intensity(k) {
-      const lead = k >= 0.6;
-      if (!ctx || !sources.length || lead === leadOn) return;
-      leadOn = lead;
-      layerGains[2].gain.setTargetAtTime(lead ? 0.8 : 0, ctx.currentTime, 0.4);
-    },
-
-    stop(fade) {
-      if (!sources.length) return;
-      if (ctx.state !== 'running') fade = 0;
-      const now = ctx.currentTime;
-      musicGain.gain.cancelScheduledValues(now);
-      musicGain.gain.setValueAtTime(musicGain.gain.value, now);
-      musicGain.gain.linearRampToValueAtTime(0, now + fade + 0.01);
-      for (const src of sources) {
+  function listenForUnlock() {
+    // Any real key press or touch lets the page start audio. The handler
+    // must call resume() while the browser is handling the press.
+    const onPress = (e) => {
+      if (e.isTrusted) resume();
+    };
+    addEventListener('keydown', onPress, true);
+    addEventListener('pointerdown', onPress, true);
+    document.addEventListener('visibilitychange', () => {
+      hidden = document.hidden;
+      if (hidden && ctx.state === 'running') ctx.suspend().catch(() => {});
+      else if (!hidden) resume();
+    });
+    resume();
+    // Inside PocketVibe: ask for the key press. A few tries, as the app's
+    // virtual keyboard can take a moment to appear.
+    if (!new URLSearchParams(location.search).has('handheld')) return;
+    (async () => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await new Promise((r) => setTimeout(r, attempt === 0 ? 300 : 1500));
+        if (ctx.state !== 'suspended') return;
         try {
-          src.stop(now + fade + 0.02);
+          const res = await fetch(UNLOCK_URL, { method: 'POST' });
+          if (!res.ok) return; // an app without it (Android plays without a key press)
         } catch {
-          // Already stopped.
+          return;
         }
       }
-      sources = [];
-      audioClock = false;
+    })();
+  }
+
+  function musicLevel() {
+    return settings.music ? MUSIC_VOLUME * (ducked ? DUCKED : 1) : 0;
+  }
+
+  // Glides the music to its level: from `from` at context time `at` if given.
+  function fadeMusic(seconds, at = ctx.currentTime, from = null) {
+    const g = musicGain.gain;
+    const now = ctx.currentTime;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    if (from !== null) g.linearRampToValueAtTime(from, at);
+    g.linearRampToValueAtTime(musicLevel(), at + seconds);
+  }
+
+  // Starts the layers at context time t0, each at the place in the loop the
+  // song has reached by then.
+  function startLoop(t0) {
+    const offset = (((t0 - startAt) % LOOP_SEC) + LOOP_SEC) % LOOP_SEC;
+    sources = layers.map((buffer, i) => {
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      src.connect(layerGains[i]);
+      src.start(t0, offset);
+      return src;
+    });
+  }
+
+  function stopSources(list, at) {
+    for (const src of list) {
+      try {
+        src.stop(at);
+      } catch {
+        // Already stopped.
+      }
+    }
+  }
+
+  function stopLoop(at) {
+    stopSources(sources, at);
+    sources = [];
+    audioClock = false;
+    wallAt = -1;
+  }
+
+  // From here on the audio clock keeps the time, carrying on from songTime.
+  function takeClock() {
+    latency = Math.min(0.3, Math.max(0, (ctx.outputLatency || 0) + (ctx.baseLatency || 0)));
+    startAt = ctx.currentTime - songTime - latency;
+    lastRaw = songTime;
+    lastRawWall = performance.now();
+    audioClock = true;
+  }
+
+  return {
+    // True once the music is rendered (or failed: then the beat runs on the
+    // wall clock, silently) and sound may play: start() can go.
+    get canStart() {
+      return !audioClock && !!layers && layers.length === 3 && !!ctx && ctx.state === 'running';
     },
 
+    // The music is playing and keeps the time.
+    get playing() {
+      return audioClock;
+    },
+
+    get sfxOn() {
+      return settings.sfx;
+    },
+    get musicOn() {
+      return settings.music;
+    },
+
+    // Starts the music where the song is: the layers come in on the next
+    // bar line, at their place in the loop, and the clock does not jump.
+    start() {
+      if (!this.canStart) return;
+      takeClock();
+      const now = ctx.currentTime;
+      const bar = Math.ceil((now + LEAD_IN - startAt) / BAR_SEC) * BAR_SEC;
+      const t0 = startAt + bar;
+      startLoop(t0);
+      fadeMusic(0.02, t0, 0);
+    },
+
+    // How lively the club is, 0 to 1: the lead plays from 0.6 on, and stops
+    // again below 0.5.
+    intensity(k) {
+      const lead = leadOn ? k >= 0.5 : k >= 0.6;
+      if (!ctx || lead === leadOn) return;
+      leadOn = lead;
+      layerGains[2].gain.setTargetAtTime(lead ? 1.2 : 0, ctx.currentTime, 0.4);
+    },
+
+    // Under the pause menu the music plays on, quieter; the song's clock
+    // stands still with the dance.
     pause() {
-      wanted = false;
-      if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
+      ducked = true;
+      if (ctx) fadeMusic(0.25);
     },
 
+    // Back from the pause: the music picks up where the dance stopped, with
+    // a quick fade over the jump.
     resume() {
-      wanted = true;
-      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
-      if (audioClock) lastRaw = ctx.currentTime - startAt - latency;
-      lastWall = performance.now();
+      ducked = false;
+      wallAt = -1;
+      if (!ctx) return;
+      if (!audioClock || ctx.state !== 'running') {
+        if (audioClock) stopLoop(0);
+        fadeMusic(0.25);
+        return;
+      }
+      const t0 = ctx.currentTime + LEAD_IN;
+      fadeMusic(0.3, t0, 0);
+      stopSources(sources, t0);
+      takeClock();
+      startLoop(t0);
     },
 
     // Seconds since beat 0. From the audio clock while the music plays (it
     // moves in steps, so it is extrapolated between them and never runs
-    // backwards); from the frame time when there is no sound.
-    time(dt) {
+    // backwards); from the wall clock when there is no sound.
+    time() {
+      const now = performance.now();
+      // The audio stopped under us (the system took it): carry on by the
+      // wall clock, and start() brings the music back on a bar line.
+      if (audioClock && ctx.state !== 'running') stopLoop(0);
       if (!audioClock) {
-        songTime += dt;
+        if (wallAt >= 0) songTime += Math.min(MAX_STEP, Math.max(0, now - wallAt) / 1000);
+        wallAt = now;
         return songTime;
       }
       const raw = ctx.currentTime - startAt - latency;
-      const now = performance.now();
       if (raw !== lastRaw) {
         lastRaw = raw;
-        lastWall = now;
+        lastRawWall = now;
       }
-      const t = lastRaw + (now - lastWall) / 1000;
+      const t = lastRaw + Math.min(MAX_STEP, (now - lastRawWall) / 1000);
       if (t > songTime) songTime = t;
       return songTime;
     },
 
-    sound(name, level = 1) {
+    // Plays a sound: level 0 to 1, rate 1 as rendered.
+    sound(name, level = 1, rate = 1) {
       const buffer = sounds[name];
-      if (!buffer || !ctx || ctx.state !== 'running') return;
+      if (!settings.sfx || !buffer || !ctx || ctx.state !== 'running') return;
+      const now = ctx.currentTime;
+      if (now - (lastStart[name] ?? -1) < MIN_GAP) return;
+      lastStart[name] = now;
       const src = ctx.createBufferSource();
       src.buffer = buffer;
+      src.playbackRate.value = rate;
       if (level === 1) src.connect(sfxGain);
       else {
         const g = ctx.createGain();
@@ -457,6 +598,20 @@ export function createAudio() {
         src.connect(g).connect(sfxGain);
       }
       src.start();
+    },
+
+    setSfx(on) {
+      settings.sfx = Boolean(on);
+      hh.save('sound.sfx', settings.sfx);
+      if (ctx) sfxGain.gain.setTargetAtTime(settings.sfx ? SFX_VOLUME : 0, ctx.currentTime, 0.02);
+    },
+
+    // The layers play on silently with the music off, so the dance keeps
+    // the audio clock.
+    setMusic(on) {
+      settings.music = Boolean(on);
+      hh.save('sound.music', settings.music);
+      if (ctx) fadeMusic(0.4);
     },
   };
 }

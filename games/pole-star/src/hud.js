@@ -1,12 +1,12 @@
-// HUD as HTML on top of the canvas: the title panel until the first tip, a
-// small reminder of the A button, her thanks floating up, and the pause
-// panel. The DOM is touched only when something happens, never every frame.
+// HUD as HTML on top of the canvas: the title and pause menus, a small
+// reminder of the A button and her thanks floating up. The DOM is touched
+// only when something happens, never every frame.
 
 const POPUPS = 3;
 
 export function createHud(root) {
   root.innerHTML = `
-    <div id="hint"><span class="btn">A</span> throw $1</div>
+    <div id="hint" hidden><span class="btn">A</span> throw $1</div>
     <div id="popups">${'<div class="popup"></div>'.repeat(POPUPS)}</div>
     <div id="message"></div>`;
   const hintEl = root.querySelector('#hint');
@@ -21,28 +21,29 @@ export function createHud(root) {
     el.classList.add(cls);
   }
 
-  function message(html, place = '') {
-    messageEl.className = place;
-    messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
-  }
-
   return {
-    intro(on) {
-      hintEl.hidden = on;
-      message(
-        on
-          ? `<div class="logo">POLE STAR</div>` +
-              `<div class="tag">starring <b>STELLA</b> · live at the Pole Star Lounge</div>` +
-              `<div class="go">Press A to throw a dollar</div>` +
-              `<div class="small">Throw as often as you like · START pause</div>`
-          : '',
-        'top',
-      );
+    hint(on) {
+      hintEl.hidden = !on;
     },
 
+    // Freezes the CSS animations (her thanks) while the show is paused.
     pause(on) {
       root.classList.toggle('paused', on);
-      message(on ? `<div class="title">PAUSED</div><div>Press START to resume</div>` : '');
+    },
+
+    // html is a fixed string from main.js; '' hides the panel. place is ''
+    // (centre) or 'top'.
+    message(html, place = '') {
+      messageEl.className = place;
+      messageEl.innerHTML = html ? `<div class="panel">${html}</div>` : '';
+    },
+
+    // A panel with a menu: head above it, foot below, the entry sel
+    // highlighted. Redrawn only when the menu changes.
+    menu(head, items, sel, foot, place = '') {
+      let list = '';
+      for (let i = 0; i < items.length; i++) list += `<div class="item${i === sel ? ' sel' : ''}">${items[i]}</div>`;
+      this.message(`${head}<div class="menu">${list}</div>${foot}`, place);
     },
 
     // Floating text at screen position (x, y) in px.

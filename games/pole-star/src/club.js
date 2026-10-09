@@ -306,12 +306,12 @@ export function createClub(scene) {
   }
 
   function placeSpots() {
+    const c = Math.cos(spin);
+    const s = Math.sin(spin);
     for (let i = 0; i < SPOTS; i++) {
       // Turn the ray with the ball, then find the first surface it meets.
       const x0 = spotDirs[i * 3];
       const z0 = spotDirs[i * 3 + 2];
-      const c = Math.cos(spin);
-      const s = Math.sin(spin);
       dir.set(x0 * c - z0 * s, spotDirs[i * 3 + 1], x0 * s + z0 * c);
       let t = Infinity;
       if (dir.z < -0.01) t = Math.min(t, (WALL_Z + 0.2 - BALL.z) / dir.z);

@@ -170,7 +170,7 @@ body.handheld #legend {
   visibility: hidden;
 }
 
-/* Panels: the title and the pause. */
+/* Panels: the title and the pause menu. */
 #message {
   position: absolute;
   inset: 0;
@@ -204,8 +204,9 @@ body.handheld #legend {
   text-shadow: 0 2px 0 #000;
 }
 
+/* Dark enough that the neon sign behind it does not show through. */
 #message.top .panel {
-  background: rgba(20, 6, 30, 0.55);
+  background: rgba(20, 6, 30, 0.88);
 }
 
 .panel .logo {
@@ -226,11 +227,6 @@ body.handheld #legend {
   color: #ffc83d;
 }
 
-.panel .go {
-  margin-top: 4px;
-  font-size: 24px;
-}
-
 .panel .title {
   font-size: 42px;
   line-height: 1.05;
@@ -243,6 +239,28 @@ body.handheld #legend {
   font-size: 18px;
   font-weight: 700;
   color: #e3d6f0;
+}
+
+/* Menus: the highlighted entry on a soft pink pill. */
+.menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 4px 0;
+}
+
+.menu .item {
+  min-width: 200px;
+  padding: 1px 18px;
+  border-radius: 12px;
+  color: #d9c6ec;
+}
+
+.menu .item.sel {
+  background: rgba(255, 79, 216, 0.22);
+  box-shadow: inset 0 0 0 2px rgba(255, 140, 230, 0.85);
+  color: #ffe6fa;
 }
 
 /* The perf overlay goes bottom right, out of the way. */

@@ -5,7 +5,8 @@
 // every joint's angle), and switching moves blends from the last pose to the
 // new one. Hands that hold the pole are placed on it with two-bone IK, so
 // the grip stays put whatever the body does. When a tip comes in she looks
-// at you and waves; when it rains money she breaks into her showpiece spin.
+// at you and waves, or blows you a kiss; when it rains money she breaks into
+// her showpiece spin.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -26,6 +27,12 @@ const LOWER = 0.27; // elbow to the middle of the hand
 const STAND_H = 0.95; // hip height when standing straight
 const LAP = -(Math.PI * 2) / (8 * BEAT); // one walk around the pole every two bars
 const TAIL = [0.16, 0.16, 0.15]; // ponytail segments
+const SOLE_Y = -0.455; // the sole of a foot, in the shin's space: its height,
+const SOLE_HEEL = -0.045; // its heel
+const SOLE_TOE = 0.125; // and its toe
+const KISS_LIPS = new THREE.Vector3(0, 0.12, 0.2); // just in front of her lips, in the head's space
+const KISS_REACH = 0.6; // the kiss thrown out: how far from her chest
+const KISS_UP = 0.66; // and how high, in the chest's space
 const GRAVITY = -9.8;
 
 // Pose layout: one Float32Array per pose.
@@ -57,6 +64,7 @@ const ROUTINE = [
   ['invert', 2],
   ['spiral', 2],
   ['pose', 1],
+  ['sway', 2],
   ['chair', 2],
   ['flag', 2],
   ['pirouette', 1],
@@ -205,7 +213,8 @@ export function createDancer(scene, camera) {
   let blend = 1;
   let blendTime = 0.7;
   let orbit = Math.PI / 2;
-  let waveT = 9; // seconds since she started waving thanks
+  let waveT = 9; // seconds since she started saying thanks
+  let kissing = false; // her thanks is a blown kiss, not a wave
   let showpiece = false; // a showpiece is wanted
   let afterShow = false; // the pose after the showpiece is playing
 
@@ -259,28 +268,35 @@ export function createDancer(scene, camera) {
     else if (p < 0.88) h = 1.55 + (1.08 - 1.55) * smooth((p - 0.25) / 0.63);
     else h = 1.08 + (STAND_H - 1.08) * smooth((p - 0.88) / 0.12) - 0.08 * bump((p - 0.88) / 0.12);
     const air = smooth((p - 0.08) / 0.1) * (1 - smooth((p - 0.84) / 0.1));
+    // Knees bend for the take-off and the landing, so the feet stay on the
+    // stage while the hips dip.
+    const dip = p < 0.1 ? bump(p / 0.1) : p > 0.88 ? 0.7 * bump((p - 0.88) / 0.12) : 0;
     P[H] = h;
-    P[R] = 0.52 - 0.12 * air;
+    P[R] = 0.52 - 0.16 * air;
+    // In the air she turns towards the pole, so the lower hand reaches it.
+    P[YAW] = -1.1 * air;
     P[OMEGA] = -0.8 + ((chair ? -4.2 : -5) + 0.8) * air;
     P[GRW] = 1;
     P[GRH] = h + 0.8;
     P[GLW] = air;
-    P[GLH] = h + (chair ? 0.3 : 0.45);
+    P[GLH] = h + (chair ? 0.2 : 0.25);
+    P[RT] = P[LT] = -0.55 * dip;
+    P[RT + 3] = P[LT + 3] = 1.1 * dip;
     if (chair) {
-      P[ROLL] = -0.25 * air;
-      P[RT] = -1.45 * air;
-      P[LT] = -1.45 * air;
-      P[RT + 3] = 1.5 * air;
-      P[LT + 3] = 1.5 * air;
+      P[ROLL] = -0.2 * air;
+      P[RT] += -1.45 * air;
+      P[LT] += -1.45 * air;
+      P[RT + 3] += 1.5 * air;
+      P[LT + 3] += 1.5 * air;
       P[HX] = -0.2 * air;
     } else {
-      P[ROLL] = -0.42 * air;
-      P[RT] = -1.3 * air;
-      P[LT] = -1.2 * air;
+      P[ROLL] = -0.32 * air;
+      P[RT] += -1.3 * air;
+      P[LT] += -1.2 * air;
       P[RT + 2] = 0.1 * air;
       P[LT + 2] = -0.1 * air;
-      P[RT + 3] = 1.75 * air;
-      P[LT + 3] = 1.85 * air;
+      P[RT + 3] += 1.75 * air;
+      P[LT + 3] += 1.85 * air;
       P[HX] = -0.25 * air;
     }
     // Off the pole the free arm opens out.
@@ -301,9 +317,11 @@ export function createDancer(scene, camera) {
     const up = smooth((lb - 0.5) / 0.4);
     P[YAW] = turn * Math.PI * 4;
     P[H] = STAND_H + 0.03 * up - 0.08 * prep;
-    P[RT + 3] = 0.3 * prep;
-    P[LT + 3] = 0.3 * prep + 2.0 * up * (1 - smooth((lb - 3.4) / 0.4));
-    P[LT] = -0.9 * up * (1 - smooth((lb - 3.4) / 0.4));
+    // The plié: thighs forward and knees bent, the feet flat on the stage.
+    P[RT] = -0.43 * prep;
+    P[RT + 3] = 0.86 * prep;
+    P[LT + 3] = 0.86 * prep + 2.0 * up * (1 - smooth((lb - 3.4) / 0.4));
+    P[LT] = -0.43 * prep - 0.9 * up * (1 - smooth((lb - 3.4) / 0.4));
     P[LT + 2] = 0.55 * up;
     P[RA + 2] = -1.1 - 1.65 * up;
     P[LA + 2] = 1.1 + 1.65 * up;
@@ -341,7 +359,9 @@ export function createDancer(scene, camera) {
     P[R] = 0.3;
     P[H] = 2.8 + 0.05 * Math.sin(lb * Math.PI * 0.5);
     P[OMEGA] = -1.4;
-    P[PITCH] = Math.PI;
+    // Over backwards: from the climb (facing the pole) her head swings away
+    // from the pole, not through it.
+    P[PITCH] = -Math.PI;
     const split = smooth((lb - 3.6) / 0.8) * (1 - smooth((lb - 7.2) / 0.6));
     const open = 1.1 + 0.12 * Math.sin(lb * Math.PI * 0.5);
     P[RT + 2] = -open * (1 - split);
@@ -398,6 +418,35 @@ export function createDancer(scene, camera) {
     P[HX + 1] = 0.3;
   }
 
+  // Her back to the pole, one hand up on it: the hips sway on the beat, the
+  // knees dip, and at the end of every bar a hair flip.
+  function sway(P, lb) {
+    stand(P);
+    const phi = lb * Math.PI;
+    const dip = 0.5 - 0.5 * Math.cos(phi * 2);
+    const f = (lb % 4) - 3; // the bar's last beat, 0 to 1
+    const flip = f > 0 ? bump(f) : 0;
+    P[R] = 0.27;
+    P[H] = STAND_H - 0.035 * dip;
+    P[YAW] = Math.PI / 2; // facing out, away from the pole
+    P[OMEGA] = -0.3;
+    P[ROLL] = 0.1 * Math.sin(phi);
+    P[CX] = 0.08 * Math.sin(phi * 2) + 0.5 * flip;
+    P[CX + 2] = -0.16 * Math.sin(phi);
+    P[RT] = P[LT] = -0.22 * dip;
+    P[RT + 3] = P[LT + 3] = 0.44 * dip;
+    P[LT + 2] = 0.12;
+    P[GRW] = 1;
+    P[GRH] = 1.86;
+    // The free hand on her hip.
+    P[LA] = 0.25;
+    P[LA + 2] = 0.55 + 0.12 * Math.sin(phi);
+    P[LA + 3] = 1.5;
+    // Head down with the bend, then flung back up.
+    P[HX] = f > 0 ? 0.55 * bump(Math.min(1, f * 1.7)) - 0.35 * bump((f - 0.5) / 0.5) : -0.05;
+    P[HX + 1] = 0.2 * Math.sin(phi);
+  }
+
   // The human flag: straight out from the pole, going round, legs scissoring.
   function flag(P, lb) {
     stand(P);
@@ -441,6 +490,7 @@ export function createDancer(scene, camera) {
     invert: { fn: invert, blend: 1.0 },
     spiral: { fn: spiral, blend: 0.9 },
     pose: { fn: posePole, blend: 0.8 },
+    sway: { fn: sway, blend: 0.8 },
     flag: { fn: flag, blend: 0.9 },
     tornado: { fn: tornado, blend: 0.8 },
   };
@@ -489,10 +539,11 @@ export function createDancer(scene, camera) {
   const ax = new THREE.Vector3();
   const ay = new THREE.Vector3();
   const tmp = new THREE.Vector3();
+  const kissTo = new THREE.Vector3();
   const down = new THREE.Vector3(0, -1, 0);
 
-  // Puts a hand on the pole at height y with two-bone IK, blended over the
-  // arm's own pose by weight. side is 1 for the left arm, -1 for the right.
+  // Puts a hand on the pole at height y, blended over the arm's own pose by
+  // weight. side is 1 for the left arm, -1 for the right.
   function grip(upper, fore, y, weight, side) {
     if (weight <= 0.001) return;
     upper.getWorldPosition(tmp);
@@ -500,13 +551,33 @@ export function createDancer(scene, camera) {
     const len = Math.hypot(tmp.x, tmp.z) || 1;
     target.set((tmp.x / len) * (POLE_R + 0.03), STAGE_Y + y, (tmp.z / len) * (POLE_R + 0.03));
     chest.worldToLocal(target);
+    // Elbows point out to the side and a little down and back.
+    hint.set(side, -0.6, -0.6);
+    reach(upper, fore, weight);
+  }
+
+  // The kiss: the free left hand to her lips, then thrown out to you (as
+  // far round as her left arm goes).
+  function blowKiss(weight) {
+    chest.worldToLocal(kissTo.copy(camera.position));
+    const a = clamp(Math.atan2(kissTo.x, kissTo.z), -0.5, 1.5);
+    kissTo.set(Math.sin(a) * KISS_REACH, KISS_UP, Math.cos(a) * KISS_REACH);
+    head.localToWorld(target.copy(KISS_LIPS));
+    chest.worldToLocal(target);
+    target.lerp(kissTo, smooth((waveT - 0.55) / 0.3));
+    hint.set(1, -1, -0.2);
+    reach(upperL, foreL, weight);
+  }
+
+  // Two-bone IK: turns the upper arm and bends the elbow so the hand reaches
+  // target (in the chest's space), the elbow bending towards hint, blended
+  // over the arm's own pose by weight.
+  function reach(upper, fore, weight) {
     d.copy(target).sub(upper.position);
     const dist = clamp(d.length(), 0.08, UPPER + LOWER - 0.002);
     d.normalize();
     const shoulder = Math.acos(clamp((UPPER * UPPER + dist * dist - LOWER * LOWER) / (2 * UPPER * dist), -1, 1));
     const bend = Math.PI - Math.acos(clamp((UPPER * UPPER + LOWER * LOWER - dist * dist) / (2 * UPPER * LOWER), -1, 1));
-    // Elbows point out to the side and a little down and back.
-    hint.set(side, -0.6, -0.6);
     hint.addScaledVector(d, -hint.dot(d)).normalize();
     u.copy(d).multiplyScalar(Math.cos(shoulder)).addScaledVector(hint, Math.sin(shoulder));
     w.copy(d).addScaledVector(u, -d.dot(u));
@@ -519,6 +590,12 @@ export function createDancer(scene, camera) {
     qFk.copy(upper.quaternion);
     upper.quaternion.copy(qFk).slerp(qIk, weight);
     fore.rotation.x += (-bend - fore.rotation.x) * weight;
+  }
+
+  // The lowest of a foot's heel and toe, in world space.
+  function soleY(shin) {
+    const heel = shin.localToWorld(tmp.set(0, SOLE_Y, SOLE_HEEL)).y;
+    return Math.min(heel, shin.localToWorld(tmp.set(0, SOLE_Y, SOLE_TOE)).y);
   }
 
   function apply(P) {
@@ -540,8 +617,10 @@ export function createDancer(scene, camera) {
 
     upperR.rotation.set(P[RA], P[RA + 1], P[RA + 2]);
     foreR.rotation.set(-P[RA + 3], 0, 0);
-    // The wave: the free left arm up, the hand swaying.
-    const wave = thanks * upright * (1 - P[GLW]);
+    // The wave: the free left arm up, the hand swaying. (The kiss is
+    // placed with IK below.)
+    const gesture = thanks * upright * (1 - P[GLW]);
+    const wave = kissing ? 0 : gesture;
     upperL.rotation.set(
       P[LA] + (-0.3 - P[LA]) * wave,
       P[LA + 1] * (1 - wave),
@@ -553,8 +632,16 @@ export function createDancer(scene, camera) {
     thighL.rotation.set(P[LT], P[LT + 1], P[LT + 2]);
     shinL.rotation.set(P[LT + 3], 0, 0);
     root.updateMatrixWorld(true);
+    // Her feet never sink into the stage: she is lifted by however far the
+    // lowest heel or toe would go under it.
+    const low = Math.min(soleY(shinR), soleY(shinL));
+    if (low < STAGE_Y) {
+      root.position.y += STAGE_Y - low;
+      root.updateMatrixWorld(true);
+    }
     grip(upperR, foreR, P[GRH], P[GRW], -1);
     grip(upperL, foreL, P[GLH], P[GLW], 1);
+    if (kissing && gesture > 0.001) blowKiss(gesture);
 
     shadow.position.x = root.position.x;
     shadow.position.z = root.position.z;
@@ -652,22 +739,22 @@ export function createDancer(scene, camera) {
       resetTail();
     },
 
-    // The music's clock jumped (it started): blend over the jump.
-    retime() {
-      from.set(pose);
-      from[YAW] = angleDiff(from[YAW], 0);
-      blend = 0;
-      blendTime = 0.5;
-    },
-
-    // A tip: she looks at you and waves (unless she is still waving).
+    // A tip: she looks at you and waves or, now and then, blows a kiss
+    // (unless she is still at it). Returns which: 'wave' or 'kiss'.
     thanks() {
-      if (waveT > 1.6) waveT = 0;
+      if (waveT > 1.6) {
+        waveT = 0;
+        kissing = Math.random() < 0.35;
+      }
+      return kissing ? 'kiss' : 'wave';
     },
 
     // It is raining money: the showpiece, as soon as the routine allows.
+    // False while she is still in one, or one is already coming.
     showpiece() {
-      if (move !== 'tornado' && !afterShow) showpiece = true;
+      if (move === 'tornado' || showpiece) return false;
+      showpiece = true;
+      return true;
     },
 
     // World position of her face, for popups.

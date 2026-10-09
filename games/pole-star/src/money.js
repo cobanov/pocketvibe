@@ -1,8 +1,9 @@
 // Dollar bills: thrown from your seat in a fluttering arc, they land on the
-// stage and stay there, piling up over the show. During her showpiece spin
-// every bill on the stage lifts off and swirls round the pole, then settles
-// back where it was. All bills are one InstancedMesh: the first FLY slots
-// are in the air, the rest are the pile on the stage.
+// stage and stay there, piling up over the show: each one on top of the
+// bills already under it. During her showpiece spin every bill on the stage
+// lifts off and swirls round the pole, then settles back where it was. All
+// bills are one InstancedMesh: the first FLY slots are in the air, the rest
+// are the pile on the stage.
 
 import * as THREE from 'three';
 import { STAGE_Y, canvasTexture, clamp, smooth } from './shared.js';
@@ -12,6 +13,9 @@ const PILE = 360;
 const FLIGHT = 0.62; // seconds from your hand to the stage
 const W = 0.36;
 const H = 0.17;
+const OVERLAP = 0.4; // bills whose centres are closer than this may overlap
+const LAYER = 0.0016; // how far a bill lies above the ones under it
+const FLOOR = STAGE_Y + 0.008; // the lowest bills
 
 // A one-dollar bill, drawn once: green paper, a dark border and a portrait
 // in the middle.
@@ -70,9 +74,10 @@ export function createMoney(scene, camera) {
   const restY = new Float32Array(PILE);
   const restZ = new Float32Array(PILE);
   const restYaw = new Float32Array(PILE);
+  const lift = new Float32Array(PILE); // 0 resting, 1 up in the swirl
   let piled = 0; // how many pile slots are in use
   let nextPile = 0;
-  let swirl = 0; // 0 resting, 1 fully airborne
+  let lifted = false; // some bill is off the stage
   let time = 0;
   let pileDirty = false;
 
@@ -100,8 +105,20 @@ export function createMoney(scene, camera) {
       if (Math.cos(a) * r > -0.6) break;
     }
     to[i3] = Math.sin(a) * r;
-    to[i3 + 1] = STAGE_Y + 0.012;
     to[i3 + 2] = Math.cos(a) * r;
+    to[i3 + 1] = restHeight(to[i3], to[i3 + 2]);
+  }
+
+  // The height a bill comes to rest at: just above every bill it may
+  // overlap, so no two overlapping bills ever share a depth.
+  function restHeight(x, z) {
+    let y = FLOOR;
+    for (let p = 0; p < piled; p++) {
+      const dx = restX[p] - x;
+      const dz = restZ[p] - z;
+      if (dx * dx + dz * dz < OVERLAP * OVERLAP && restY[p] + LAYER > y) y = restY[p] + LAYER;
+    }
+    return y;
   }
 
   function flatQuat(yaw, out) {
@@ -112,16 +129,44 @@ export function createMoney(scene, camera) {
   function land(i) {
     live[i] = 0;
     const p = nextPile;
+    const full = piled === PILE;
     nextPile = (nextPile + 1) % PILE;
-    piled = Math.min(PILE, piled + 1);
     restX[p] = to[i * 3];
-    // Each bill a hair above the last few, so overlapping bills do not flicker.
-    restY[p] = STAGE_Y + 0.008 + (p % 48) * 0.0011;
     restZ[p] = to[i * 3 + 2];
     restYaw[p] = yawEnd[i];
+    lift[p] = 0;
+    if (full) settle();
+    else {
+      // Bills may have landed under it since it was thrown.
+      restY[p] = restHeight(restX[p], restZ[p]);
+      piled++;
+    }
     placePile(p, 0);
     pileDirty = true;
     mesh.setMatrixAt(i, hidden);
+  }
+
+  // Once the stage is full, each new bill takes the place of the oldest and
+  // the bills that lay on that one settle down: every height is worked out
+  // again, oldest bill first, from the bills still there. Without it the
+  // pile would creep up all evening.
+  function settle() {
+    for (let k = 0; k < PILE; k++) {
+      const p = (nextPile + k) % PILE;
+      const x = restX[p];
+      const z = restZ[p];
+      let y = FLOOR;
+      for (let m = 0; m < k; m++) {
+        const q = (nextPile + m) % PILE;
+        const dx = restX[q] - x;
+        const dz = restZ[q] - z;
+        if (dx * dx + dz * dz < OVERLAP * OVERLAP && restY[q] + LAYER > y) y = restY[q] + LAYER;
+      }
+      if (y !== restY[p]) {
+        restY[p] = y;
+        if (lift[p] === 0) placePile(p, 0);
+      }
+    }
   }
 
   function placePile(p, w) {
@@ -129,12 +174,13 @@ export function createMoney(scene, camera) {
       pos.set(restX[p], restY[p], restZ[p]);
       flatQuat(restYaw[p], q);
     } else {
-      // Up in the swirl: round the pole, rising and wrapping round.
+      // Up in the swirl: round the pole, rising and falling.
       const k = smooth(clamp(w * 1.7 - (p % 9) * 0.08, 0, 1));
       const a0 = Math.atan2(restX[p], restZ[p]);
       const ang = a0 + time * (2.6 + (p % 7) * 0.35);
       const rad = 0.55 + ((p * 0.618) % 1) * 1.5;
-      const hgt = STAGE_Y + 0.3 + ((p * 0.37 + time * (0.35 + (p % 5) * 0.05)) % 1) * 4.6;
+      const rise = p * 2.3 + time * (2.2 + (p % 5) * 0.3);
+      const hgt = STAGE_Y + 0.3 + (0.5 - 0.5 * Math.cos(rise)) * 4.2;
       pos.set(
         restX[p] + (Math.sin(ang) * rad - restX[p]) * k,
         restY[p] + (hgt - restY[p]) * k,
@@ -187,7 +233,7 @@ export function createMoney(scene, camera) {
       for (let p = 0; p < PILE; p++) mesh.setMatrixAt(FLY + p, hidden);
       piled = 0;
       nextPile = 0;
-      swirl = 0;
+      lifted = false;
       mesh.instanceMatrix.needsUpdate = true;
     },
 
@@ -224,12 +270,19 @@ export function createMoney(scene, camera) {
       }
 
       // The showpiece lifts the pile; it settles back once the spin ends.
-      const goal = tornado ? 1 : 0;
-      const before = swirl;
-      swirl += (goal - swirl) * Math.min(1, dt * (tornado ? 1.6 : 1.1));
-      if (swirl < 0.002) swirl = 0;
-      if (swirl > 0 || before > 0) {
-        for (let p = 0; p < piled; p++) placePile(p, swirl);
+      // Each bill eases up on its own, so one that lands mid-spin rises
+      // from where it lies.
+      if (tornado || lifted) {
+        const goal = tornado ? 1 : 0;
+        const rate = Math.min(1, dt * (tornado ? 1.6 : 1.1));
+        lifted = false;
+        for (let p = 0; p < piled; p++) {
+          let w = lift[p] + (goal - lift[p]) * rate;
+          if (w < 0.002) w = 0;
+          else lifted = true;
+          lift[p] = w;
+          placePile(p, w);
+        }
         dirty = true;
       }
       if (dirty) mesh.instanceMatrix.needsUpdate = true;
