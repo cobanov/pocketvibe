@@ -1,4 +1,4 @@
-# PocketVibe: devir notu (2026-10-09; handheld 0.7.1, Android 0.7.2)
+# PocketVibe: devir notu (2026-10-09; handheld 0.7.1, Android 0.7.3, iPhone 0.7.3 TestFlight)
 
 Önce bunu, sonra `docs/plan.md` ve `docs/development.md`'yi oku; memory'de `pocketvibe-project.md`,
 `readme-style.md`, `handheld-testing.md`, `handheld-tailscale.md` var. Eski devir notları git
@@ -6,6 +6,17 @@ geçmişinde (`git log -- docs/handoff.md`).
 
 ## Durum
 
+- **iPhone 0.7.3** (TestFlight, build 136; App Store Connect'te "PocketVibe: Mini Games", app id
+  6820965487, çünkü "PocketVibe" adı alınmış; ana ekranda adı PocketVibe): `ios/`, Android uygulamasının
+  Swift karşılığı (WKWebView, `Service.swift` yerel servis, `TouchPad.swift` aynı ekran tuşları). Gamepad'i
+  sayfalar Gamepad API ile kendileri okuyor. Launcher iOS'ta Çık, uygulama güncellemesi ve kayıt yedeğini
+  gizliyor. Simülatörde UI testiyle oynandı; **gerçek iPhone'da henüz denenmedi** (ses sessiz mod anahtarına
+  uyuyor, arka plandan dönüş, WKWebView'de Gamepad API). Yükleme: `ios/scripts/testflight.sh` (ayrıntı
+  `docs/development.md`, iPhone bölümü). İç test grubunda yalnız mertcobanov@icloud.com var; ilk denemede
+  ekipteki 7 kişi de eklenip çıkarıldı, davet e-postası almış olabilirler.
+- **Android 0.7.3** (`android-v0.7.3`, latest değil): telefon dikeyken oyun alanı kare (RG Rotate gibi;
+  21 oyunun hepsi 2:1 ile 1:1 arasına uyuyor), sığmazsa tuşlara yer kalacak kadar, en az 3:2. Handheld
+  değişmedi, `v0.7.2`/`v0.7.3` çıkmadı.
 - **Android 0.7.2** (`android-v0.7.2`, latest değil, 2026-10-09): telefonlar için ekranda tuşlar
   (`android/.../TouchPad.kt`). Dikeyde oyun üstte 3:2, tuşlar altında; yatayda tuşlar oyunun iki
   yanında. Gamepad bağlıyken (el konsolunun kendi tuşları da gamepad sayılıyor) gizli, oyun tüm ekranı
