@@ -52,6 +52,7 @@ final class Service {
     private let network = NWPathMonitor()
     private var wifi = false
     private var launcher: HttpServer!
+    private lazy var music = OggToWav(cache: cache)
 
     /// Something to tell the player when the launcher next loads.
     var notice: String?
@@ -589,7 +590,11 @@ final class Service {
         if request.path == "\(Self.shellPath)unlock-audio" { return .json(["ok": true]) }
         guard request.method == "GET" || request.method == "HEAD" else { return .error("not allowed", 405) }
         if request.path.hasPrefix(Self.shellPath) { return shellFile(request.path) ?? .notFound }
-        return serveFile(games.appendingPathComponent(gid), request.path)
+        let response = serveFile(games.appendingPathComponent(gid), request.path)
+        if let file = response.file, file.pathExtension.lowercased() == "ogg", let wav = music.wav(for: file) {
+            return Response(status: 200, type: "audio/wav", file: wav, headers: ["Cache-Control": "no-cache"])
+        }
+        return response
     }
 
     // ---------- The launcher and its /api ----------
@@ -620,6 +625,9 @@ final class Service {
         if path.hasPrefix(Self.shellPath) { return shellFile(path) ?? .notFound }
         let name = path == "/" ? "index.html" : String((path.removingPercentEncoding ?? path).drop { $0 == "/" })
         guard let data = asset("launcher/\(name)") else { return .notFound }
+        if name.hasSuffix(".ogg"), let wav = music.wav(named: "launcher/\(name)|\(version)", data: { data }) {
+            return Response(status: 200, type: "audio/wav", file: wav, headers: ["Cache-Control": "no-cache"])
+        }
         var headers = ["Cache-Control": "no-cache"]
         // The page this app opens carries the session key once; it becomes the cookie.
         if name == "index.html" && request.query["k"] == token { headers["Set-Cookie"] = "pv=\(token); Path=/; HttpOnly; SameSite=Strict" }
@@ -753,7 +761,7 @@ private func imageType(_ file: URL) -> String {
     return head == Data([0x89, 0x50, 0x4E, 0x47]) ? "image/png" : "image/jpeg"
 }
 
-private func sha1(_ text: String) -> String {
+func sha1(_ text: String) -> String {
     Insecure.SHA1.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
 }
 

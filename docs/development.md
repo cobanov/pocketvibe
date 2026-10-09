@@ -135,7 +135,11 @@ WKWebView. `Service.swift` is the Swift version of `PocketVibe.kt` (`Http.swift`
 phone. They reach the page as key events sent by script. A gamepad needs nothing from the app:
 the pages read it with the Gamepad API, and the buttons on the screen hide while one is
 connected. The iPhone app has no Quit, no app update (TestFlight and the App Store do that) and
-no save backups; the launcher leaves those out when `/api/info` says `"platform": "ios"`.
+no save backups; the launcher leaves those out when `/api/info` says `"platform": "ios"`. iOS
+cannot decode Ogg Vorbis, the music's format, so the service answers a request for an `.ogg` with
+the same sound as WAV, decoded once with stb_vorbis (`Vendor/`, public domain) and cached. iOS
+also starts a page's sound only during a user gesture; a press on the screen's buttons runs as one
+(`evaluateJavaScript`) and resumes the pages' Web Audio.
 
 The Xcode project is generated (`brew install xcodegen`); the version is the handheld app's and
 the build number the repository's commit count:

@@ -18,9 +18,14 @@ targets:
     platform: iOS
     sources:
       - path: PocketVibe
+        excludes: [Vendor/stb_vorbis.c]
+      # Someone else's code: its warnings are not ours, and it decodes faster optimised, also in Debug.
+      - path: PocketVibe/Vendor/stb_vorbis.c
+        compilerFlags: [-w, -O2]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.cobanov.pocketvibe
+        SWIFT_OBJC_BRIDGING_HEADER: PocketVibe/BridgingHeader.h
         PRODUCT_NAME: PocketVibe
         INFOPLIST_FILE: PocketVibe/Info.plist
         GENERATE_INFOPLIST_FILE: NO
