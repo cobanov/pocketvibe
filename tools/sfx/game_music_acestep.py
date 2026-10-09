@@ -41,6 +41,48 @@ PIECES = {
         "cheerful bouncy cartoon game music, wooden marimba melody, pizzicato strings, ukulele strums, "
         "light hand percussion and shaker, tuba bass, playful and silly countryside farm vibe, "
         "instrumental video game music, no vocals"),
+    "block-drop": ("B Minor", 124,
+        "energetic but focused electronic puzzle game music, crisp plucked synth arpeggios, punchy tight drums, "
+        "warm rolling bass, catchy bright hook, steady and driving, instrumental video game music, no vocals"),
+    "cloud-climber": ("D Major", 120,
+        "bright airy happy platformer game music, glockenspiel and flute-like synth melody, bouncy bass, "
+        "light crisp drums, whimsical and uplifting, pastel sky adventure, instrumental video game music, no vocals"),
+    "crate-pusher": ("B♭ Major", 92,
+        "cosy relaxed puzzle game music, mellow electric piano chords, soft upright bass, gentle brushed drums, "
+        "warm vibraphone melody, thoughtful and calm, instrumental video game music, no vocals"),
+    "maze-chase": ("C Minor", 132,
+        "retro arcade synthwave with chiptune flavour, tense and playful chase, pulsing octave bass, square wave lead, "
+        "punchy drum machine, neon maze, instrumental video game music, no vocals"),
+    "mini-golf": ("G Major", 100,
+        "sunny relaxed bossa nova lounge, nylon string guitar, soft brushed percussion, warm round bass, "
+        "light flute melody, leisurely and cheerful summer afternoon, instrumental video game music, no vocals"),
+    "neon-pinball": ("E Minor", 126,
+        "glossy neon synth funk, slap bass, bright synth brass stabs, sparkling arpeggios, disco drums, "
+        "flashy arcade energy, instrumental video game music, no vocals"),
+    "rock-blaster": ("F Minor", 120,
+        "dark spacey electronic game music, deep pulsing synth bass, wide sci-fi pads, driving electronic drums, "
+        "ominous arpeggios, deep space danger, instrumental video game music, no vocals"),
+    "lane-runner": ("F# Minor", 140,
+        "high energy electronic dance game music, driving four on the floor kick, plucky synth riff, uplifting chords, "
+        "fast running action, instrumental video game music, no vocals"),
+    "sky-hopper": ("E♭ Major", 110,
+        "light cheerful chiptune pop, bouncy square wave melody, simple bass line, airy pads, soft drums, "
+        "carefree flight above the clouds, instrumental video game music, no vocals"),
+    "snake": ("G Minor", 116,
+        "playful jazzy funk groove, clavinet and muted guitar, groovy bass, tight dry drums, sly and catchy, "
+        "toy board game, instrumental video game music, no vocals"),
+    "snow-slalom": ("C# Minor", 128,
+        "exhilarating winter downhill electronic music, crisp sleigh bell percussion, icy shimmering synths, "
+        "driving breakbeat, fresh and fast, instrumental video game music, no vocals"),
+    "star-defender": ("A Minor", 118,
+        "retro 1980s sci-fi arcade synth march, steady marching drum pattern, heroic analog synth lead, pulsing bass, "
+        "space shooter defending earth, instrumental video game music, no vocals"),
+    "tank-brigade": ("D Minor", 112,
+        "determined military electronic march, snare rolls, heavy synth bass, brass-like synth stabs, "
+        "battle theme for a tank game, instrumental video game music, no vocals"),
+    "tile-merge": ("A♭ Major", 84,
+        "calm minimalist puzzle music, soft piano and kalimba, warm pads, gentle laid back beat, "
+        "focused and soothing, instrumental video game music, no vocals"),
 }
 SEEDS = [7101, 7102, 7103]
 DURATION = 90
