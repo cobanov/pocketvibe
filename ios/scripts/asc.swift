@@ -7,6 +7,7 @@
 //   swift scripts/asc.swift capability <T>  turn on a capability (ASSOCIATED_DOMAINS, ...) for the bundle id
 //   swift scripts/asc.swift listing <json> <shots>  the App Store page: texts, categories, age rating,
 //                                           review notes (AppStore/listing.json) and screenshots (*.png)
+//   swift scripts/asc.swift free-everywhere free, in every territory (and new ones as they come)
 //   swift scripts/asc.swift builds          the latest builds and their processing state
 //   swift scripts/asc.swift tester <email>  add a team member to the internal group that gets every build
 //
@@ -295,6 +296,50 @@ func listing(_ file: String, _ shots: String) {
     }
 }
 
+func freeEverywhere() {
+    guard let appID = app()?["id"] as? String else { die("no app record") }
+    // The price: the USA's free price point, the base for every territory.
+    let points = list("/v1/apps/\(appID)/appPricePoints?filter[territory]=USA&limit=200")
+    guard let free = points.first(where: { Double(attributes($0)["customerPrice"] as? String ?? "") == 0 }),
+          let pointID = free["id"] as? String else { die("no free price point") }
+    do {
+        try call("POST", "/v1/appPriceSchedules", [
+            "data": [
+                "type": "appPriceSchedules",
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]],
+                    "baseTerritory": ["data": ["type": "territories", "id": "USA"]],
+                    "manualPrices": ["data": [["type": "appPrices", "id": "${free}"]]],
+                ],
+            ],
+            "included": [[
+                "type": "appPrices", "id": "${free}", "attributes": ["startDate": NSNull()],
+                "relationships": ["appPricePoint": ["data": ["type": "appPricePoints", "id": pointID]]],
+            ]],
+        ])
+        print("price: free")
+    } catch { die("setting the price failed: \(error)") }
+    // Every territory there is, and new ones too.
+    let territories = list("/v1/territories?limit=200").compactMap { $0["id"] as? String }
+    do {
+        try call("POST", "/v2/appAvailabilities", [
+            "data": [
+                "type": "appAvailabilities",
+                "attributes": ["availableInNewTerritories": true],
+                "relationships": [
+                    "app": ["data": ["type": "apps", "id": appID]],
+                    "territoryAvailabilities": ["data": territories.map { ["type": "territoryAvailabilities", "id": "${\($0)}"] }],
+                ],
+            ],
+            "included": territories.map {
+                ["type": "territoryAvailabilities", "id": "${\($0)}", "attributes": ["available": true],
+                 "relationships": ["territory": ["data": ["type": "territories", "id": $0]]]]
+            },
+        ])
+        print("available in \(territories.count) territories")
+    } catch { die("setting availability failed: \(error)") }
+}
+
 func builds() {
     guard let id = app()?["id"] as? String else { die("no app record") }
     for build in list("/v1/builds?filter[app]=\(id)&sort=-uploadedDate&limit=5") {
@@ -349,6 +394,7 @@ case "capability":
 case "listing":
     guard args.count == 3 else { die("usage: listing <listing.json> <screenshots folder>") }
     listing(args[args.startIndex + 1], args[args.startIndex + 2])
+case "free-everywhere": freeEverywhere()
 case "builds": builds()
 case "tester":
     guard args.count == 2 else { die("usage: tester <email>") }
