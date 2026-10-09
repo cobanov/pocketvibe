@@ -448,8 +448,9 @@ function settingsSections() {
   const s = state.settings ?? {};
   const info = state.info ?? {};
   const stores = state.store.stores?.length ? state.store.stores : (s.stores ?? []).map((url) => ({ url, name: url }));
-  // The Android app has no save backups or app updates of its own yet.
-  const android = info.platform === 'android';
+  // The phone apps have no save backups yet, and the iPhone's updates come
+  // from TestFlight or the App Store.
+  const mobile = info.platform === 'android' || info.platform === 'ios';
   return [
     {
       title: t('sound'),
@@ -480,7 +481,7 @@ function settingsSections() {
       title: t('general'),
       rows: [{ id: 'language', label: t('language'), value: `‹ ${LANGUAGES[getLanguage()]} ›` }],
     },
-    ...(android ? [] : [{
+    ...(mobile ? [] : [{
       title: t('saveData'),
       note: t('backupsWhere'),
       rows: [
@@ -504,12 +505,15 @@ function settingsSections() {
       title: t('about'),
       note: CREDITS,
       rows: [
-        { id: 'update', label: t('appUpdate'), value: updateValue() },
+        ...(info.platform === 'ios' ? [] : [{ id: 'update', label: t('appUpdate'), value: updateValue() }]),
         { id: 'version', label: 'PocketVibe', value: info.version ? `${t('version')} ${info.version}` : '' },
       ],
     },
   ];
 }
+
+// An iPhone app never quits itself; the system closes it.
+const canQuit = () => state.info?.platform !== 'ios';
 
 function gamesUpdateValue() {
   const busy = state.library.filter((g) => downloading(g.id)).length;
@@ -930,7 +934,7 @@ function renderHints() {
     if (id === 'update') parts.push(hint('A', state.update?.available ? t('update') : t('check')));
     if (id === 'gpu') parts.push(hint('A', t('gpuSwitch')));
     if (id.startsWith('store:')) parts.push(hint('Y', t('remove')));
-    parts.push(hint('B', t('quit')));
+    if (canQuit()) parts.push(hint('B', t('quit')));
   } else {
     const game = items()[state.focus[state.tab]];
     if (game) parts.push(hint('A', state.tab === 'store' ? t('open') : game.update ? t('updateAndPlay') : t('play')));
@@ -938,7 +942,7 @@ function renderHints() {
     if (state.tab === 'store') parts.push(hint('X', t(state.hideInstalled ? 'showInstalled' : 'hideInstalled')));
     if (game) parts.push(hint('Y', t(state.view[state.tab])));
     if (game) parts.push(hint('Sel', state.layout[state.tab] === 'grid' ? t('list') : t('cards')));
-    parts.push(hint('B', t('quit')));
+    if (canQuit()) parts.push(hint('B', t('quit')));
   }
   ui.hints.innerHTML = parts.join('');
 }
@@ -1302,7 +1306,7 @@ function handleButton(button, repeat) {
     return;
   }
   if (button === 'B') {
-    showDialog(t('quitConfirm'), () => api('/api/quit', 'POST'));
+    if (canQuit()) showDialog(t('quitConfirm'), () => api('/api/quit', 'POST'));
     return;
   }
 
