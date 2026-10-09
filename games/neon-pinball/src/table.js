@@ -138,6 +138,11 @@ for (let s = -1; s <= 1; s += 2) {
 
 // --- Upper playfield -------------------------------------------------------
 
+// Spinner lane up the left side: a short guide beside the side wall, with a
+// spinner hanging across it that turns when a ball rolls through.
+seg(-3.75, 11.4, -3.75, 12.9, 'divider', WALL, 0, 0.45, 0.1);
+export const SPINNER = { x0: -4.9, x1: -3.85, y: 12.15 };
+
 bumpers.push({ x: -1.75, y: 14.0, r: 0.7 }, { x: 1.75, y: 14.0, r: 0.7 }, { x: 0, y: 12.0, r: 0.7 });
 
 // Rollover lanes at the top, between four short dividers.
@@ -169,5 +174,8 @@ lamps.push({ x: 0, y: 1.05, r: 0.3, color: 0xff3b6b });
 
 export const LAMP_POWER = lamps.length; // 6, plunger power meter beside the lane
 for (let i = 0; i < 6; i++) lamps.push({ x: 6.62, y: 0.7 + i * 0.62, r: 0.17, color: i < 4 ? 0x3cf0ff : 0xff3fd2 });
+
+export const LAMP_MB = lamps.length; // 2: multiball progress, one per bank
+for (let i = 0; i < 2; i++) lamps.push({ x: i ? 0.72 : -0.72, y: 10.5, r: 0.24, color: 0xff3fd2 });
 
 export const LAMP_COUNT = lamps.length;

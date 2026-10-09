@@ -299,3 +299,157 @@ body.handheld #legend {
 #hint .skill {
   color: #2de2ff;
 }
+
+#event.magenta {
+  color: #ff7ae6;
+  text-shadow: 0 2px 0 #000, 0 0 12px #ff3fd2;
+}
+
+.mball {
+  font-size: 22px;
+  color: #ff7ae6;
+  text-shadow: 0 2px 0 #000, 0 0 8px #ff3fd2;
+  animation: blink 0.5s steps(2) infinite;
+}
+
+.mball:empty {
+  animation: none;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Menus */
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+
+.menu .item {
+  padding: 2px 14px;
+  border-radius: 8px;
+  font-size: 22px;
+  letter-spacing: 1px;
+  color: #b9a8ff;
+}
+
+.menu .item b {
+  display: inline-block;
+  min-width: 44px;
+  color: #2de2ff;
+}
+
+.menu .item.sel {
+  background: rgba(255, 63, 210, 0.28);
+  color: #fff;
+}
+
+.menu .item.sel::before {
+  content: '▶ ';
+  color: #ffe14a;
+}
+
+.menu .item.sel::after {
+  content: ' ◀';
+  color: #ffe14a;
+}
+
+.key {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #ff3fd2;
+  color: #fff;
+  font-size: 0.85em;
+  line-height: 1.35;
+  text-shadow: 0 1px 0 #000;
+}
+
+.panel .keys {
+  font-size: 20px;
+}
+
+.panel .small.keys {
+  font-size: 18px;
+}
+
+.panel.title-panel {
+  gap: 8px;
+}
+
+/* Game over */
+.panel .big-score {
+  font-size: 52px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 12px #2de2ff;
+}
+
+.panel .stats {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-size: 20px;
+  color: #c9d8ff;
+}
+
+.panel .stats b {
+  color: #ffe14a;
+}
+
+.panel.record {
+  border-color: rgba(255, 225, 74, 0.8);
+  box-shadow: 0 0 22px rgba(255, 225, 74, 0.5), inset 0 0 14px rgba(255, 63, 210, 0.25);
+}
+
+/* End-of-ball bonus, over the lower middle of the table */
+#bonus {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34%;
+  display: flex;
+  justify-content: center;
+}
+
+#bonus:empty {
+  display: none;
+}
+
+.bonus-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 220px;
+  padding: 10px 22px;
+  border: 2px solid rgba(45, 226, 255, 0.75);
+  border-radius: 12px;
+  background: rgba(8, 4, 30, 0.85);
+  box-shadow: 0 0 16px rgba(45, 226, 255, 0.45);
+  font-size: 22px;
+  font-weight: 700;
+  color: #c9d8ff;
+  text-shadow: 0 2px 0 #000;
+}
+
+.bonus-title {
+  font-size: 26px;
+  letter-spacing: 3px;
+  color: #2de2ff;
+  text-shadow: 0 2px 0 #000, 0 0 10px #2de2ff;
+}
+
+.bonus-total {
+  font-size: 38px;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 12px #ff3fd2;
+}

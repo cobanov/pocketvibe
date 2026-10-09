@@ -13,6 +13,7 @@ import {
   FLIPPER,
   LAMP_COUNT,
   LANE_X,
+  SPINNER,
   TARGET,
   bumpers,
   lamps,
@@ -22,21 +23,26 @@ import {
   targets,
   wedges,
 } from './table.js';
-import { BG, BUMPER_COLORS, CYAN, LIME, MAGENTA, STYLE, VIOLET, YELLOW, bar, post, shaded, slab } from './shared.js';
+import { BG, BUMPER_COLORS, CYAN, LIME, MAGENTA, ORANGE, STYLE, VIOLET, YELLOW, bar, post, shaded, slab } from './shared.js';
 import { createFloorTexture } from './floor.js';
+import { MAX_BALLS } from './physics.js';
 
 const WALL_H = 0.42;
 const TRAIL = 6;
 const SPARKS = 48;
 
-// Index ranges in the glow InstancedMesh.
+// Index ranges in the glow InstancedMesh: per ball a glow and its trail.
 const G_BALL = 0;
-const G_TRAIL = 1;
-const G_BUMPER = G_TRAIL + TRAIL;
+const G_BUMPER = G_BALL + MAX_BALLS * (TRAIL + 1);
 const G_SLING = G_BUMPER + 3;
-const G_LAMP = G_SLING + 2;
+const G_SPIN = G_SLING + 2;
+const G_LAMP = G_SPIN + 1;
 const G_SPARK = G_LAMP + LAMP_COUNT;
 const GLOWS = G_SPARK + SPARKS;
+
+const SPIN_X = (SPINNER.x0 + SPINNER.x1) / 2;
+const SPIN_W = SPINNER.x1 - SPINNER.x0;
+const SPIN_Z = 0.66; // height of the spinner's axle
 
 function glowTexture() {
   const canvas = document.createElement('canvas');
@@ -104,6 +110,11 @@ function staticGeometry() {
     parts.push(bar(x - 0.3, -0.83, x + 0.3, -0.83, 0.1, 0.02, 0.55, i % 2 ? CYAN : MAGENTA, 1, 0.1));
   }
 
+  // The spinner's axle and its two brackets on the lane walls.
+  parts.push(bar(SPINNER.x0, SPINNER.y, SPINNER.x1, SPINNER.y, 0.05, 0.05, SPIN_Z - 0.02, 0xc8c8e0, 0.6, 0));
+  parts.push(post(SPINNER.x0, SPINNER.y, 0.08, SPIN_Z + 0.06, 0, ORANGE, 0.5, 0.3, 8));
+  parts.push(post(SPINNER.x1, SPINNER.y, 0.08, SPIN_Z + 0.06, 0, ORANGE, 0.5, 0.3, 8));
+
   // Cabinet side walls.
   parts.push(bar(-5.3, BOUNDS.y0, -5.3, ARC.y, 0.2, 0.75, 0, VIOLET, 0.35, 0));
   parts.push(bar(6.95, BOUNDS.y0, 6.95, ARC.y, 0.2, 0.75, 0, VIOLET, 0.35, 0));
@@ -167,11 +178,24 @@ export function createView(scene, hh) {
   plunger.position.x = LANE_X;
   scene.add(plunger);
 
-  const ball = new THREE.Mesh(
-    new THREE.SphereGeometry(BALL_R, 16, 12),
-    new THREE.MeshLambertMaterial({ color: 0xe9eeff, emissive: 0x2a3050 }),
-  );
-  scene.add(ball);
+  // The balls share a geometry and a material; the second one plays only in
+  // multiball.
+  const ballGeo = new THREE.SphereGeometry(BALL_R, 16, 12);
+  const ballMat = new THREE.MeshLambertMaterial({ color: 0xe9eeff, emissive: 0x2a3050 });
+  const ballMeshes = [];
+  for (let i = 0; i < MAX_BALLS; i++) {
+    ballMeshes.push(new THREE.Mesh(ballGeo, ballMat));
+    scene.add(ballMeshes[i]);
+  }
+
+  // The spinner: a flat plate hanging from its axle, turning around it.
+  const spinGeo = new THREE.BoxGeometry(SPIN_W - 0.12, 0.05, 0.42);
+  spinGeo.deleteAttribute('uv');
+  spinGeo.translate(0, 0, -0.21);
+  shaded(spinGeo, YELLOW, 0.55, 0.35);
+  const spinMesh = new THREE.Mesh(spinGeo, vertexMat);
+  spinMesh.position.set(SPIN_X, SPINNER.y, SPIN_Z);
+  scene.add(spinMesh);
 
   // Bumper caps flash white when hit.
   const capGeo = post(0, 0, 0.6, 0.12, 0, 0xffffff, 0.55, 0, 16);
@@ -226,8 +250,8 @@ export function createView(scene, hh) {
   const targetFlash = new Float32Array(targets.length);
   const lampShown = new Float32Array(LAMP_COUNT);
   const lampPop = new Float32Array(LAMP_COUNT);
-  const trailX = new Float32Array(TRAIL);
-  const trailY = new Float32Array(TRAIL);
+  const trailX = new Float32Array(TRAIL * MAX_BALLS);
+  const trailY = new Float32Array(TRAIL * MAX_BALLS);
   let trailHead = 0;
 
   const spX = new Float32Array(SPARKS);
@@ -315,29 +339,41 @@ export function createView(scene, hh) {
       floorFlash = Math.max(floorFlash, amount);
     },
 
-    // levels: brightness 0..1 of every lamp. ballVisible hides a drained ball.
-    update(dt, physics, levels, ballVisible) {
-      const b = physics.ball;
-
-      // Ball and its glow and trail.
-      ball.visible = ballVisible && b.y > DRAIN_Y - 0.2;
-      ball.position.set(b.x, b.y, BALL_R);
-      trailHead = (trailHead + 1) % TRAIL;
-      trailX[trailHead] = b.x;
-      trailY[trailHead] = b.y;
-      const speed = Math.hypot(b.vx, b.vy);
-      if (ball.visible) {
-        setGlow(G_BALL, b.x, b.y, 0.03, 1.7, 1.7, 0, CYAN, 0.55);
+    // levels: brightness 0..1 of every lamp.
+    update(dt, physics, levels) {
+      // Balls with their glow and trail; a drained one hides under the apron.
+      // While paused (dt 0) the trails hold still.
+      if (dt > 0) trailHead = (trailHead + 1) % TRAIL;
+      for (let n = 0; n < MAX_BALLS; n++) {
+        const b = physics.balls[n];
+        const mesh = ballMeshes[n];
+        const g = G_BALL + n * (TRAIL + 1);
+        const t0 = n * TRAIL;
+        mesh.visible = b.active && b.y > DRAIN_Y - 0.2;
+        mesh.position.set(b.x, b.y, BALL_R);
+        trailX[t0 + trailHead] = b.x;
+        trailY[t0 + trailHead] = b.y;
+        if (!mesh.visible) {
+          for (let i = 0; i <= TRAIL; i++) hideGlow(g + i);
+          continue;
+        }
+        const speed = Math.hypot(b.vx, b.vy);
+        setGlow(g, b.x, b.y, 0.03, 1.7, 1.7, 0, CYAN, 0.55);
         const k = Math.min(1, Math.max(0, (speed - 8) / 20));
         for (let i = 1; i <= TRAIL; i++) {
-          const j = (trailHead - i + TRAIL) % TRAIL;
+          const j = t0 + ((trailHead - i + TRAIL) % TRAIL);
           const f = 1 - i / (TRAIL + 1);
-          if (k > 0 && i < TRAIL) setGlow(G_TRAIL + i - 1, trailX[j], trailY[j], 0.25, 0.9 * f, 0.9 * f, 0, CYAN, k * f * 0.8);
-          else hideGlow(G_TRAIL + i - 1);
+          if (k > 0 && i < TRAIL) setGlow(g + i, trailX[j], trailY[j], 0.25, 0.9 * f, 0.9 * f, 0, CYAN, k * f * 0.8);
+          else hideGlow(g + i);
         }
-      } else {
-        for (let i = 0; i <= TRAIL; i++) hideGlow(G_BALL + i);
       }
+
+      // The spinner turns and glows while it spins.
+      const spin = physics.spinner;
+      spinMesh.rotation.x = spin.angle;
+      const sk = Math.min(1, Math.abs(spin.speed) / 40);
+      if (sk > 0.02) setGlow(G_SPIN, SPIN_X, SPINNER.y, 0.04, 1.6 + sk, 1.4 + sk, 0, YELLOW, 0.2 + sk * 0.8);
+      else hideGlow(G_SPIN);
 
       // Flippers and plunger.
       const fl = physics.flippers;

@@ -3,8 +3,8 @@
 // glow here costs nothing per frame.
 
 import * as THREE from 'three';
-import { BOUNDS, LAMP_MULT, bumpers, lamps, lanes, segments } from './table.js';
-import { BUMPER_COLORS, CYAN, MAGENTA, RED, STYLE, VIOLET, YELLOW } from './shared.js';
+import { BOUNDS, LAMP_MB, LAMP_MULT, SPINNER, bumpers, lamps, lanes, segments } from './table.js';
+import { BUMPER_COLORS, CYAN, MAGENTA, ORANGE, RED, STYLE, VIOLET, YELLOW } from './shared.js';
 
 const SIZE = 512;
 
@@ -117,6 +117,14 @@ export function createFloorTexture() {
   for (let s = -1; s <= 1; s += 2) {
     for (let i = 0; i < 2; i++) chevron(s * 3.45, 5.6 - i * 0.6, 0.25, MAGENTA, 0.5, -1);
   }
+  // Up the spinner lane, and a glow under the spinner.
+  const spinX = (SPINNER.x0 + SPINNER.x1) / 2;
+  for (let i = 0; i < 2; i++) chevron(spinX, 11.25 + i * 0.5, 0.26, ORANGE, 0.35 + i * 0.2);
+  const spinGlow = ctx.createRadialGradient(spinX, SPINNER.y, 0, spinX, SPINNER.y, 0.8);
+  spinGlow.addColorStop(0, css(YELLOW, 0.3));
+  spinGlow.addColorStop(1, css(YELLOW, 0));
+  ctx.fillStyle = spinGlow;
+  ctx.fillRect(spinX - 0.8, SPINNER.y - 0.8, 1.6, 1.6);
 
   // Text helper: undoes the table's non-uniform scale so glyphs keep their
   // shape. size is the letter height in table units.
@@ -148,6 +156,8 @@ export function createFloorTexture() {
     text(`${i + 2}X`, l.x, l.y - 0.62, 0.42, YELLOW, 0.75, false);
   }
   text('SHOOT AGAIN', 0, 0.42, 0.34, RED, 0.85, false);
+  text('MULTIBALL', 0, lamps[LAMP_MB].y - 0.5, 0.3, MAGENTA, 0.85, false);
+  text('SPIN', spinX, SPINNER.y + 0.75, 0.3, ORANGE, 0.85, false);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
