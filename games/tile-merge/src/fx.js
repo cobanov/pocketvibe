@@ -1,9 +1,10 @@
-// Juice: chunky bevelled crumbs that burst out of merges (one InstancedMesh,
-// a ring of slots where a new particle takes the oldest) and one flat ring
-// that sweeps out from big merges.
+// Juice: chunky little cubes that burst out of merges (one InstancedMesh, a
+// ring of slots where a new particle takes the oldest) and one flat ring that
+// sweeps out from big merges. The cubes are plain (12 triangles): they are a
+// few pixels across, and 180 bevelled ones went over the triangle budget.
 
 import * as THREE from 'three';
-import { TILE_RGB, bake, bevelBox } from './shared.js';
+import { TILE_RGB, bake } from './shared.js';
 
 const MAX = 180;
 const GRAVITY = 22;
@@ -12,7 +13,7 @@ const RING_TIME = 0.4;
 
 export function createFx(scene) {
   const mesh = new THREE.InstancedMesh(
-    bake(bevelBox(1, 1, 1, 0.22), 0xffffff),
+    bake(new THREE.BoxGeometry(1, 1, 1), 0xffffff),
     new THREE.MeshBasicMaterial({ vertexColors: true }),
     MAX,
   );

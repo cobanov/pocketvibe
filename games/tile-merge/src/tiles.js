@@ -3,11 +3,15 @@
 // canvas atlas drawn at startup; a per-instance attribute picks the cell.
 // This module also owns the animations: eased slides, merge pops, spawn
 // scale-ins, a nudge for moves that go nowhere and the grey of a lost game.
+// Tiles are modelled for the 4x4 board and scaled by TILE_SCALE on the others.
 
 import * as THREE from 'three';
-import { CELLS, DX, DZ, MAX_EXP, TILE_H, TILE_RGB, TILE_W, bake, bevelBox, cellX, cellZ, easeOutBack, easeOutCubic } from './shared.js';
+import {
+  CELLS, DX, DZ, GOAL_EXP, MAX_CELLS, MAX_EXP, SIZE, TILE_H, TILE_RGB, TILE_SCALE, TILE_W,
+  bake, bevelBox, cellX, cellZ, easeOutBack, easeOutCubic,
+} from './shared.js';
 
-const MAX = 32; // a slide never shows more than 16 tiles, plus room to spare
+const MAX = 32; // a slide never shows more than 25 tiles, plus room to spare
 const SLIDE_TIME = 0.12;
 const POP_TIME = 0.24;
 const SPAWN_TIME = 0.22;
@@ -15,7 +19,7 @@ const NUDGE_TIME = 0.2;
 const DONE = 9; // timer value of an animation that has finished
 
 // Atlas: 512 x 512 px, 4 x 5 cells of 128 x 102 px, one per value from 2 to
-// 131072.
+// 1048576.
 const ATLAS_SIZE = 512;
 const ATLAS_COLS = 4;
 const CELL_W = 128;
@@ -128,10 +132,10 @@ export function createTiles(scene) {
 
   // What is on screen: during a slide the tiles of `before` travel to their
   // `dest`; afterwards `shown` is the settled board.
-  const before = new Uint8Array(CELLS);
-  const dest = new Int8Array(CELLS);
-  const merged = new Uint8Array(CELLS);
-  const shown = new Uint8Array(CELLS);
+  const before = new Uint8Array(MAX_CELLS);
+  const dest = new Int8Array(MAX_CELLS);
+  const merged = new Uint8Array(MAX_CELLS);
+  const shown = new Uint8Array(MAX_CELLS);
   let spawned = -1;
   let sliding = false;
   let slideT = 0;
@@ -139,12 +143,12 @@ export function createTiles(scene) {
 
   // Per-cell animation timers in seconds (negative ones wait). They follow
   // their tile through the next slide, so a quick move never cuts a pop off.
-  const popT = new Float32Array(CELLS).fill(DONE);
-  const popSize = new Float32Array(CELLS);
-  const spawnT = new Float32Array(CELLS).fill(DONE);
-  const nextPop = new Float32Array(CELLS);
-  const nextPopSize = new Float32Array(CELLS);
-  const nextSpawn = new Float32Array(CELLS);
+  const popT = new Float32Array(MAX_CELLS).fill(DONE);
+  const popSize = new Float32Array(MAX_CELLS);
+  const spawnT = new Float32Array(MAX_CELLS).fill(DONE);
+  const nextPop = new Float32Array(MAX_CELLS);
+  const nextPopSize = new Float32Array(MAX_CELLS);
+  const nextSpawn = new Float32Array(MAX_CELLS);
   let nudgeT = DONE;
   let nudgeDir = 0;
   let grey = 0;
@@ -152,11 +156,12 @@ export function createTiles(scene) {
 
   function put(i, x, z, lift, sx, sy, sz, e, flash, shine) {
     const o = i * 16;
-    matrices[o] = sx;
-    matrices[o + 5] = sy;
-    matrices[o + 10] = sz;
+    const scale = TILE_SCALE;
+    matrices[o] = sx * scale;
+    matrices[o + 5] = sy * scale;
+    matrices[o + 10] = sz * scale;
     matrices[o + 12] = x;
-    matrices[o + 13] = lift;
+    matrices[o + 13] = lift * scale;
     matrices[o + 14] = z;
     const k = e * 3;
     let r = TILE_RGB[k];
@@ -204,7 +209,7 @@ export function createTiles(scene) {
       sx *= DX[slideDir] !== 0 ? along : across;
       sz *= DX[slideDir] !== 0 ? across : along;
     }
-    const shine = e >= 11 ? 0.12 + 0.1 * Math.sin(time * 3 + c) : 0;
+    const shine = e >= GOAL_EXP[SIZE] ? 0.12 + 0.1 * Math.sin(time * 3 + c) : 0;
     put(i, x, z, lift, sx, s, sz, e, flash, shine);
   }
 
@@ -258,8 +263,9 @@ export function createTiles(scene) {
     },
 
     // Animates and draws. Returns true on the frame a slide lands, so the
-    // caller can burst the merges and take the next move.
-    update(dt) {
+    // caller can burst the merges and take the next move. hurry: moves are
+    // waiting, so the slide runs at double speed.
+    update(dt, hurry = false) {
       time += dt;
       for (let c = 0; c < CELLS; c++) {
         if (popT[c] < DONE) popT[c] = Math.min(DONE, popT[c] + dt);
@@ -269,7 +275,7 @@ export function createTiles(scene) {
 
       let landed = false;
       if (sliding) {
-        slideT += dt;
+        slideT += hurry ? dt * 2 : dt;
         if (slideT >= SLIDE_TIME) {
           // Timers move with their tiles; merged tiles start a fresh pop and
           // the new tile starts to grow.
@@ -318,7 +324,7 @@ export function createTiles(scene) {
         let ox = 0;
         let oz = 0;
         if (nudgeT < NUDGE_TIME) {
-          const push = Math.sin(Math.PI * (nudgeT / NUDGE_TIME)) * 0.07;
+          const push = Math.sin(Math.PI * (nudgeT / NUDGE_TIME)) * 0.07 * TILE_SCALE;
           ox = DX[nudgeDir] * push;
           oz = DZ[nudgeDir] * push;
         }

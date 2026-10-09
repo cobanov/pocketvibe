@@ -1,10 +1,11 @@
-// The static scenery. The board (a tray with 16 sockets) has baked shading
-// like the tiles; the round table, its legs, the rug, the floor and the
-// things lying on the table are lit. Each group is one merged mesh, so the
-// whole scene costs two draw calls.
+// The static scenery. The board (a tray with a socket for every cell) has
+// baked shading like the tiles; the round table, its legs, the rug, the floor
+// and the things lying on the table are lit. Each group is one merged mesh,
+// so the whole scene costs two draw calls. There is a tray for each board
+// size, all the same outside; only the one in use is shown.
 
 import * as THREE from 'three';
-import { CELLS, PITCH, SIZE, bake, block, cellX, cellZ, mergeGeometries, paint } from './shared.js';
+import { AREA, SIZES, bake, block, mergeGeometries, paint } from './shared.js';
 
 const BOARD = 0x9a7560;
 const RIM = 0xb98f72;
@@ -37,9 +38,10 @@ function merge(parts) {
   return geometry;
 }
 
-function boardGeometry() {
+// The tray of the n x n board.
+function boardGeometry(n) {
   const parts = [];
-  const inner = (SIZE / 2) * PITCH + 0.08; // half size of the playing area
+  const inner = AREA / 2 + 0.08; // half size of the playing area
   const rimT = 0.3;
   const rimH = 0.5;
   // The tray floor; its top is y = 0, where the tiles stand.
@@ -57,10 +59,11 @@ function boardGeometry() {
   parts.push(block(rimT * 0.7, 0.08, inner * 2, -inner - rimT / 2, capY, 0, RIM_TOP, 0.03));
   parts.push(block(rimT * 0.7, 0.08, inner * 2, inner + rimT / 2, capY, 0, RIM_TOP, 0.03));
   // A darker socket under every tile.
-  for (let c = 0; c < CELLS; c++) {
-    const g = new THREE.PlaneGeometry(PITCH - 0.1, PITCH - 0.1);
+  const pitch = AREA / n;
+  for (let c = 0; c < n * n; c++) {
+    const g = new THREE.PlaneGeometry(pitch - 0.1, pitch - 0.1);
     g.rotateX(-Math.PI / 2);
-    g.translate(cellX(c), 0.004, cellZ(c));
+    g.translate(((c % n) - (n - 1) / 2) * pitch, 0.004, (Math.floor(c / n) - (n - 1) / 2) * pitch);
     parts.push(bake(g, SOCKET));
   }
   return merge(parts);
@@ -164,6 +167,17 @@ function roomGeometry() {
 }
 
 export function createTable(scene) {
-  scene.add(new THREE.Mesh(boardGeometry(), new THREE.MeshBasicMaterial({ vertexColors: true })));
+  const boardMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const boards = {};
+  for (const n of SIZES) {
+    boards[n] = new THREE.Mesh(boardGeometry(n), boardMaterial);
+    scene.add(boards[n]);
+  }
   scene.add(new THREE.Mesh(roomGeometry(), new THREE.MeshLambertMaterial({ vertexColors: true })));
+  return {
+    // Shows the tray of the n x n board (0 shows all, for warming up).
+    show(n) {
+      for (const k of SIZES) boards[k].visible = n === 0 || k === n;
+    },
+  };
 }

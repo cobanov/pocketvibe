@@ -5,13 +5,32 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const BG = 0xf4cfae; // warm peach behind the table, also the fog
 
-// The board: 4x4 cells, PITCH world units apart, centred on the origin and
-// lying on the table top (y = 0). Row 0 is the far row (screen top).
-export const SIZE = 4;
-export const CELLS = SIZE * SIZE;
-export const PITCH = 1.08;
-export const TILE_W = 0.94; // tile body width and depth
-export const TILE_H = 0.42; // tile body height
+// The board: SIZE x SIZE cells, PITCH world units apart, centred on the
+// origin and lying on the table top (y = 0). Row 0 is the far row (screen
+// top). Three boards (3x3, 4x4 classic and 5x5) share one tray: the playing
+// area keeps its size and the cells and tiles scale to fit it. These are live
+// bindings, changed by setBoardSize; arrays are made for the largest board.
+export const SIZES = [3, 4, 5];
+export const MAX_SIZE = 5;
+export const MAX_CELLS = MAX_SIZE * MAX_SIZE;
+export const AREA = 4 * 1.08; // width of the playing area
+export let SIZE = 4;
+export let CELLS = 16;
+export let PITCH = 1.08;
+export let TILE_SCALE = 1; // tiles are modelled for the 4x4 board
+export const TILE_W = 0.94; // tile body width and depth on the 4x4 board
+export const TILE_H = 0.42; // tile body height on the 4x4 board
+
+// The tile each board is won with: 256 on 3x3 (nine cells barely hold a
+// 512), 2048 on the classic board and 4096 on the roomy 5x5.
+export const GOAL_EXP = { 3: 8, 4: 11, 5: 12 };
+
+export function setBoardSize(n) {
+  SIZE = n;
+  CELLS = n * n;
+  PITCH = AREA / n;
+  TILE_SCALE = 4 / n;
+}
 
 export function cellX(cell) {
   return ((cell % SIZE) - (SIZE - 1) / 2) * PITCH;
@@ -29,10 +48,10 @@ export const DOWN = 3;
 export const DX = [-1, 1, 0, 0];
 export const DZ = [0, 0, -1, 1];
 
-// Tiles are stored as exponents: 1 is the 2 tile, 11 the 2048 tile, 17 the
-// 131072 tile (the largest a 4x4 board can ever hold). 0 is an empty cell.
-export const MAX_EXP = 17;
-export const WIN_EXP = 11;
+// Tiles are stored as exponents: 1 is the 2 tile, 11 the 2048 tile, 20 the
+// 1048576 tile, the largest the number atlas holds (tiles that big stop
+// merging; a 4x4 board can never reach it). 0 is an empty cell.
+export const MAX_EXP = 20;
 
 // Body colour of each tile, warm and soft up to 2048, then cooler jewels.
 export const TILE_HEX = [
@@ -54,6 +73,9 @@ export const TILE_HEX = [
   0x9a83d8, // 32768 lavender
   0xd474b0, // 65536 orchid
   0x5a4868, // 131072 plum
+  0x3f5f86, // 262144 ink blue
+  0x2f5a4c, // 524288 pine
+  0x2a2a3a, // 1048576 night
 ];
 
 // Linear RGB of each tile colour, ready to copy into instance colour arrays.
