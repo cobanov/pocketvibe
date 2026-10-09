@@ -3,6 +3,7 @@ package dev.cobanov.pocketvibe
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.pm.ApplicationInfo
+import android.hardware.input.InputManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -30,13 +31,14 @@ import android.webkit.WebViewClient
  * opens, from the local service (PocketVibe). The handheld's buttons reach the
  * page as the keyboard keys the launcher and every game already read, so
  * nothing in them is Android-specific. Holding Start + Select leaves a game,
- * as on the handheld.
+ * as on the handheld. A phone, with no gamepad, gets the buttons on its
+ * screen (PadLayout).
  */
 class MainActivity : Activity() {
     // A PocketVibe button as a key: its Android key code, and its Linux scan
     // code, from which WebView sets the DOM code the pages look at (KeyX for A,
     // and so on; see KEYMAP in launcher.js and handheld.js).
-    private enum class Key(val code: Int, val scan: Int) {
+    enum class Key(val code: Int, val scan: Int) {
         UP(KeyEvent.KEYCODE_DPAD_UP, 103),
         DOWN(KeyEvent.KEYCODE_DPAD_DOWN, 108),
         LEFT(KeyEvent.KEYCODE_DPAD_LEFT, 105),
@@ -67,9 +69,11 @@ class MainActivity : Activity() {
     )
 
     private lateinit var service: PocketVibe
+    private lateinit var root: PadLayout
+    private lateinit var inputs: InputManager
     private var web: WebView? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val combo = HashSet<Int>() // Start and Select, while held
+    private val combo = HashSet<Key>() // Start and Select, while held
     private var sticks = 0 // directions held on the d-pad's axes or the left stick, as bits
 
     private val goHome = Runnable { if (service.inGame) openLauncher() }
@@ -81,6 +85,11 @@ class MainActivity : Activity() {
         if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true)
         service = PocketVibe.get(this)
         service.onQuit = { runOnUiThread { finishAndRemoveTask() } }
+        root = PadLayout(this, ::press)
+        setContentView(root)
+        inputs = getSystemService(InputManager::class.java)
+        inputs.registerInputDeviceListener(gamepads, handler)
+        showPad()
         createWebView()
         openLauncher()
     }
@@ -129,7 +138,7 @@ class MainActivity : Activity() {
         }
         view.isFocusable = true
         view.isFocusableInTouchMode = true
-        setContentView(view)
+        root.web = view
         view.requestFocus()
         web = view
     }
@@ -154,16 +163,19 @@ class MainActivity : Activity() {
         }
         val key = buttons[event.keyCode] ?: return super.dispatchKeyEvent(event)
         if (event.repeatCount > 0) return true // the pages repeat held buttons themselves
-        if (event.keyCode == KeyEvent.KEYCODE_BUTTON_START || event.keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) {
-            holdCombo(event.keyCode, down)
-        }
-        send(key, down)
+        root.padShown = false // real buttons: the screen's are in the way
+        press(key, down)
         return true
     }
 
+    private fun press(key: Key, down: Boolean) {
+        if (key == Key.START || key == Key.SELECT) holdCombo(key, down)
+        send(key, down)
+    }
+
     // Start + Select: held for 0.4 s leaves the game, for 3 s quits PocketVibe.
-    private fun holdCombo(code: Int, down: Boolean) {
-        if (down) combo.add(code) else combo.remove(code)
+    private fun holdCombo(key: Key, down: Boolean) {
+        if (down) combo.add(key) else combo.remove(key)
         handler.removeCallbacks(goHome)
         handler.removeCallbacks(quitApp)
         if (combo.size == 2) {
@@ -191,7 +203,35 @@ class MainActivity : Activity() {
             if (now != ((sticks and bit) != 0)) send(key, now)
         }
         sticks = held
+        root.padShown = false
         return true
+    }
+
+    // ---------- The screen's buttons ----------
+
+    // On a screen with no gamepad. A handheld's own buttons are a gamepad too,
+    // so they never show there.
+    private fun gamepadConnected() = InputDevice.getDeviceIds().any { id ->
+        val device = InputDevice.getDevice(id)
+        device != null && !device.isVirtual &&
+            (device.supportsSource(InputDevice.SOURCE_GAMEPAD) || device.supportsSource(InputDevice.SOURCE_JOYSTICK))
+    }
+
+    private fun showPad() {
+        root.padShown = !gamepadConnected()
+    }
+
+    private val gamepads = object : InputManager.InputDeviceListener {
+        override fun onInputDeviceAdded(id: Int) = showPad()
+        override fun onInputDeviceRemoved(id: Int) = showPad()
+        override fun onInputDeviceChanged(id: Int) = showPad()
+    }
+
+    // Buttons pressed on something that is not a gamepad (a keyboard's
+    // arrows) hid the screen's; touching the screen brings them back.
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN && !root.padShown) showPad()
+        return super.dispatchTouchEvent(event)
     }
 
     private fun send(key: Key, down: Boolean) {
@@ -239,6 +279,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        inputs.unregisterInputDeviceListener(gamepads)
         service.onQuit = null
         web?.destroy()
         web = null
