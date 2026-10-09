@@ -8,9 +8,14 @@ export const LANE_W = 2.2;
 export const LANES = [-LANE_W, 0, LANE_W];
 
 // The player stays at z = 0 and the world moves towards +z.
-export const SPAWN_Z = -66; // new rows appear here, hidden in the fog
+export const SPAWN_Z = -66; // things show from here on, hidden in the fog
 export const DESPAWN_Z = 8; // behind the camera
 export const TRACK_LEN = 80; // length of the road and the tree belt
+
+// The runner's jump, used by the player and to shape coin arcs over hurdles.
+export const JUMP_SPEED = 12;
+export const GRAVITY = 36;
+export const COIN_Y = 0.9; // a coin at the runner's middle
 
 const tmpColor = new THREE.Color();
 

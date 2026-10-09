@@ -2,15 +2,16 @@
   "id": "lane-runner",
   "title": "Lane Runner",
   "author": "cobanov",
-  "version": "1.1.0",
-  "description": "Endless runner on a three-lane road. Jump hurdles, slide under bars, dodge walls and collect coins.",
+  "version": "1.2.0",
+  "description": "Endless runner on a three-lane road. Jump hurdles, slide under bars, dodge walls and oncoming vans, and grab coins, magnets and shields as the road speeds up.",
   "genre": "Arcade",
   "controls": {
     "LEFT / RIGHT": "Change lane",
-    "A / UP": "Jump; start / play again",
+    "A / UP": "Jump; select in menus",
     "DOWN": "Slide (in the air: drop to the ground)",
-    "START": "Pause / resume",
-    "B": "Back to title (paused or game over)"
+    "D-pad": "Choose in menus",
+    "START": "Pause menu / resume",
+    "B": "Back; title from game over"
   },
   "responsive": true
 }

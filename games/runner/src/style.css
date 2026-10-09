@@ -95,16 +95,245 @@ body.handheld #legend {
 /* Game HUD */
 
 .hud-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
-  padding: 12px 18px;
-  font-size: 26px;
-  font-weight: 700;
-  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+  align-items: flex-start;
+  padding: 10px 18px;
+  font-size: 30px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 #000, 0 0 5px #000;
+}
+
+.hud-row[hidden],
+#powers[hidden] {
+  display: none;
+}
+
+.hud-row .left {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+#dist {
+  font-size: 20px;
+  color: #d6e2f0;
 }
 
 #coins {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #ffd23f;
+  transform-origin: right center;
+}
+
+.coin {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffcf33;
+  border: 3px solid #b8770f;
+  box-shadow: 0 2px 0 #000;
+}
+
+#coins.bump-a {
+  animation: bump-a 0.18s ease-out;
+}
+
+#coins.bump-b {
+  animation: bump-b 0.18s ease-out;
+}
+
+@keyframes bump-a {
+  40% { transform: scale(1.25); }
+}
+
+@keyframes bump-b {
+  40% { transform: scale(1.25); }
+}
+
+/* Power-ups: a label and a bar that drains by a CSS animation. */
+
+#powers {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+}
+
+.power {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+}
+
+.power[hidden] {
+  display: none;
+}
+
+.power.magnet {
+  color: #ff7a7f;
+}
+
+.power.shield {
+  color: #7fe6ff;
+}
+
+.power i {
+  display: block;
+  width: 96px;
+  height: 9px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.power b {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transform-origin: left center;
+}
+
+.power.run-a b {
+  animation: drain-a var(--time) linear forwards;
+}
+
+.power.run-b b {
+  animation: drain-b var(--time) linear forwards;
+}
+
+#powers.frozen .power b {
+  animation-play-state: paused;
+}
+
+@keyframes drain-a {
+  0% { transform: scaleX(1); }
+  75% { opacity: 1; }
+  80% { opacity: 0.3; }
+  85% { opacity: 1; }
+  90% { opacity: 0.3; }
+  95% { opacity: 1; }
+  100% { transform: scaleX(0); }
+}
+
+@keyframes drain-b {
+  0% { transform: scaleX(1); }
+  75% { opacity: 1; }
+  80% { opacity: 0.3; }
+  85% { opacity: 1; }
+  90% { opacity: 0.3; }
+  95% { opacity: 1; }
+  100% { transform: scaleX(0); }
+}
+
+#toast {
+  position: absolute;
+  top: 74px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 34px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 1px;
+  color: #ffd23f;
+  text-shadow: 0 3px 0 #000, 0 0 6px #000;
+  opacity: 0;
+}
+
+#toast.show-a {
+  animation: toast-a 1.5s ease-out;
+}
+
+#toast.show-b {
+  animation: toast-b 1.5s ease-out;
+}
+
+@keyframes toast-a {
+  0% { opacity: 1; transform: scale(0.5); }
+  12% { opacity: 1; transform: scale(1.2); }
+  20% { opacity: 1; transform: scale(1); }
+  75% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+@keyframes toast-b {
+  0% { opacity: 1; transform: scale(0.5); }
+  12% { opacity: 1; transform: scale(1.2); }
+  20% { opacity: 1; transform: scale(1); }
+  75% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: translateY(-14px); }
+}
+
+#pop {
+  position: absolute;
+  top: 84px;
+  left: 18px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #8ff0a4;
+  text-shadow: 0 2px 0 #000, 0 0 4px #000;
+  opacity: 0;
+}
+
+#pop.show-a {
+  animation: pop-a 0.9s ease-out;
+}
+
+#pop.show-b {
+  animation: pop-b 0.9s ease-out;
+}
+
+@keyframes pop-a {
+  0% { opacity: 1; transform: translateY(8px); }
+  60% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+@keyframes pop-b {
+  0% { opacity: 1; transform: translateY(8px); }
+  60% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-10px); }
+}
+
+#flash {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+#flash.show-a {
+  animation: flash-a 0.4s ease-out;
+}
+
+#flash.show-b {
+  animation: flash-b 0.4s ease-out;
+}
+
+@keyframes flash-a {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes flash-b {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 #message {
@@ -116,6 +345,18 @@ body.handheld #legend {
   text-align: center;
 }
 
+/* The title's and the results' panel sit higher and tighter, so the runner
+   shows under them. */
+#message.top {
+  align-items: flex-start;
+  padding-top: 12px;
+}
+
+#message.top .panel {
+  gap: 7px;
+  padding: 14px 30px 12px;
+}
+
 #message:empty {
   display: none;
 }
@@ -123,17 +364,37 @@ body.handheld #legend {
 .panel {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 10px;
-  padding: 20px 34px;
-  border-radius: 10px;
-  background: rgba(10, 20, 40, 0.55);
+  padding: 18px 36px;
+  border-radius: 12px;
+  background: rgba(10, 20, 40, 0.6);
+  border: 2px solid rgba(255, 210, 63, 0.35);
+  color: #fff;
   font-size: 24px;
   font-weight: 700;
   text-shadow: 0 2px 0 #000;
 }
 
+.panel .logo {
+  font-size: 54px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 2px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 4px 0 #1a2340, 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.panel .logo span {
+  margin-left: 14px;
+  color: #ffd23f;
+}
+
 .panel .title {
   font-size: 44px;
+  font-weight: 900;
+  font-style: italic;
   letter-spacing: 2px;
   color: #ffd23f;
 }
@@ -143,8 +404,105 @@ body.handheld #legend {
   color: #d6e2f0;
 }
 
-.hud-row[hidden] {
-  display: none;
+.panel .dim {
+  color: #9fb0c8;
+}
+
+.panel .stats {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 28px;
+  font-size: 22px;
+  text-align: left;
+}
+
+.panel .stats b {
+  text-align: right;
+}
+
+.panel .stats .score {
+  color: #ffd23f;
+}
+
+.panel .blink {
+  animation: blink 1s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.35; }
+}
+
+/* Menus: the chosen item is yellow with an arrow (a CSS triangle) in front. */
+
+.panel .menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+
+.panel .item {
+  position: relative;
+  padding: 2px 18px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #c3d0e2;
+}
+
+.panel .item.on {
+  color: #ffd23f;
+}
+
+.panel .item.on::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  margin-top: -9px;
+  border-style: solid;
+  border-width: 9px 0 9px 14px;
+  border-color: transparent transparent transparent #ffd23f;
+  filter: drop-shadow(0 2px 0 #000);
+}
+
+/* Records on the title: three numbers with their names under them. */
+
+.panel .records {
+  display: flex;
+  gap: 18px;
+  padding: 6px 4px 2px;
+  border-top: 2px solid rgba(255, 210, 63, 0.25);
+}
+
+.panel .records div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.panel .records b {
+  font-size: 22px;
+  color: #ffd23f;
+}
+
+.panel .records span {
+  font-size: 18px;
+  color: #d6e2f0;
+}
+
+.panel .new {
+  margin-left: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: #ffd23f;
+  color: #1a2340;
+  font-size: 18px;
+  font-style: normal;
+  text-shadow: none;
+  vertical-align: 2px;
 }
 
 /* The coin counter sits top right, so the perf overlay goes bottom right. */

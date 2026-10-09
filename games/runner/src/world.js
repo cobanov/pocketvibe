@@ -1,8 +1,9 @@
-// Scenery: the scrolling road, the grass and the trees on both sides.
+// Scenery: the scrolling road, the grass, the trees on both sides and the
+// banner across the road at the best distance.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { DESPAWN_Z, LANE_W, TRACK_LEN, paint } from './shared.js';
+import { DESPAWN_Z, LANE_W, SPAWN_Z, TRACK_LEN, box, paint } from './shared.js';
 
 const TILE = 4; // world units per texture repeat along the road
 const TREES_PER_SIDE = 16;
@@ -43,6 +44,31 @@ function grassTexture() {
   });
 }
 
+// The banner's cloth: BEST between two checkered ends, drawn once.
+function bannerTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffd23f';
+  ctx.fillRect(0, 0, 256, 32);
+  ctx.fillStyle = '#1a2340';
+  for (let i = 0; i < 6; i++) {
+    for (let j = 0; j < 4; j++) {
+      if ((i + j) % 2) continue;
+      ctx.fillRect(i * 8, j * 8, 8, 8);
+      ctx.fillRect(208 + i * 8, j * 8, 8, 8);
+    }
+  }
+  ctx.font = 'bold 26px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('BEST', 128, 17);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function treeGeometry() {
   const trunk = new THREE.CylinderGeometry(0.15, 0.2, 1, 5);
   trunk.translate(0, 0.5, 0);
@@ -51,7 +77,7 @@ function treeGeometry() {
   return mergeGeometries([paint(trunk, 0x7a5232), paint(leaves, 0x2f7d3a)]);
 }
 
-export function createWorld(scene) {
+export function createWorld(scene, material) {
   const roadWidth = LANE_W * 3 + 0.4;
 
   const roadMap = roadTexture();
@@ -75,11 +101,7 @@ export function createWorld(scene) {
   scene.add(grass);
 
   // All trees are one InstancedMesh; trunk and leaves are merged with vertex colors.
-  const trees = new THREE.InstancedMesh(
-    treeGeometry(),
-    new THREE.MeshLambertMaterial({ vertexColors: true }),
-    TREE_COUNT,
-  );
+  const trees = new THREE.InstancedMesh(treeGeometry(), material, TREE_COUNT);
   trees.frustumCulled = false; // instances move, so the cached bounds would be wrong
   scene.add(trees);
 
@@ -99,10 +121,38 @@ export function createWorld(scene) {
     treeZ[i] = DESPAWN_Z - (i >> 1) * spacing - Math.random() * spacing;
   }
 
+  // The best distance: a banner on two posts and a line across the road.
+  const banner = new THREE.Group();
+  const postX = roadWidth / 2 + 0.25;
+  banner.add(
+    new THREE.Mesh(
+      mergeGeometries([
+        box(0.2, 5.1, 0.2, -postX, 2.55, 0, 0xf4f4f4),
+        box(0.2, 5.1, 0.2, postX, 2.55, 0, 0xf4f4f4),
+        box(roadWidth, 0.04, 0.4, 0, 0.02, 0, 0xffd23f),
+      ]),
+      material,
+    ),
+  );
+  const bannerMap = bannerTexture();
+  const cloth = new THREE.Mesh(new THREE.PlaneGeometry(postX * 2, postX * 0.25), new THREE.MeshBasicMaterial({ map: bannerMap }));
+  cloth.position.y = 4.7;
+  banner.add(cloth);
+  banner.visible = false;
+  scene.add(banner);
+
   const dummy = new THREE.Object3D();
   let scrolled = 0;
 
   return {
+    textures: [roadMap, grassMap, bannerMap],
+
+    // Puts the best-distance banner at z (null: no banner).
+    setBest(z) {
+      banner.visible = z !== null && z > SPAWN_Z && z < DESPAWN_Z;
+      if (banner.visible) banner.position.z = z;
+    },
+
     // Moves the scenery towards the camera by `move` world units.
     update(move) {
       scrolled = (scrolled + move / TILE) % 1;
