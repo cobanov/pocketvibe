@@ -1,0 +1,46 @@
+{
+  "locale": "en-US",
+  "subtitle": "Open-source 3D pocket games",
+  "privacyPolicyUrl": "https://pocketvibe.dev/privacy/",
+  "supportUrl": "https://pocketvibe.dev/support/",
+  "marketingUrl": "https://pocketvibe.dev/",
+  "copyright": "2026 Mert Cobanov",
+  "categories": {
+    "primary": "GAMES",
+    "one": "GAMES_CASUAL",
+    "two": "GAMES_ACTION"
+  },
+  "promotionalText": "More than twenty free 3D games made for handheld consoles, now on your iPhone: the handheld's buttons on your screen, gamepad support, and new games in the store.",
+  "keywords": "arcade,retro,handheld,mini games,offline,gamepad,controller,platformer,puzzle,racing,pinball,snake",
+  "description": "PocketVibe is a little game console in your pocket. It started on Linux handhelds and Android, and now brings its games to the iPhone: small, fast 3D games that you play with the buttons of a handheld, drawn right on your screen.\n\nPLAY\n- Over twenty games: a jetpack runner, brick breaker, minigolf, a lap racer, pinball, falling blocks, a snake on a toy board, a tower stacker and more.\n- Five of them come with the app, and the Store has the rest, one press away. Games update themselves before they start.\n- No accounts, no ads, no in-app purchases, no tracking. Everything plays offline once it is downloaded.\n\nMADE FOR YOUR THUMBS\n- Hold the phone upright and the game sits on top with a d-pad, A, B, X, Y, L, R, Start and Select below it. Turn it on its side and the buttons move to either side.\n- Connect a gamepad and the on-screen buttons make way for it.\n\nOPEN SOURCE\nEvery game in the store is open source, built from its public code and reviewed before it is published. Anyone can make one: PocketVibe's game template and guide are at pocketvibe.dev. If a game is not right, report it from its page in the app.",
+  "ageRating": {
+    "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+    "contests": "NONE",
+    "gamblingSimulated": "NONE",
+    "horrorOrFearThemes": "NONE",
+    "matureOrSuggestiveThemes": "NONE",
+    "medicalOrTreatmentInformation": "NONE",
+    "profanityOrCrudeHumor": "NONE",
+    "sexualContentGraphicAndNudity": "NONE",
+    "sexualContentOrNudity": "NONE",
+    "violenceCartoonOrFantasy": "INFREQUENT_OR_MILD",
+    "violenceRealistic": "NONE",
+    "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+    "gambling": false,
+    "unrestrictedWebAccess": false,
+    "gunsOrOtherWeapons": "INFREQUENT_OR_MILD",
+    "userGeneratedContent": true,
+    "messagingAndChat": false,
+    "advertising": false,
+    "parentalControls": false,
+    "ageAssurance": false,
+    "lootBox": false,
+    "healthOrWellnessTopics": false
+  },
+  "review": {
+    "contactFirstName": "Mert",
+    "contactLastName": "Cobanoglu",
+    "contactEmail": "support@pocketvibe.dev",
+    "notes": "PocketVibe is a launcher for small open-source 3D games made with three.js, first built for Linux and Android handheld consoles. No account or login is needed.\n\nHOW TO TRY IT\n- The Library starts with five games. Use the on-screen buttons: the d-pad moves, A plays or selects, B goes back, L and R switch between Library, Store and Settings.\n- Hold START and SELECT together to leave a game.\n- The Store tab lists more games; open one and press A to download it.\n\nGUIDELINE 4.7 (HTML5 MINI GAMES)\n- The games are HTML5 and JavaScript, downloaded from our curated store (catalog: https://pocketvibe-store.mertcobanov.workers.dev/catalog.json) and run in WKWebView. They get no native APIs, no permissions and no user data.\n- Every game is open source and built from its public code; a maintainer reviews each pull request before it is published: https://github.com/cobanov/pocketvibe-store\n- Report: on a game's page press X (More), then Report this game. Reports go to the store's maintainer, who answers within a few days and removes games that break the rules.\n- Block: the same menu has Hide games by <author>, which keeps that author's games out of the store; Settings lists hidden authors.\n- Age: every game carries an age rating; this app lists only games rated 9+ or lower.\n- Index and links: the Store tab lists every game with its details, and each game has a universal link, https://pocketvibe.dev/game/<id>/, that opens it in the app.\n- No purchases, no ads, no data collection (https://pocketvibe.dev/privacy/)."
+  }
+}

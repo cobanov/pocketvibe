@@ -22,6 +22,9 @@ enum Key: CaseIterable {
         }
     }
 
+    /// The button's name on the handheld: A, UP, START...
+    var name: String { "\(self)".uppercased() }
+
     var key: String {
         switch self {
         case .up, .down, .left, .right, .start: code
@@ -372,6 +375,21 @@ final class TouchPad: UIView {
             arrows[key]?.path = arrow.cgPath
         }
         let scale = traitCollection.displayScale > 0 ? traitCollection.displayScale : 3
+        // Each button for VoiceOver and UI tests (pad.A, pad.UP, ...).
+        let armBoxes: [(Key, CGRect)] = [
+            (.up, CGRect(x: c.x - arm, y: c.y - r, width: 2 * arm, height: r - arm)),
+            (.down, CGRect(x: c.x - arm, y: c.y + arm, width: 2 * arm, height: r - arm)),
+            (.left, CGRect(x: c.x - r, y: c.y - arm, width: r - arm, height: 2 * arm)),
+            (.right, CGRect(x: c.x + arm, y: c.y - arm, width: r - arm, height: 2 * arm)),
+        ]
+        accessibilityElements = (armBoxes + buttons.map { ($0.key, $0.box) }).map { key, box in
+            let element = UIAccessibilityElement(accessibilityContainer: self)
+            element.accessibilityLabel = key.name
+            element.accessibilityIdentifier = "pad.\(key.name)"
+            element.accessibilityTraits = .button
+            element.accessibilityFrameInContainerSpace = box
+            return element
+        }
         for b in buttons {
             b.shape.path = (b.round ? UIBezierPath(ovalIn: b.box) : UIBezierPath(roundedRect: b.box, cornerRadius: b.box.height / 2)).cgPath
             let font = UIFont.systemFont(ofSize: b.round ? b.box.width * 0.42 : 13, weight: .bold)
