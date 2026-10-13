@@ -1103,13 +1103,20 @@ def clean_up():
 # RG34XX SP reports BTN_SOUTH, and libmanette's mapping for its GUID swaps A
 # and B. ROCKNIX's own database has the right line; libmanette reads a user
 # file over its own, so PocketVibe writes the line there. Checked on the
-# RG DS with a button test page.
+# RG DS with a button test page. The RG503 reports the same GUID, but its right
+# stick is ABS_RX/ABS_RY (a3/a4), so the RG DS line leaves its right Y dead;
+# its line was checked on the device by the reporter of #22.
 PAD_MAPPINGS = {
     'Anbernic RG DS': '190000004b4800000111000000010000,retrogame_joypad (RG DS),'
                       'a:b0,b:b1,x:b2,y:b3,back:b8,guide:b10,start:b9,dpleft:b15,dpdown:b14,'
                       'dpright:b16,dpup:b13,leftshoulder:b4,lefttrigger:b6,rightshoulder:b5,'
                       'righttrigger:b7,leftstick:b11,rightstick:b12,leftx:a0,lefty:a1,'
                       'rightx:a2,righty:a3,platform:Linux,',
+    'Anbernic RG503': '190000004b4800000111000000010000,retrogame_joypad (RG503),'
+                      'a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftstick:b11,rightstick:b12,'
+                      'leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,'
+                      'dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,'
+                      'rightx:a3,righty:a4,platform:Linux,',
 }
 PAD_MAPPING_FILE = RUNTIME / 'root' / '.config' / 'libmanette' / 'gamecontrollerdb'
 
@@ -1125,7 +1132,8 @@ def fix_pad_mapping():
             if not PAD_MAPPING_FILE.exists() or PAD_MAPPING_FILE.read_text() != line + '\n':
                 PAD_MAPPING_FILE.parent.mkdir(parents=True, exist_ok=True)
                 PAD_MAPPING_FILE.write_text(line + '\n')
-        elif PAD_MAPPING_FILE.exists() and 'RG DS' in PAD_MAPPING_FILE.read_text():
+        elif PAD_MAPPING_FILE.exists() and any(
+                f'({name.removeprefix("Anbernic ")})' in PAD_MAPPING_FILE.read_text() for name in PAD_MAPPINGS):
             PAD_MAPPING_FILE.unlink()
     except OSError as e:
         print(f'gamepad mapping not written: {e}', file=sys.stderr)
