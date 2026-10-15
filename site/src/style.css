@@ -1113,12 +1113,12 @@ h2 {
   color: #3ddc84;
 }
 
-.iphone .mark {
+.apple .mark {
   color: #e8e8ed;
 }
 
-.ps5 .mark {
-  color: #4f8cff;
+.playstation .mark {
+  color: #3d8bff;
 }
 
 /* Download buttons: the platform's mark, what it is, and the newest version. */
