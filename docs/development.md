@@ -156,7 +156,9 @@ though the simulator passes the Mac's gamepads on.
 
 `ios/scripts/testflight.sh` builds, signs and uploads to TestFlight with an App Store Connect API
 key (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `APPLE_TEAM_ID`). `ios/scripts/asc.swift` registers the bundle
-id, makes the App Store profile, lists builds and adds an internal tester (one at a time: each one added gets an invitation). The App
+id, makes the App Store profile, lists builds and adds an internal tester (one at a time: each one added gets an invitation).
+`asc.swift public-beta ios/AppStore/listing.json <build>` opens the public beta: a "Public" TestFlight group with a
+link anyone can join, the build in it, sent to Beta App Review (the link works once the review passes). The App
 Store Connect API cannot create the app record; it was made once in the web page. App Store
 Connect takes each build number once, so commit before uploading again.
 

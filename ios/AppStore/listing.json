@@ -38,6 +38,10 @@
     "lootBox": false,
     "healthOrWellnessTopics": false
   },
+  "beta": {
+    "description": "PocketVibe puts a little game console on your iPhone: more than twenty small 3D games made for handheld consoles, played with buttons drawn on the screen or with a gamepad. No account, no ads, no tracking. Five games come with the app and the Store has the rest.",
+    "whatsNew": "Play the games in the Library and download more from the Store. Tell us which games run slowly on your iPhone, and anything that is hard to do with the on-screen buttons or your gamepad. Hold START and SELECT together to leave a game."
+  },
   "review": {
     "contactFirstName": "Mert",
     "contactLastName": "Cobanoglu",

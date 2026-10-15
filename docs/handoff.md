@@ -15,8 +15,12 @@ geçmişinde (`git log -- docs/handoff.md`).
   `/support/`; `support@pocketvibe.dev` Cloudflare Email Routing ile mertcobanov@gmail.com'a gidiyor.
   App Store Connect'te metinler, kategoriler (Casual, Action), yaş cevapları, 4 ekran görüntüsü, ücretsiz
   ve 175 ülke API ile girildi (`ios/AppStore/listing.json`, `asc.swift listing`, `free-everywhere`).
-  **Eksik (sahibin işi):** inceleme iletişim telefonu (`REVIEW_PHONE=... asc.swift listing ...`), App
-  Privacy formu ("Veri toplanmıyor"), DSA "tacir değilim" beyanı, sürümü seçip incelemeye göndermek.
+  2026-10-16: inceleme iletişim telefonu girildi, 0.7.4 sürümüne build 152 bağlandı (`asc.swift status`).
+  **Eksik (sahibin işi, API'si yok):** App Privacy formu ("Veri toplanmıyor") ve DSA "tacir değilim"
+  beyanı; sonra `asc.swift submit`.
+- **TestFlight public beta (2026-10-16):** "Public" dış test grubu, build 152 Beta App Review'da
+  (`asc.swift public-beta ios/AppStore/listing.json 152`). Link: https://testflight.apple.com/join/9nWk8ThJ
+  (inceleme geçince açılır; sonra sitedeki iPhone kartına ve hero düğmesine konacak).
 - **Android 0.7.4 / iPhone 0.7.4:** oyun sırasında telefon çevrilince oyun şeklini koruyor (bant yok);
   iPhone'da gamepad'i uygulama okuyor (sayfaların Gamepad API'si kapalı), arka plandan dönünce sunucu
   cevap vermiyorsa yeniden başlıyor.

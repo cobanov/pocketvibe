@@ -12,6 +12,10 @@
 //   swift scripts/asc.swift submit          sends the version being prepared to App Review
 //   swift scripts/asc.swift builds          the latest builds and their processing state
 //   swift scripts/asc.swift tester <email>  add a team member to the internal group that gets every build
+//   swift scripts/asc.swift status          the version being prepared, its build, screenshots, review contact; the public beta
+//   swift scripts/asc.swift public-beta <json> <n>  the public TestFlight beta: listing.json's "beta" texts,
+//                                           a "Public" group with a link anyone can join, build <n> in it
+//                                           and sent to Beta App Review (REVIEW_PHONE=+90...)
 //
 // Environment: ASC_KEY_ID, ASC_ISSUER_ID, APPLE_TEAM_ID (the key is read from
 // ~/.appstoreconnect/private_keys/AuthKey_<ASC_KEY_ID>.p8).
@@ -433,6 +437,112 @@ func tester(_ email: String) {
     }
 }
 
+@discardableResult
+func create(_ type: String, attributes: [String: Any], relationships: [String: Any]) -> [String: Any] {
+    do {
+        return try call("POST", "/v1/\(type)", ["data": ["type": type, "attributes": attributes, "relationships": relationships]])["data"] as? [String: Any] ?? [:]
+    } catch { die("creating \(type) failed: \(error)") }
+}
+
+/// TestFlight for anyone with the link: an external group, "Public", whose
+/// public link opens once Beta App Review has passed the build.
+func publicBeta(_ file: String, _ buildNumber: String) {
+    guard let raw = FileManager.default.contents(atPath: file),
+          let page = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
+          let beta = page["beta"] as? [String: Any], let review = page["review"] as? [String: Any] else { die("no beta texts in \(file)") }
+    // The phone is kept out of the repository, as for the App Store.
+    guard let phone = env["REVIEW_PHONE"] else { die("Beta App Review wants a phone number (REVIEW_PHONE=+90...)") }
+    let locale = page["locale"] as? String ?? "en-US"
+    guard let appID = app()?["id"] as? String else { die("no app record") }
+    let appRef: [String: Any] = ["app": ["data": ["type": "apps", "id": appID]]]
+    guard let build = list("/v1/builds?filter[app]=\(appID)&filter[version]=\(buildNumber)").first,
+          let buildID = build["id"] as? String else { die("no build \(buildNumber)") }
+
+    // What testers read about the app, and where their feedback goes.
+    let texts: [String: Any] = ["description": beta["description"] ?? "", "feedbackEmail": review["contactEmail"] ?? "",
+                                "marketingUrl": page["marketingUrl"] ?? "", "privacyPolicyUrl": page["privacyPolicyUrl"] ?? ""]
+    if let loc = list("/v1/apps/\(appID)/betaAppLocalizations").first(where: { attributes($0)["locale"] as? String == locale }),
+       let id = loc["id"] as? String {
+        patch("betaAppLocalizations", id, attributes: texts)
+    } else {
+        create("betaAppLocalizations", attributes: texts.merging(["locale": locale]) { a, _ in a }, relationships: appRef)
+    }
+    print("beta description and feedback email set")
+
+    // Who Beta App Review can reach, and how to try the app.
+    var contact: [String: Any] = ["contactPhone": phone, "demoAccountRequired": false, "notes": review["notes"] ?? ""]
+    for key in ["contactFirstName", "contactLastName", "contactEmail"] { contact[key] = review[key] }
+    guard let detailID = one("/v1/apps/\(appID)/betaAppReviewDetail")["id"] as? String else { die("no beta review details") }
+    patch("betaAppReviewDetails", detailID, attributes: contact)
+    print("beta review contact set")
+
+    // The build: what to test, and its export compliance (Info.plist says no
+    // non-exempt encryption; older builds may not have the answer yet).
+    if let loc = list("/v1/builds/\(buildID)/betaBuildLocalizations").first(where: { attributes($0)["locale"] as? String == locale }),
+       let id = loc["id"] as? String {
+        patch("betaBuildLocalizations", id, attributes: ["whatsNew": beta["whatsNew"] ?? ""])
+    } else {
+        create("betaBuildLocalizations", attributes: ["locale": locale, "whatsNew": beta["whatsNew"] ?? ""],
+               relationships: ["build": ["data": ["type": "builds", "id": buildID]]])
+    }
+    if attributes(build)["usesNonExemptEncryption"] is NSNull {
+        patch("builds", buildID, attributes: ["usesNonExemptEncryption": false])
+    }
+    print("build \(buildNumber): what to test set")
+
+    // The group, open to anyone through its link (TestFlight caps it at 10,000 testers).
+    let groupAttributes: [String: Any] = ["publicLinkEnabled": true, "publicLinkLimitEnabled": false, "feedbackEnabled": true]
+    var group = list("/v1/apps/\(appID)/betaGroups?limit=200").first {
+        attributes($0)["isInternalGroup"] as? Bool == false && attributes($0)["name"] as? String == "Public"
+    }
+    if let id = group?["id"] as? String {
+        patch("betaGroups", id, attributes: groupAttributes)
+    } else {
+        group = create("betaGroups", attributes: groupAttributes.merging(["name": "Public"]) { a, _ in a }, relationships: appRef)
+    }
+    guard let groupID = group?["id"] as? String else { die("no Public group") }
+    do {
+        try call("POST", "/v1/betaGroups/\(groupID)/relationships/builds", ["data": [["type": "builds", "id": buildID]]])
+    } catch { die("adding build \(buildNumber) to the Public group failed: \(error)") }
+    print("build \(buildNumber) is in the Public group")
+
+    do {
+        try call("POST", "/v1/betaAppReviewSubmissions", ["data": [
+            "type": "betaAppReviewSubmissions", "relationships": ["build": ["data": ["type": "builds", "id": buildID]]],
+        ]])
+        print("build \(buildNumber) sent to Beta App Review")
+    } catch let error as APIError where error.status == 409 {
+        print("build \(buildNumber) was already sent to Beta App Review")
+    } catch { die("sending to Beta App Review failed: \(error)") }
+    let state = attributes(one("/v1/builds/\(buildID)/buildBetaDetail"))["externalBuildState"] ?? "?"
+    print("beta review state: \(state)")
+    print("public link (opens once the review passes): \(attributes(one("/v1/betaGroups/\(groupID)"))["publicLink"] ?? "none yet")")
+}
+
+/// What is ready for App Review and the public beta. App Privacy answers and
+/// the trader status have no API: App Store Connect's web page shows them.
+func status() {
+    guard let appID = app()?["id"] as? String else { die("no app record") }
+    for version in list("/v1/apps/\(appID)/appStoreVersions?filter[platform]=IOS&limit=3") {
+        let a = attributes(version)
+        guard let id = version["id"] as? String else { continue }
+        let build = attributes(one("/v1/appStoreVersions/\(id)/build"))["version"] ?? "none"
+        let review = attributes(one("/v1/appStoreVersions/\(id)/appStoreReviewDetail"))
+        let shots = list("/v1/appStoreVersions/\(id)/appStoreVersionLocalizations").flatMap { loc in
+            list("/v1/appStoreVersionLocalizations/\(loc["id"] as? String ?? "")/appScreenshotSets").flatMap { list("/v1/appScreenshotSets/\($0["id"] as? String ?? "")/appScreenshots") }
+        }
+        print("version \(a["versionString"] ?? "?"): \(a["appStoreState"] ?? "?"), build \(build), \(shots.count) screenshots, review contact \(review["contactPhone"] is String ? "set" : "missing")")
+    }
+    for group in list("/v1/apps/\(appID)/betaGroups?limit=200") where attributes(group)["isInternalGroup"] as? Bool == false {
+        let a = attributes(group)
+        let builds = list("/v1/betaGroups/\(group["id"] as? String ?? "")/builds").map { build -> String in
+            let state = attributes(one("/v1/builds/\(build["id"] as? String ?? "")/buildBetaDetail"))["externalBuildState"] ?? "?"
+            return "\(attributes(build)["version"] ?? "?") \(state)"
+        }
+        print("beta group \(a["name"] ?? "?"): link \(a["publicLink"] ?? "none"), builds \(builds.joined(separator: ", "))")
+    }
+}
+
 let args = CommandLine.arguments.dropFirst()
 switch args.first {
 case "probe": probe()
@@ -455,5 +565,9 @@ case "builds": builds()
 case "tester":
     guard args.count == 2 else { die("usage: tester <email>") }
     tester(args[args.startIndex + 1])
-default: die("usage: swift scripts/asc.swift probe|ensure-app|profile <sha1>|builds|tester <email>")
+case "status": status()
+case "public-beta":
+    guard args.count == 3 else { die("usage: public-beta <listing.json> <build number>") }
+    publicBeta(args[args.startIndex + 1], args[args.startIndex + 2])
+default: die("usage: swift scripts/asc.swift probe|ensure-app|profile <sha1>|listing|free-everywhere|version|submit|status|builds|tester <email>|public-beta")
 }
