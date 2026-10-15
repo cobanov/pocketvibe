@@ -23,28 +23,141 @@
   document.title = 'PocketVibe';
 
   // ---- The service (pocketvibed's routes)
-  const DEFAULT_SETTINGS = { language: 'en', music: true, musicVolume: 0.8, uiSounds: true, sfxVolume: 0.8, showFps: false, stores: [] };
+  const STORE = 'https://pocketvibe-store.mertcobanov.workers.dev/catalog.json';
+  const ROOT = '/data/pocketvibe/';
+  const DEFAULT_SETTINGS = { language: 'en', music: true, musicVolume: 0.8, uiSounds: true, sfxVolume: 0.8, showFps: false, stores: [STORE] };
   let settings = { ...DEFAULT_SETTINGS, ...readJson(`${DATA}settings.json`, {}) };
   const plays = readJson(`${DATA}plays.json`, {});
-  const manifests = readJson('/app0/assets/js/library.json', []);
-  const library = () => manifests
+  const bundled = readJson('/app0/assets/js/library.json', []);
+  // Games from the store, in /data/pocketvibe/games/<id>; they win over bundled ones.
+  const installed = readJson(`${ROOT}installed.json`, {});
+  const saveInstalled = () => __ps5.writeText(`${ROOT}installed.json`, JSON.stringify(installed));
+  const manifests = () => {
+    const byId = new Map(bundled.map((m) => [m.id, { ...m, bundled: true }]));
+    for (const m of Object.values(installed)) byId.set(m.id, m);
+    return [...byId.values()];
+  };
+  const library = () => manifests()
     .map((m) => ({ ...m, lastPlayed: plays[m.id]?.last ?? 0, plays: plays[m.id]?.count ?? 0 }))
     .sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
   const pad = (n) => String(n).padStart(2, '0');
 
-  function route(path, method, body) {
+  // A request through the native HTTPS client, resolved when it finishes.
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function http(url, path = null, onProgress = null) {
+    const id = __ps5.httpStart(url, path);
+    if (id < 0) throw new Error('request refused');
+    for (;;) {
+      const st = __ps5.httpPoll(id);
+      if (st.state === 'done' || st.state === 'failed') {
+        const body = __ps5.httpTake(id);
+        if (st.state === 'failed') throw new Error(st.error || 'download failed');
+        return { ...st, body };
+      }
+      onProgress?.(st);
+      await wait(100);
+    }
+  }
+
+  // The catalog, with the last copy kept for when the network is not there.
+  const STORE_FIELDS = ['title', 'author', 'version', 'description', 'genre', 'entry', 'download', 'cover', 'sha256', 'updated'];
+  let catalog = readJson(`${ROOT}catalog.json`, { name: 'PocketVibe Store', games: [] });
+  let online = false;
+  const entries = () => (Array.isArray(catalog.games) ? catalog.games : []).filter((e) =>
+    e && /^[a-z0-9][a-z0-9-]{0,63}$/.test(e.id ?? '') && typeof e.title === 'string' && typeof e.download === 'string' && e.download.startsWith('https://')
+    && STORE_FIELDS.every((k) => e[k] === undefined || typeof e[k] === 'string'));
+  async function refreshCatalog() {
+    try {
+      const r = await http(settings.stores?.[0] || STORE);
+      const data = JSON.parse(r.body);
+      if (data && Array.isArray(data.games)) {
+        catalog = data;
+        online = true;
+        __ps5.writeText(`${ROOT}catalog.json`, r.body);
+        fetchCovers();
+      }
+    } catch (e) {
+      online = false;
+      console.log(`store offline: ${e.message}`);
+    }
+  }
+  function storeView() {
+    const local = new Map(manifests().map((m) => [m.id, m]));
+    const games = entries().map((e) => ({
+      ...e,
+      store: catalog.name ?? 'PocketVibe Store',
+      installed: local.has(e.id),
+      update: local.has(e.id) && local.get(e.id).version !== e.version,
+    }));
+    return { online, games, stores: [{ url: STORE, name: catalog.name ?? 'PocketVibe Store', online, count: games.length }] };
+  }
+
+  // Store covers, saved for good once fetched.
+  const coverWaits = new Map();
+  async function fetchCovers() {
+    for (const e of entries()) {
+      if (!e.cover?.startsWith('https://') || __ps5.readBinary(`${ROOT}covers/${e.id}.png`) || coverWaits.has(e.id)) continue;
+      const done = http(e.cover, `${ROOT}covers/${e.id}.png`).catch(() => null);
+      coverWaits.set(e.id, done);
+      await done;
+      coverWaits.delete(e.id);
+      images.delete(`${ROOT}covers/${e.id}.png`);
+      g.__hudDirty = true;
+    }
+  }
+
+  // Installing: download, check, unpack beside the old copy, then swap.
+  const jobs = {};
+  async function install(id) {
+    const entry = entries().find((e) => e.id === id);
+    jobs[id] = { state: 'downloading', progress: 0, error: null };
+    try {
+      if (!entry) throw new Error('not in the store');
+      const zip = `${ROOT}downloads/${id}.zip`;
+      const r = await http(entry.download, zip, (st) => { if (st.total) jobs[id].progress = Math.min(st.got / st.total, 1); });
+      if (entry.sha256 && r.sha256 !== entry.sha256) throw new Error('download is corrupted (checksum mismatch)');
+      jobs[id] = { state: 'installing', progress: 1, error: null };
+      const fresh = `${ROOT}games/.${id}.new`;
+      __ps5.removeGame(fresh);
+      const written = __ps5.unzip(zip, fresh);
+      if (typeof written === 'string') throw new Error(written);
+      const manifest = { ...readJson(`${fresh}/pocketvibe.json`, {}) };
+      if (!__ps5.readBinary(`${fresh}/${entry.entry ?? manifest.entry ?? 'index.html'}`)) throw new Error('archive has no index.html');
+      for (const k of ['title', 'author', 'version', 'description', 'genre', 'entry']) if (entry[k] !== undefined) manifest[k] = entry[k];
+      if (entry.controls && typeof entry.controls === 'object') manifest.controls = entry.controls;
+      manifest.id = id;
+      manifest.entry ??= 'index.html';
+      __ps5.writeText(`${fresh}/pocketvibe.json`, JSON.stringify(manifest, null, 2));
+      const target = `${ROOT}games/${id}`;
+      __ps5.removeGame(target);
+      if (!__ps5.rename(fresh, target)) throw new Error('cannot install');
+      installed[id] = manifest;
+      saveInstalled();
+      images.delete(`${target}/cover.png`);
+      jobs[id] = { state: 'done', progress: 1, error: null };
+    } catch (e) {
+      jobs[id] = { state: 'error', progress: 0, error: e.message };
+    }
+  }
+
+  async function route(path, method, body) {
     if (method === 'GET') {
       switch (path) {
         case '/api/library': return library();
-        case '/api/store': return { online: false, games: [], stores: [] };
-        case '/api/status': { const d = new Date(); return { time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, battery: null, charging: false, wifi: false }; }
+        case '/api/store': await refreshCatalog(); return storeView();
+        case '/api/status': { const d = new Date(); return { time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, battery: null, charging: false, wifi: online }; }
         case '/api/settings': return settings;
         case '/api/info': return { version: VERSION, free: 0, total: 0, games: 0, ip: null, gpu: null };
-        case '/api/screens': return { screens: null, primary: 0 };
+        // One screen inside the TV's title-safe area (5% in from each edge),
+        // so a TV that crops the picture's edges does not cut the bars.
+        case '/api/screens': {
+          const [w, h] = [g.innerWidth, g.innerHeight];
+          return { screens: [{ x: Math.round(w * 0.05), y: Math.round(h * 0.05), width: Math.round(w * 0.9), height: Math.round(h * 0.9) }], primary: 0 };
+        }
         case '/api/saves': return [];
         case '/api/update': return { current: VERSION, available: false };
         case '/api/notice': return { notice: null };
-        case '/api/jobs': return {};
+        case '/api/jobs': return jobs;
       }
       return null;
     }
@@ -53,13 +166,25 @@
       __ps5.writeText(`${DATA}settings.json`, JSON.stringify(settings));
       return settings;
     }
-    const launch = /^\/api\/launch\/([a-z0-9-]+)$/.exec(path);
-    if (launch) {
-      const id = launch[1];
-      if (!manifests.some((m) => m.id === id)) return null;
-      plays[id] = { count: (plays[id]?.count ?? 0) + 1, last: Date.now() / 1000 };
-      __ps5.writeText(`${DATA}plays.json`, JSON.stringify(plays));
-      return { url: `pocketvibe-game:${id}` };
+    const action = /^\/api\/(launch|install|remove)\/([a-z0-9-]+)$/.exec(path);
+    if (action) {
+      const [, verb, id] = action;
+      if (verb === 'launch') {
+        if (!manifests().some((m) => m.id === id)) return null;
+        plays[id] = { count: (plays[id]?.count ?? 0) + 1, last: Date.now() / 1000 };
+        __ps5.writeText(`${DATA}plays.json`, JSON.stringify(plays));
+        return { url: `pocketvibe-game:${id}` };
+      }
+      if (verb === 'install') {
+        if (jobs[id]?.state === 'downloading' || jobs[id]?.state === 'installing') return { ok: true };
+        install(id);
+        return { ok: true };
+      }
+      if (!installed[id]) return { error: 'built-in games stay' };
+      __ps5.removeGame(`${ROOT}games/${id}`);
+      delete installed[id];
+      saveInstalled();
+      return { ok: true };
     }
     if (path === '/api/quit') { g.__flushStorage?.(); __ps5.exit(); return {}; }
     if (path === '/api/unlock-audio' || path === '/api/report') return {};
@@ -74,13 +199,15 @@
     json: async () => JSON.parse(text),
     text: async () => text,
   });
+  const files = g.fetch; // ps5.js: the launcher's own files (sounds, music)
   g.fetch = async (input, options = {}) => {
     const url = String(input?.url ?? input).replace(/^[a-z]+:\/\/[^/]+/i, '');
     const path = url.split('?')[0];
     const method = (options.method ?? 'GET').toUpperCase();
     let body;
     try { body = options.body ? JSON.parse(options.body) : undefined; } catch { body = undefined; }
-    const data = path.startsWith('/api/') ? route(path, method, body) : null;
+    if (!path.startsWith('/api/')) return files(input, options);
+    const data = await route(path, method, body);
     return data === null ? response(404, JSON.stringify({ error: 'not here' })) : response(200, JSON.stringify(data));
   };
 
@@ -95,10 +222,16 @@
   const images = new Map();
   g.__loadImage = (src) => {
     const cover = /\/api\/cover\/([a-z0-9-]+)/.exec(src);
-    const path = cover ? `${GAMES}${cover[1]}.png` : null;
-    if (!path) return null;
-    if (!images.has(path)) images.set(path, __ps5.image(path));
-    return images.get(path);
+    if (!cover) return null;
+    const id = cover[1];
+    const paths = [installed[id] && `${ROOT}games/${id}/cover.png`, `${GAMES}${id}.png`, `${ROOT}covers/${id}.png`].filter(Boolean);
+    for (const path of paths) {
+      if (!images.has(path)) images.set(path, __ps5.image(path));
+      if (images.get(path)) return images.get(path);
+    }
+    // Still downloading: the picture element waits for it.
+    const pending = coverWaits.get(id);
+    return pending ? pending.then(() => g.__loadImage(src)) : null;
   };
 
   // ---- The screen: a blank canvas under the page, the page drawn over it.

@@ -6,10 +6,11 @@
 
 (() => {
   const g = globalThis;
-  // scePad button bits in standard-mapping order: Cross, Circle, Square,
-  // Triangle, L1, R1, L2, R2, touch pad (Select), Options (Start), L3, R3,
-  // up, down, left, right.
-  const BITS = [0x4000, 0x2000, 0x8000, 0x1000, 0x400, 0x800, 0x100, 0x200, 0x100000, 0x8, 0x2, 0x4, 0x10, 0x40, 0x80, 0x20];
+  // scePad button bits in the order of the Gamepad API's standard mapping,
+  // as PocketVibe reads it (0 B, 1 A, 2 X, 3 Y): on a PlayStation, Cross
+  // confirms (A) and Circle goes back (B); Square is X and Triangle Y. Then
+  // L1, R1, L2, R2, touch pad (Select), Options (Start), L3, R3, the D-pad.
+  const BITS = [0x2000, 0x4000, 0x8000, 0x1000, 0x400, 0x800, 0x100, 0x200, 0x100000, 0x8, 0x2, 0x4, 0x10, 0x40, 0x80, 0x20];
   const pad = {
     id: 'DualSense', index: 0, connected: false, mapping: 'standard', timestamp: 0,
     axes: [0, 0, 0, 0],
@@ -18,6 +19,30 @@
   const axis = (v) => {
     const a = (v - 127.5) / 127.5;
     return Math.abs(a) < 0.15 ? 0 : a;
+  };
+
+  // fetch reads the page's own files: a game's sounds and music, relative to
+  // its folder. pocketvibed's unlock-audio call answers fine.
+  g.__baseDir = g.__gameDir ?? (g.__storageName && g.__storageName !== 'launcher' ? `/app0/assets/js/games/${g.__storageName}/` : '/app0/assets/js/launcher/');
+  const fileResponse = (path) => {
+    let bytes;
+    const body = () => (bytes ??= __ps5.readBinary(path));
+    const ok = body() !== null;
+    return {
+      ok, status: ok ? 200 : 404, statusText: ok ? 'OK' : 'Not Found', url: path,
+      headers: { get: () => null },
+      arrayBuffer: async () => body(),
+      text: async () => __ps5.readText(path) ?? '',
+      json: async () => JSON.parse(__ps5.readText(path) ?? 'null'),
+      blob: async () => ({ arrayBuffer: async () => body() }),
+    };
+  };
+  g.fetch = async (input) => {
+    const url = String(input?.url ?? input);
+    if (url.includes('/__pocketvibe__/')) return { ok: true, status: 200, json: async () => ({}), text: async () => '{}' };
+    const path = url.replace(/^[a-z]+:\/\/[^/]+/i, '').replace(/^\.\//, '').replace(/^\/+/, '');
+    if (path.includes('..')) return fileResponse('');
+    return fileResponse(`${g.__baseDir}${path.split('?')[0]}`);
   };
 
   let frame = 0;

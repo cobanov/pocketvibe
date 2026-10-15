@@ -326,6 +326,12 @@ void main() {
     function picture(src) {
       if (pictures.has(src)) return pictures.get(src);
       const img = loadImage?.(src) ?? null;
+      if (img && typeof img.then === 'function') {
+        // Not here yet: draw nothing now and look again once it is.
+        img.then(() => { pictures.delete(src); g.__hudDirty = true; });
+        pictures.set(src, null);
+        return null;
+      }
       let pic = null;
       if (img) {
         const tex = gl.createTexture();

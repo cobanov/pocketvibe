@@ -81,7 +81,7 @@
 
   // ---- HTML: markup to nodes and back.
   const VOID = new Set(['br', 'hr', 'img', 'input', 'meta', 'link', 'wbr', 'col', 'source']);
-  const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', times: '×', middot: '·', bull: '•', hellip: '…', mdash: '—', ndash: '–', larr: '←', rarr: '→', uarr: '↑', darr: '↓', copy: '©', deg: '°', star: '★' };
+  const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', times: '×', middot: '·', bull: '•', hellip: '…', mdash: '\u2014', ndash: '–', larr: '←', rarr: '→', uarr: '↑', darr: '↓', copy: '©', deg: '°', star: '★' };
   const decode = (t) => t.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e) =>
     e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : +e.slice(1)) : ENTITIES[e] ?? m);
   const escape = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -412,8 +412,7 @@
     set src(v) {
       this.setAttribute('src', v);
       this.complete = false;
-      Promise.resolve().then(() => {
-        const info = g.__loadImage?.(String(v)) ?? null;
+      Promise.resolve(g.__loadImage?.(String(v)) ?? null).then((info) => {
         this.complete = true;
         if (info) { this.naturalWidth = this.width = info.w; this.naturalHeight = this.height = info.h; }
         const type = info ? 'load' : 'error';

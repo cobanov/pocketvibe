@@ -51,7 +51,11 @@ static int safe_data_path(const char *path) {
 
 void files_init(void) {
   sceKernelMkdir("/data/pocketvibe", 0777);
-  sceKernelMkdir(DATA_DIR "storage", 0777);
+  for (const char *const *d = (const char *const[]){"storage", "games", "downloads", "covers", NULL}; *d; d++) {
+    char path[128];
+    snprintf(path, sizeof path, DATA_DIR "%s", *d);
+    sceKernelMkdir(path, 0777);
+  }
 }
 
 // __ps5.writeText(path, text) -> true when saved.
@@ -94,6 +98,18 @@ JSValue js_image(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *
   JS_SetPropertyStr(ctx, o, "data", JS_NewUint8ArrayCopy(ctx, px, (size_t)w * h * 4));
   stbi_image_free(px);
   return o;
+}
+
+// __ps5.readBinary(path) -> ArrayBuffer or null (game sounds and the like).
+JSValue js_read_binary(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
+  const char *path = JS_ToCString(ctx, argv[0]);
+  size_t n = 0;
+  char *bytes = path ? slurp(path, &n) : NULL;
+  JS_FreeCString(ctx, path);
+  if (!bytes) return JS_NULL;
+  JSValue ab = JS_NewArrayBufferCopy(ctx, (uint8_t *)bytes, n);
+  free(bytes);
+  return ab;
 }
 
 // ES modules by path: imports resolve against the importing file (QuickJS's

@@ -29,18 +29,31 @@ close_app() { # loads the close payload through shsrv's hbldr (port 9021 ignored
   shell "hbldr /data/pocketvibe-dev/close-$title.elf" >/dev/null
 }
 
-echo "== close"
-close_app
-sleep 2
+# Only files that changed since the last deploy of this title go up
+# (DEPLOY_ALL=1 sends everything).
+manifest=${MANIFEST:-$logdir/../work/deployed-$title.txt}
+current=$(cd "$app" && find . -type f | sed 's|^\./||' | sort | while read -r f; do echo "$(shasum "$f" | cut -c1-40) $f"; done)
+if [ -n "${DEPLOY_ALL:-}" ] || [ ! -f "$manifest" ]; then
+  files=$(cut -d' ' -f2- <<<"$current")
+else
+  files=$(comm -13 <(sort "$manifest") <(sort <<<"$current") | cut -d' ' -f2-)
+fi
+echo "$(wc -w <<<"$files" | tr -d ' ') of $(wc -l <<<"$current" | tr -d ' ') files changed"
 
 echo "== upload to /data/hb-staging/$title"
-files=$(cd "$app" && find . -type f | sed 's|^\./||' | sort)
 for f in $files; do
   curl -sS --ftp-create-dirs -T "$app/$f" "$ftp/data/hb-staging/$title/$f"
 done
 
 echo "== verify sizes"
-stats=$(shell "$(for f in $files; do echo "stat /data/hb-staging/$title/$f"; done)")
+# In batches: shsrv answers a few dozen commands per session in time.
+stats=""
+batch=()
+for f in $files; do
+  batch+=("stat /data/hb-staging/$title/$f")
+  if [ ${#batch[@]} -ge 40 ]; then stats+=$(shell "$(printf '%s\n' "${batch[@]}")"); batch=(); fi
+done
+[ ${#batch[@]} -eq 0 ] || stats+=$(shell "$(printf '%s\n' "${batch[@]}")")
 for f in $files; do
   want=$(stat -f %z "$app/$f")
   got=$(awk -v n="/data/hb-staging/$title/$f" '/filename: /{cur=$NF} $1=="size:" && cur==n {print $2}' <<<"$stats")
@@ -48,14 +61,23 @@ for f in $files; do
 done
 echo "all $(wc -w <<<"$files" | tr -d ' ') files match"
 
-echo "== move into /data/homebrew/$title"
+echo "== close, then move into /data/homebrew/$title"
+close_app
+sleep 3
 curl -sS -Q "*MKD /data/homebrew/$title" "$ftp/" >/dev/null
-for d in $(for f in $files; do dirname "$f"; done | grep -v '^\.$' | sort -u); do
+# Every folder on the way, parents first.
+for d in $(for f in $files; do p=$(dirname "$f"); while [ "$p" != . ]; do echo "$p"; p=$(dirname "$p"); done; done | sort -u); do
   curl -sS -Q "*MKD /data/homebrew/$title/$d" "$ftp/" >/dev/null
 done
 for f in $files; do
-  curl -sS -Q "RNFR /data/hb-staging/$title/$f" -Q "RNTO /data/homebrew/$title/$f" "$ftp/" >/dev/null
+  # A file the running title holds open refuses to move: close and try once more.
+  if ! curl -sS -Q "RNFR /data/hb-staging/$title/$f" -Q "RNTO /data/homebrew/$title/$f" "$ftp/" >/dev/null 2>&1; then
+    close_app
+    sleep 3
+    curl -sS -Q "RNFR /data/hb-staging/$title/$f" -Q "RNTO /data/homebrew/$title/$f" "$ftp/" >/dev/null || { echo "MOVE FAILED $f"; exit 1; }
+  fi
 done
+echo "$current" > "$manifest"
 
 echo "== wait for ShadowMount"
 for _ in $(seq 30); do

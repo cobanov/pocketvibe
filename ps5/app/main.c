@@ -43,6 +43,16 @@ void files_init(void);
 JSValue js_write_text(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 JSValue js_image(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 JSModuleDef *module_loader(JSContext *ctx, const char *name, void *opaque);
+JSValue js_read_binary(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+// audio.c
+void audio_register(JSContext *ctx, JSValue global);
+// http.c
+JSValue js_http_start(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+JSValue js_http_poll(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+JSValue js_http_take(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+JSValue js_unzip(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+JSValue js_remove_game(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
+JSValue js_rename(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv);
 int sceSystemServiceParamGetInt(int id, int *value);
 
 // Replaces app_heap.c's weak 128 MiB default; it tries smaller sizes if this
@@ -341,6 +351,26 @@ static JSValue js_resize(JSContext *ctx, JSValueConst this_val, int argc, JSValu
 static JSContext *hud_ctx;
 static JSValue hud_draw = JS_UNDEFINED;
 
+// The part of the screen the TV shows, from the console's Display Area
+// setting (Settings > Screen and Video): everything is drawn inside it.
+typedef struct {
+  float ratio;
+  uint8_t reserved[128];
+} safe_area_info;
+int sceSystemServiceGetDisplaySafeAreaInfo(safe_area_info *info);
+static float safe_area = 1;
+
+static void update_safe_area(void) {
+  safe_area_info info = {0};
+  int rc = sceSystemServiceGetDisplaySafeAreaInfo(&info);
+  static int logged;
+  if (!logged++) printf("display safe area rc 0x%x ratio %.3f\n", rc, info.ratio);
+  if (rc == 0 && info.ratio > 0.5f && info.ratio <= 1) {
+    if (info.ratio != safe_area) printf("display safe area %.3f\n", info.ratio);
+    safe_area = info.ratio;
+  }
+}
+
 static void present_canvas(double now) {
   if (!canvas_fbo) return;
   static const GLenum caps[] = {GL_BLEND, GL_DEPTH_TEST, GL_CULL_FACE, GL_SCISSOR_TEST,
@@ -381,6 +411,7 @@ static void present_canvas(double now) {
 
   double scale = (double)screen_w / canvas_w;
   if (canvas_h * scale > screen_h) scale = (double)screen_h / canvas_h;
+  scale *= safe_area;
   double w = canvas_w * scale / screen_w, h = canvas_h * scale / screen_h;  // of the screen
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
   glViewport(0, 0, screen_w, screen_h);
@@ -534,9 +565,9 @@ static void run_jobs(JSRuntime *rt) {
 static int run_script(JSContext *ctx, const char *name, int module, int optional) {
   char path[256];
   size_t n;
-  snprintf(path, sizeof path, DEV_DIR "%s", name);
+  snprintf(path, sizeof path, name[0] == '/' ? "%s" : DEV_DIR "%s", name);
   char *src = read_file(path, &n);
-  if (!src) {
+  if (!src && name[0] != '/') {
     snprintf(path, sizeof path, APP_DIR "%s", name);
     src = read_file(path, &n);
   }
@@ -754,6 +785,14 @@ static void *run(void *arg) {
   set_function(ctx, host, "fontMetrics", js_font_metrics, 1);
   set_function(ctx, host, "writeText", js_write_text, 2);
   set_function(ctx, host, "image", js_image, 1);
+  set_function(ctx, host, "readBinary", js_read_binary, 1);
+  set_function(ctx, host, "httpStart", js_http_start, 2);
+  set_function(ctx, host, "httpPoll", js_http_poll, 1);
+  set_function(ctx, host, "httpTake", js_http_take, 1);
+  set_function(ctx, host, "unzip", js_unzip, 2);
+  set_function(ctx, host, "removeGame", js_remove_game, 1);
+  set_function(ctx, host, "rename", js_rename, 2);
+  audio_register(ctx, global);
   set_function(ctx, host, "launch", js_launch, 1);
   JS_SetPropertyStr(ctx, host, "tzOffset", JS_NewInt32(ctx, tz_minutes));
   JS_SetPropertyStr(ctx, host, "enterButton", JS_NewInt32(ctx, enter_button));
@@ -765,11 +804,11 @@ static void *run(void *arg) {
   selection(game, sizeof game);
   if (game[0] >= '0' && game[0] <= '9') neighbour(game, 0, game, sizeof game);
   int launcher = !strcmp(game, "launcher");
-  char game_script[160] = "game.js";
+  char game_script[384] = "game.js";
   printf("running %s\n", game);
   JS_SetPropertyStr(ctx, global, "__storageName", JS_NewString(ctx, game));
   // The launcher at a TV's scale: laid out at 1280x720 and drawn at 1080p.
-  if (launcher) JS_SetPropertyStr(ctx, global, "PV_SEARCH", JS_NewString(ctx, "?scale=1.5"));
+  if (launcher) JS_SetPropertyStr(ctx, global, "PV_SEARCH", JS_NewString(ctx, "?scale=1.5&buttons=ps"));
   if (!launcher) {
     char dev_game[160];
     size_t n;
@@ -779,15 +818,42 @@ static void *run(void *arg) {
     free(dev);
   }
   // The game's stylesheet, for the HUD.
-  char css_path[192];
+  char css_path[384];
   size_t css_len = 0;
   snprintf(css_path, sizeof css_path, APP_DIR "games/%s.css", game);
+  // A game from the store (in /data/pocketvibe/games/<name>) wins over the
+  // packaged copy: its index.html names the module and the stylesheet.
+  if (!launcher) {
+    char dir[192], index_path[256];
+    snprintf(dir, sizeof dir, "/data/pocketvibe/games/%s/", game);
+    snprintf(index_path, sizeof index_path, "%sindex.html", dir);
+    size_t len;
+    char *html = read_file(index_path, &len);
+    const char *script = html ? strstr(html, "type=\"module\"") : NULL;
+    const char *src = script ? strstr(script, "src=\"") : NULL;
+    const char *link = html ? strstr(html, "rel=\"stylesheet\"") : NULL;
+    const char *href = link ? strstr(link, "href=\"") : NULL;
+    // "./assets/x.js" or "/assets/x.js" -> <dir>assets/x.js
+    #define REL(p) ((p) + ((p)[0] == '.' && (p)[1] == '/' ? 2 : (p)[0] == '/' ? 1 : 0))
+    if (src) {
+      const char *s1 = REL(src + 5);
+      snprintf(game_script, sizeof game_script, "%s%.*s", dir, (int)strcspn(s1, "\""), s1);
+      if (href) {
+        const char *h1 = REL(href + 6);
+        snprintf(css_path, sizeof css_path, "%s%.*s", dir, (int)strcspn(h1, "\""), h1);
+      }
+      JS_SetPropertyStr(ctx, global, "__gameDir", JS_NewString(ctx, dir));
+      printf("store copy: %s\n", game_script);
+    }
+    free(html);
+  }
   char *css = launcher ? NULL : read_file(css_path, &css_len);
   JS_SetPropertyStr(ctx, global, "__gameCss", css ? JS_NewStringLen(ctx, css, css_len) : JS_NewString(ctx, ""));
   free(css);
   int failed = run_script(ctx, "config.js", 0, 1) || run_script(ctx, "glconst.js", 0, 0) ||
                run_script(ctx, "webgl.js", 0, 0) || run_script(ctx, "canvas2d.js", 0, 0) ||
-               run_script(ctx, "dom.js", 0, 0) || run_script(ctx, "ps5.js", 0, 0);
+               run_script(ctx, "dom.js", 0, 0) || run_script(ctx, "audio.js", 0, 0) ||
+               run_script(ctx, "ps5.js", 0, 0);
   // The launcher is a page of its own: its HUD comes first, its module last.
   if (launcher && !failed)
     failed = run_script(ctx, "css.js", 0, 0) || run_script(ctx, "layout.js", 0, 0) ||
@@ -815,6 +881,7 @@ static void *run(void *arg) {
   JS_FreeValue(ctx, vsync);
 
   shot_last = shot_request();
+  int touchpad_frames = 0;
   GLuint queries[4];
   glGenQueries(4, queries);
   stats s = {0};
@@ -832,8 +899,11 @@ static void *run(void *arg) {
         switch_to(next);
       }
     }
-    // START + SELECT (Options + touch pad) leaves a game for the launcher.
-    if (!launcher && (pad.buttons & (BTN_OPTIONS | BTN_TOUCHPAD)) == (BTN_OPTIONS | BTN_TOUCHPAD)) switch_to("launcher");
+    // Holding the touch pad (SELECT) for a second, or START + SELECT, leaves a
+    // game for the launcher; a short press stays SELECT for the game.
+    touchpad_frames = pad.buttons & BTN_TOUCHPAD ? touchpad_frames + 1 : 0;
+    if (!launcher && (touchpad_frames >= 50 || (pad.buttons & (BTN_OPTIONS | BTN_TOUCHPAD)) == (BTN_OPTIONS | BTN_TOUCHPAD)))
+      switch_to("launcher");
 
     glBeginQuery(GL_TIME_ELAPSED, queries[n % 4]);
     if (!failed) {
@@ -851,6 +921,7 @@ static void *run(void *arg) {
     run_jobs(rt);
     double th = now_ms();
     if (n % 30 == 0) screenshot_if_asked();
+    if (n % 120 == 0) update_safe_area();
     glEndQuery(GL_TIME_ELAPSED);
     eglSwapBuffers(dpy, surface);
     double t2 = now_ms();

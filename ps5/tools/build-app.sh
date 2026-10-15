@@ -18,7 +18,16 @@ title=${2:-PPSA90550}
 ps5=$(cd "$(dirname "$0")/.." && pwd)
 deps=${DEPS:-$HOME/Developer/ps5-homebrew/deps}
 work=${WORK:-$HOME/Developer/ps5-homebrew/work}
-mkdir -p "$work"
+mkdir -p "$work/art"
+
+# The home screen's tile (the iPhone app's icon) and background (the games'
+# covers, made once: delete $work/art/pic0.dds to make it again).
+sips -z 512 512 "$ps5/../ios/PocketVibe/Assets.xcassets/AppIcon.appiconset/AppIcon.png" --out "$work/art/icon0.png" >/dev/null
+if [ ! -f "$work/art/pic0.dds" ]; then
+  swift "$ps5/tools/background.swift" "$work/art/pic0.png" "$games"/*/cover.png
+  clang -O2 -w -I"$ps5/third_party" -o "$work/art/bc7dds" "$ps5/tools/bc7dds.c"
+  "$work/art/bc7dds" "$work/art/pic0.png" "$deps/boilerplate/sce_sys/pic0.dds" "$work/art/pic0.dds"
+fi
 
 docker run --rm --platform linux/amd64 -v "$ps5:/ps5:ro" -v "$deps:/deps:ro" -v "$work:/work" \
   -v "$games:/games:ro" -v "$ps5/../app/pocketvibe/launcher:/launcher:ro" -e TITLE="$title" ps5-build-amd64 bash -euo pipefail -c '
@@ -30,6 +39,11 @@ rm -rf "$app" && mkdir -p "$app"
 
 cp "$template/Makefile" "$app/Makefile"
 for d in assets runtime sce_sys tooling tools; do mkdir -p "$app/$d" && cp -a "$template/$d/." "$app/$d/"; done
+# The PocketVibe tile and background in place of the template ones; no menu music.
+cp /work/art/icon0.png "$app/sce_sys/icon0.png"
+cp /work/art/pic0.dds "$app/sce_sys/pic0.dds"
+cp /work/art/pic0.dds "$app/sce_sys/pic1.dds"
+rm -f "$app/sce_sys/snd0.at9"
 mkdir -p "$app/.deps" && cp -a "$template/.deps/native" "$app/.deps/native"
 sdk="$app/.deps/native/ps5-payload-sdk"
 
@@ -65,7 +79,7 @@ q=/ps5/third_party/quickjs-0.17.0
 cc() { PS5_PAYLOAD_SDK="$sdk" sh "$app/tooling/prospero-clang18" -std=gnu11 -O2 -w -D_GNU_SOURCE \
   -DGL_GLEXT_PROTOTYPES=1 -ffunction-sections -fdata-sections -I"$app/include" -I"$q" -I/ps5/third_party "$@"; }
 objects=()
-for f in /ps5/app/main.c /ps5/app/text.c /ps5/app/files.c $q/quickjs.c $q/libregexp.c $q/libunicode.c $q/dtoa.c; do
+for f in /ps5/app/main.c /ps5/app/text.c /ps5/app/files.c /ps5/app/audio.c /ps5/app/http.c $q/quickjs.c $q/libregexp.c $q/libunicode.c $q/dtoa.c; do
   o="$app/build/pv/$(basename "${f%.c}").o"
   cc -c "$f" -o "$o" &
   objects+=("$o")
@@ -92,28 +106,43 @@ done
 # Scripts the host runs, packaged at /app0/assets/js/.
 mkdir -p "$app/assets/js"
 cp /ps5/runtime/glconst.js /ps5/runtime/webgl.js /ps5/runtime/canvas2d.js /ps5/runtime/dom.js /ps5/runtime/ps5.js \
-  /ps5/runtime/css.js /ps5/runtime/layout.js /ps5/runtime/hud.js /ps5/runtime/ps5hud.js /ps5/runtime/ps5launcher.js "$app/assets/js/"
+  /ps5/runtime/css.js /ps5/runtime/layout.js /ps5/runtime/hud.js /ps5/runtime/ps5hud.js /ps5/runtime/ps5launcher.js \
+  /ps5/runtime/audio.js "$app/assets/js/"
 # The launcher, unchanged.
 mkdir -p "$app/assets/js/launcher"
 cp /launcher/*.js /launcher/*.css /launcher/index.html "$app/assets/js/launcher/"
+cp -r /launcher/sounds /launcher/music "$app/assets/js/launcher/"
 mkdir -p "$app/assets/js/games"
 for bundle in /games/*/dist/assets/index-*.js; do
-  name=$(basename "$(dirname "$(dirname "$(dirname "$bundle")")")")
+  folder=$(basename "$(dirname "$(dirname "$(dirname "$bundle")")")")
+  # Packaged under the id in pocketvibe.json (the launcher launches by id).
+  name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get(\"id\") or sys.argv[2])" "/games/$folder/pocketvibe.json" "$folder" 2>/dev/null || echo "$folder")
   cp "$bundle" "$app/assets/js/games/$name.js"
   css=$(ls "$(dirname "$bundle")"/index-*.css 2>/dev/null | head -1)
   [ -z "$css" ] || cp "$css" "$app/assets/js/games/$name.css"
-  [ ! -f "/games/$name/cover.png" ] || cp "/games/$name/cover.png" "$app/assets/js/games/$name.png"
+  [ ! -f "/games/$folder/cover.png" ] || cp "/games/$folder/cover.png" "$app/assets/js/games/$name.png"
+  # Everything else the build has (sounds, music) under games/<name>/, where its fetches go.
+  for extra in "/games/$folder/dist"/*; do
+    case "$(basename "$extra")" in assets|index.html) ;; *) mkdir -p "$app/assets/js/games/$name" && cp -r "$extra" "$app/assets/js/games/$name/" ;; esac
+  done
   echo "$name" >> "$app/assets/js/games.txt"
 done
 
 # The library the launcher lists: the pocketvibe.json of every packaged game.
 python3 - "$app/assets/js/games.txt" "$app/assets/js/library.json" <<PY
 import json, sys
+import glob
 names = open(sys.argv[1]).read().split()
+folders = {}
+for path in glob.glob("/games/*/pocketvibe.json"):
+    try:
+        folders[json.load(open(path)).get("id") or path.split("/")[2]] = path
+    except (OSError, ValueError):
+        pass
 games = []
 for name in names:
     try:
-        meta = json.load(open(f"/games/{name}/pocketvibe.json"))
+        meta = json.load(open(folders[name]))
     except (OSError, ValueError):
         meta = {}
     meta.setdefault("id", name)

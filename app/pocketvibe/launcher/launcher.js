@@ -8,6 +8,14 @@ import { Celebration } from './celebrate.js';
 import { fitScreens, parseScreens, place, uiScale } from './screens.js';
 
 const PADMAP = { 0: 'B', 1: 'A', 2: 'X', 3: 'Y', 4: 'L', 5: 'R', 8: 'SELECT', 9: 'START', 12: 'UP', 13: 'DOWN', 14: 'LEFT', 15: 'RIGHT' };
+
+// Button names as the controller prints them: PlayStation symbols with
+// ?buttons=ps (the PS5 confirms with Cross and goes back with Circle). Cross
+// is ×, as the console fonts have no ✕.
+const PS_LABELS = { A: '×', B: '○', X: '□', Y: '△', L: 'L1', R: 'R1', Sel: 'Touchpad', SELECT: 'Touchpad', START: 'Options' };
+const psButtons = new URLSearchParams(location.search).get('buttons') === 'ps';
+const label = (button) => (psButtons ? PS_LABELS[button] ?? button : button);
+for (const el of document.querySelectorAll('nav .hint')) el.textContent = label(el.textContent);
 const KEYMAP = {
   ArrowUp: 'UP', ArrowDown: 'DOWN', ArrowLeft: 'LEFT', ArrowRight: 'RIGHT',
   KeyX: 'A', KeyZ: 'B', KeyS: 'X', KeyA: 'Y', KeyQ: 'L', KeyW: 'R',
@@ -339,7 +347,7 @@ function celebrateNext() {
   const cover = covers.get(game.id) === 'ok'
     ? `<div class="cover" style="background-image: url(/api/cover/${game.id})"></div>`
     : `<div class="cover" style="${placeholder(game).style}"><span>${escapeHtml(placeholder(game).initials)}</span></div>`;
-  const hint = (button, text) => `<span><b class="hint">${button}</b>${text}</span>`;
+  const hint = (button, text) => `<span><b class="hint">${label(button)}</b>${text}</span>`;
   celebration.show(
     `<div class="glow"></div>
      <div class="celebrate-cover">${cover}<div class="shine"></div><div class="check">✓</div></div>
@@ -933,7 +941,7 @@ function scrollToFocus(instant = false) {
 }
 
 function renderHints() {
-  const hint = (button, text) => `<span><b class="hint">${button}</b>${text}</span>`;
+  const hint = (button, text) => `<span><b class="hint">${label(button)}</b>${text}</span>`;
   const parts = [];
   if (keyboard.active) {
     ui.hints.innerHTML = '';
@@ -986,7 +994,7 @@ function askForPanfrost() {
 
 function showDialog(text, onYes) {
   state.dialog = { text, onYes };
-  ui.dialog.innerHTML = `<div class="box"><p>${escapeHtml(text)}</p><span class="hint">A</span> ${t('yes')} &nbsp;&nbsp; <span class="hint">B</span> ${t('no')}</div>`;
+  ui.dialog.innerHTML = `<div class="box"><p>${escapeHtml(text)}</p><span class="hint">${label('A')}</span> ${t('yes')} &nbsp;&nbsp; <span class="hint">${label('B')}</span> ${t('no')}</div>`;
   ui.dialog.hidden = false;
   cue('menu_open');
   renderHints();
