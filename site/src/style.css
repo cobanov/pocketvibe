@@ -1113,6 +1113,14 @@ h2 {
   color: #3ddc84;
 }
 
+.iphone .mark {
+  color: #e8e8ed;
+}
+
+.ps5 .mark {
+  color: #4f8cff;
+}
+
 /* Download buttons: the platform's mark, what it is, and the newest version. */
 .get {
   display: grid;
@@ -1250,6 +1258,43 @@ h2 {
 
 .platform .get-button small {
   color: #5c4a10;
+}
+
+/* Not downloadable from here (yet): the same place, without the yellow. */
+.platform .get-button.soon {
+  margin: 0;
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.platform .get-button.soon small {
+  color: var(--muted);
+}
+
+/* News under the pitch. */
+.news {
+  margin: 0 0 18px;
+  font-size: 15px;
+}
+
+.news a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.news a:hover,
+.news a:focus-visible {
+  color: var(--text);
+}
+
+.news b {
+  margin-right: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 12px;
+  text-transform: uppercase;
 }
 
 .platform ol {
