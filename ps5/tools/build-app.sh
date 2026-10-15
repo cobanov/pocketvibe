@@ -21,7 +21,7 @@ work=${WORK:-$HOME/Developer/ps5-homebrew/work}
 mkdir -p "$work"
 
 docker run --rm --platform linux/amd64 -v "$ps5:/ps5:ro" -v "$deps:/deps:ro" -v "$work:/work" \
-  -v "$games:/games:ro" -v "$games/../app/pocketvibe/launcher:/launcher:ro" -e TITLE="$title" ps5-build-amd64 bash -euo pipefail -c '
+  -v "$games:/games:ro" -v "$ps5/../app/pocketvibe/launcher:/launcher:ro" -e TITLE="$title" ps5-build-amd64 bash -euo pipefail -c '
 template=/deps/boilerplate
 gl=/deps/ps5-opengl-src
 prefix=/deps/ps5-opengl-sdk-1.0.2/sdk

@@ -46,11 +46,16 @@ export function fitScreens(screens, primary, width, height) {
   return { main: { x: 0, y: 0, width, height }, other: null };
 }
 
+// A scale chosen by the page's address (?scale=1.5), for screens seen from
+// across a room: the PS5 on a TV wants less enlargement than a handheld.
+const fixedScale = Number(new URLSearchParams(location.search).get('scale')) || 0;
+
 // How much to enlarge the interface on a big screen, in CSS pixels: by
 // quarters of the screen's real pixels, never below 1, so small screens keep
 // every pixel and big ones are not tiny. On the handhelds a CSS pixel is a
 // screen pixel; Android phones and handhelds have two or three per CSS pixel.
 export function uiScale(rect) {
+  if (fixedScale > 0) return fixedScale;
   const ratio = window.devicePixelRatio || 1;
   const fit = Math.min((rect.width * ratio) / NATIVE.width, (rect.height * ratio) / NATIVE.height);
   return Math.max(1, Math.floor(fit * 4) / 4) / ratio;

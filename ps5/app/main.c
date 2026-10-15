@@ -768,6 +768,8 @@ static void *run(void *arg) {
   char game_script[160] = "game.js";
   printf("running %s\n", game);
   JS_SetPropertyStr(ctx, global, "__storageName", JS_NewString(ctx, game));
+  // The launcher at a TV's scale: laid out at 1280x720 and drawn at 1080p.
+  if (launcher) JS_SetPropertyStr(ctx, global, "PV_SEARCH", JS_NewString(ctx, "?scale=1.5"));
   if (!launcher) {
     char dev_game[160];
     size_t n;
