@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><title>Kumanda ayarı</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html,body{margin:0;height:100%;background:#101018;color:#fff;font:28px sans-serif}
+  body{box-sizing:border-box;padding:48px 64px;display:flex;flex-direction:column}
+  h1{margin:0 0 6px;font-size:44px}
+  .sub{color:#9aa;margin-bottom:22px}
+  #prompt{font-size:46px;min-height:64px;margin:12px 0;color:#ffd166}
+  #live{font:22px/1.45 monospace;white-space:pre-wrap;background:#181826;border-radius:14px;padding:18px 24px;flex:1;overflow:hidden}
+  #bar{display:flex;margin-top:22px}
+  #bar div{padding:16px 30px;margin-right:18px;border-radius:12px;background:#2a2a40;border:3px solid transparent}
+  #bar div.on{border-color:#ffd166;background:#3a3a58}
+  #msg{margin-top:14px;color:#8fe39b;min-height:34px}
+</style></head>
+<body>
+<h1>Kumanda ayarı</h1>
+<div class="sub">USB veya Bluetooth kumandanı bağla, bir tuşuna bas. Ekranın altındaki düğmeler: sol/sağ ile seç, OK ile uygula. Geri: menüye dön.</div>
+<div id="prompt"></div>
+<div id="live">Kumanda aranıyor… (Bluetooth kumandayı TV ayarlarından eşleştirdikten sonra bir tuşuna bas)</div>
+<div id="bar"></div>
+<div id="msg"></div>
+<script>
+// ES5 on purpose: runs on the TV's web engine.
+var STEPS = [['UP', 'YUKARI'], ['DOWN', 'AŞAĞI'], ['LEFT', 'SOL'], ['RIGHT', 'SAĞ'], ['A', 'A  (onay / zıpla)'], ['B', 'B  (geri)'], ['X', 'X'], ['Y', 'Y'], ['L', 'L  (sol omuz)'], ['R', 'R  (sağ omuz)'], ['START', 'START  (duraklat)'], ['SELECT', 'SELECT']];
+var LAYOUTS = ['auto', 'native', 'xbox'];
+var LAYOUT_TXT = { auto: 'Otomatik', native: 'Nintendo (sağ düğme = A)', xbox: 'Xbox/PS (alt düğme = A)' };
+var PAD = window.__PV_PAD || { layout: 'auto', maps: {} };
+var $ = function (id) { return document.getElementById(id); };
+var wiz = null, focus = 0, lastPadBtn = {};
+
+function rawPads() {
+  var g = window.__pvRawGamepads ? window.__pvRawGamepads() : (navigator.getGamepads ? navigator.getGamepads() : []);
+  var out = [];
+  for (var i = 0; i < g.length; i++) if (g[i]) out.push(g[i]);
+  return out;
+}
+function post(body) {
+  return fetch('/api/padmap', { method: 'POST', headers: { 'X-PocketVibe': '1', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
+function say(t) { $('msg').textContent = t; }
+
+var BAR = [
+  { t: function () { return 'Eşleştir'; }, go: startWizard },
+  { t: function () { return 'Düzen: ' + LAYOUT_TXT[PAD.layout || 'auto']; }, go: function () {
+      var l = LAYOUTS[(LAYOUTS.indexOf(PAD.layout || 'auto') + 1) % LAYOUTS.length];
+      PAD.layout = l; post({ layout: l }); say('Düzen kaydedildi.'); renderBar();
+    } },
+  { t: function () { return 'Sıfırla'; }, go: function () {
+      var p = rawPads()[0]; if (!p) return say('Önce kumandanın bir tuşuna bas.');
+      delete PAD.maps[p.id]; post({ id: p.id, map: null }); say('Bu kumandanın özel eşlemesi silindi.');
+    } },
+  { t: function () { return 'Menü'; }, go: function () { location.href = '/'; } }
+];
+function renderBar() {
+  var h = '';
+  for (var i = 0; i < BAR.length; i++) h += '<div class="' + (i === focus ? 'on' : '') + '" data-i="' + i + '">' + BAR[i].t() + '</div>';
+  $('bar').innerHTML = h;
+}
+$('bar').addEventListener('click', function (e) {
+  var n = e.target; var i = n && n.getAttribute && n.getAttribute('data-i');
+  if (i !== null && i !== undefined) { focus = +i; renderBar(); BAR[focus].go(); }
+});
+
+// ---- wizard ----
+function snapshot(p) {
+  var b = [], a = [], i;
+  for (i = 0; i < p.buttons.length; i++) b.push(!!p.buttons[i].pressed);
+  for (i = 0; i < p.axes.length; i++) a.push(p.axes[i]);
+  return { b: b, a: a };
+}
+function startWizard() {
+  var p = rawPads()[0];
+  if (!p) return say('Kumanda yok: önce kumandanın bir tuşuna bas.');
+  wiz = { id: p.id, step: 0, map: {}, base: snapshot(p), release: false };
+  say(''); showStep();
+}
+function showStep() {
+  if (!wiz) { $('prompt').textContent = ''; return; }
+  $('prompt').textContent = (wiz.step + 1) + '/' + STEPS.length + '   ' + STEPS[wiz.step][1] + ' tuşuna bas   (OK: atla · Geri: iptal)';
+}
+function used(src) {
+  for (var k in wiz.map) { var m = wiz.map[k]; if (m.t === src.t && m.i === src.i && Math.abs((m.v || 0) - (src.v || 0)) < 0.2) return true; }
+  return false;
+}
+function advance() {
+  wiz.step++; wiz.release = false;
+  if (wiz.step >= STEPS.length) return finish();
+  var p = rawPads()[0]; wiz.base = p ? snapshot(p) : wiz.base; showStep();
+}
+function finish() {
+  var map = wiz.map, id = wiz.id, n = 0, k;
+  for (k in map) n++;
+  wiz = null; showStep();
+  if (n < 4) return say('Çok az tuş eşlendi, kaydedilmedi.');
+  PAD.maps[id] = { map: map };
+  post({ id: id, map: map }).then(function () { say('Kaydedildi (' + n + ' tuş). Oyunlarda hemen geçerli.'); });
+}
+function wizardTick(p) {
+  var base = wiz.base, i, best = null, bestd = 0;
+  if (wiz.release) {   // wait until everything is back to rest
+    var rest = true;
+    for (i = 0; i < p.buttons.length; i++) if (p.buttons[i].pressed && !base.b[i]) rest = false;
+    for (i = 0; i < p.axes.length; i++) if (Math.abs(p.axes[i] - base.a[i]) > 0.4) rest = false;
+    if (rest) advance();
+    return;
+  }
+  for (i = 0; i < p.buttons.length; i++) if (p.buttons[i].pressed && !base.b[i]) { best = { t: 'b', i: i }; bestd = 9; break; }
+  if (!best) for (i = 0; i < p.axes.length; i++) {
+    var d = Math.abs(p.axes[i] - base.a[i]);
+    if (d > 0.6 && d > bestd) { bestd = d; best = { t: 'a', i: i, v: Math.round(p.axes[i] * 100) / 100 }; }
+  }
+  if (best && !used(best)) { wiz.map[STEPS[wiz.step][0]] = best; wiz.release = true; say(''); }
+}
+
+// ---- live view + pad navigation ----
+function tick() {
+  var pads = rawPads(), txt = '', i, j;
+  if (!pads.length) txt = 'Kumanda bulunamadı.\nBluetooth: TV Ayarları > Bağlantı > Bluetooth ile eşleştir, sonra bir tuşa bas.\nUSB: kumandayı takıp bir tuşa bas.';
+  for (i = 0; i < pads.length; i++) {
+    var p = pads[i], bs = [], as = [];
+    for (j = 0; j < p.buttons.length; j++) if (p.buttons[j].pressed) bs.push('b' + j);
+    for (j = 0; j < p.axes.length; j++) if (Math.abs(p.axes[j]) > 0.15) as.push('a' + j + '=' + p.axes[j].toFixed(2));
+    var saved = PAD.maps[p.id] ? 'özel eşleme VAR' : (p.mapping === 'standard' ? 'standart eşleme' : 'bilinmeyen düzen (tahmin) — Eşleştir\'i çalıştır');
+    txt += '[' + p.index + '] ' + p.id + '\n    ' + saved + ', ' + p.buttons.length + ' tuş, ' + p.axes.length + ' eksen\n    basılı: ' + (bs.join(' ') || '-') + '   eksen: ' + (as.join(' ') || '-') + '\n\n';
+  }
+  $('live').textContent = txt;
+  if (wiz && pads.length) wizardTick(pads[0]);
+  if (!wiz && navigator.getGamepads) {   // navigate the bar with the pad itself (normalized layout)
+    var np = navigator.getGamepads();
+    for (i = 0; i < np.length; i++) if (np[i]) {
+      var d = np[i].__down || {}, was = lastPadBtn;
+      if (d.LEFT && !was.LEFT) { focus = (focus + BAR.length - 1) % BAR.length; renderBar(); }
+      if (d.RIGHT && !was.RIGHT) { focus = (focus + 1) % BAR.length; renderBar(); }
+      if (d.A && !was.A) BAR[focus].go();
+      if (d.B && !was.B) location.href = '/';
+      lastPadBtn = d; break;
+    }
+  }
+}
+addEventListener('keydown', function (e) {
+  var k = e.keyCode;
+  if (wiz) {
+    if (k === 13) { advance(); e.preventDefault(); }
+    else if (k === 461 || k === 27 || k === 8) { wiz = null; showStep(); say('İptal edildi.'); e.preventDefault(); }
+    return;
+  }
+  if (k === 37) { focus = (focus + BAR.length - 1) % BAR.length; renderBar(); }
+  else if (k === 39) { focus = (focus + 1) % BAR.length; renderBar(); }
+  else if (k === 13) BAR[focus].go();
+  else if (k === 461 || k === 27 || k === 8) { location.href = '/'; e.preventDefault(); }
+});
+renderBar(); setInterval(tick, 50);
+</script>
+</body></html>

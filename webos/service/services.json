@@ -1,0 +1,5 @@
+{
+  "id": "com.pocketvibe.app.service",
+  "description": "PocketVibe daemon",
+  "services": [ { "name": "com.pocketvibe.app.service" } ]
+}

@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>PocketVibe</title></head>
+<body style="margin:0;background:#101018;color:#fff;font:28px sans-serif;padding:60px;box-sizing:border-box">
+<div id="m" style="font-size:44px;margin-bottom:30px">PocketVibe başlatılıyor…</div>
+<pre id="r" style="font:26px/1.5 monospace;white-space:pre-wrap;margin:0"></pre>
+<div id="h" style="margin-top:30px;color:#ffd166"></div>
+<div style="margin-top:20px;color:#9aa;font-size:24px">Launcher'da INFO tuşu: kumanda ayarı · Oyunda: Geri'ye basılı tut, INFO ya da START+SELECT ile menüye dön</div>
+<script>
+// ES5 only: this page must run on any webOS web engine, old ones included.
+var HOME = 'http://127.0.0.1:8730/';
+var lines = [], bad = [];
+function row(name, ok, info, critical) { lines.push((ok ? '[OK]  ' : '[YOK] ') + name + (info ? ': ' + info : '')); if (!ok && critical) bad.push(name); }
+var ua = navigator.userAgent, cm = /Chrome\/(\d+)/.exec(ua), cv = cm ? +cm[1] : 0;
+var wo = /Web0S/.test(ua) ? (/webOS\.TV-(\d+)/.exec(ua) || [])[1] : null;
+lines.push('UA: ' + ua);
+function gl(kind) {
+  try { var c = document.createElement('canvas'), g = c.getContext(kind); if (!g) return null;
+    var d = g.getExtension('WEBGL_debug_renderer_info');
+    return { r: d ? g.getParameter(d.UNMASKED_RENDERER_WEBGL) : '?', t: g.getParameter(g.MAX_TEXTURE_SIZE) };
+  } catch (e) { return null; }
+}
+var g2 = gl('webgl2'), g1 = gl('webgl');
+row('Chromium', cv >= 68, cv + (cv < 68 ? ' (68+ gerekli)' : ''), true);
+row('WebGL2 (oyunlar için şart)', !!g2, g2 ? g2.r + ', tex ' + g2.t : (g1 ? 'sadece WebGL1' : 'WebGL yok'), true);
+row('ES modules', 'noModule' in document.createElement('script'), '', true);
+row('CSS grid', window.CSS && CSS.supports && CSS.supports('display', 'grid'), '', true);
+row('Gamepad API', !!navigator.getGamepads, '');
+row('Opsiyonel zincir ?.', (function () { try { new Function('return ({}).a?.b'); return true; } catch (e) { return false; } })(), 'build dönüştürüyor, sorun değil');
+if (performance.memory) lines.push('JS heap limiti: ' + Math.round(performance.memory.jsHeapSizeLimit / 1048576) + ' MB');
+if (wo) lines.push('webOS TV ürün sürümü: ' + wo);
+document.getElementById('r').textContent = lines.join('\n');
+
+var proceeded = false;
+function go() { if (proceeded) return; proceeded = true; document.getElementById('m').textContent = 'PocketVibe başlatılıyor…'; probe(0); }
+function startService() {
+  try { var b = new PalmServiceBridge(); b.onservicecallback = function () {}; b.call('luna://com.pocketvibe.app.service/start', '{}'); } catch (e) {}
+}
+function probe(n) {
+  fetch(HOME + 'webos-shim.js', { mode: 'no-cors' })
+    .then(function () { location.replace(HOME); })
+    .catch(function () {
+      if (n === 3 || n === 10) startService();
+      if (n > 40) { document.getElementById('h').textContent = 'Servis başlamadı. SSH ile: node <servis klasörü>/pocketvibed.js'; return; }
+      setTimeout(function () { probe(n + 1); }, 1000);
+    });
+}
+startService();
+if (bad.length) {
+  document.getElementById('m').textContent = 'Bu TV eksik: ' + bad.join(', ');
+  document.getElementById('h').textContent = 'OK tuşu: yine de devam et (büyük olasılıkla çalışmaz). Bu ekranın fotoğrafını gönder.';
+  addEventListener('keydown', function (e) { if (e.keyCode === 13) go(); });
+} else {
+  setTimeout(go, 2500);
+}
+</script></body></html>

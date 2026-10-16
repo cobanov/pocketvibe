@@ -1,0 +1,1 @@
+{ "name": "com.pocketvibe.app.service", "version": "1.0.0", "description": "PocketVibe daemon", "main": "pocketvibed.js" }

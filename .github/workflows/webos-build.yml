@@ -1,0 +1,40 @@
+name: webos-build
+
+# Builds the LG webOS .ipk. Run it by hand (Actions > webos-build > Run workflow) or push a tag like webos-v0.7.4,
+# which also attaches the .ipk to a GitHub release.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['webos-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test the gamepad mapping
+        run: node webos/tools/padtest.js
+      - name: Build the .ipk
+        run: ./webos/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pocketvibe-webos-ipk
+          path: webos/dist/*.ipk
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/webos-v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" webos/dist/*.ipk \
+            --title "PocketVibe for LG webOS ${GITHUB_REF_NAME#webos-v}" \
+            --notes "LG webOS TV build. Install: see webos/README.md" || \
+          gh release upload "${GITHUB_REF_NAME}" webos/dist/*.ipk --clobber
