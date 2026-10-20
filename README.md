@@ -53,6 +53,8 @@ in your browser.
 
 **On Android** (10 or newer): open [pocketvibe.cobanov.dev/download/android](https://pocketvibe.cobanov.dev/download/android) on the handheld and install the APK.
 
+**On an LG webOS TV:** [pocketvibe-webos](https://github.com/tolgakurtuluss/pocketvibe-webos) is a community port by [@tolgakurtuluss](https://github.com/tolgakurtuluss).
+
 **Make a game:**
 
 ```sh
