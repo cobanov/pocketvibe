@@ -19,7 +19,9 @@ opens: with libmali, games run slowly.
    (`smb://` and the handheld's IP address) and copy the files into `ports`. On a handheld with
    a second SD card for games, you can also copy them onto that card with your computer. (On a
    single card, ROCKNIX keeps `roms` in a partition that Windows and macOS cannot open.)
-3. Restart the handheld, open **Ports** and start **PocketVibe**.
+3. Restart the handheld, open **Ports** and start **PocketVibe**. Copied from a Mac, Ports may
+   also list a `._PocketVibe` (a file macOS leaves behind): start the other one, and its first
+   start removes the extra file.
 
 The first start downloads PocketVibe's game engine (WPE WebKit, about 150 MB) and installs it,
 with a progress bar for each step. Over Wi-Fi this takes about a minute and a half, and it
