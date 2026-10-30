@@ -2,7 +2,11 @@ package dev.cobanov.pocketvibe
 
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.graphics.Color
+import android.net.Uri
 import android.hardware.input.InputManager
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +23,9 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.webkit.ConsoleMessage
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
@@ -83,6 +90,11 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) WebView.setWebContentsDebuggingEnabled(true)
+        val webview = webViewVersion()
+        if (webview < 94) {
+            showOldWebView(webview)
+            return
+        }
         service = PocketVibe.get(this)
         service.onQuit = { runOnUiThread { finishAndRemoveTask() } }
         service.onGameStart = { responsive -> runOnUiThread { root.startGame(responsive) } }
@@ -153,6 +165,7 @@ class MainActivity : Activity() {
     // ---------- Buttons ----------
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (!::root.isInitialized) return super.dispatchKeyEvent(event) // the old-WebView screen
         val down = event.action == KeyEvent.ACTION_DOWN
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             // The system's back: out of a game, or B in the launcher.
@@ -188,6 +201,7 @@ class MainActivity : Activity() {
 
     // Many handhelds report the d-pad as axes, not keys; the left stick steers too.
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (!::root.isInitialized) return super.dispatchGenericMotionEvent(event)
         if (!event.isFromSource(InputDevice.SOURCE_JOYSTICK) || event.action != MotionEvent.ACTION_MOVE) {
             return super.dispatchGenericMotionEvent(event)
         }
@@ -232,7 +246,7 @@ class MainActivity : Activity() {
     // Buttons pressed on something that is not a gamepad (a keyboard's
     // arrows) hid the screen's; touching the screen brings them back.
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN && !root.padShown) showPad()
+        if (::root.isInitialized && event.actionMasked == MotionEvent.ACTION_DOWN && !root.padShown) showPad()
         return super.dispatchTouchEvent(event)
     }
 
@@ -242,6 +256,57 @@ class MainActivity : Activity() {
         web?.dispatchKeyEvent(
             KeyEvent(now, now, action, key.code, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, key.scan, 0, InputDevice.SOURCE_KEYBOARD),
         )
+    }
+
+    // ---------- An old WebView ----------
+
+    // The launcher and the games need Chrome 94's JavaScript; on an older WebView
+    // (the AOSP WebView 80 of a Retroid Pocket 3+) the launcher does not even parse,
+    // so this is checked before it loads.
+    private fun webViewVersion() =
+        WebView.getCurrentWebViewPackage()?.versionName?.substringBefore('.')?.toIntOrNull() ?: Int.MAX_VALUE
+
+    private fun showOldWebView(version: Int) {
+        val tr = resources.configuration.locales[0].language == "tr"
+        val title = if (tr) "WebView çok eski" else "WebView is too old"
+        val body = if (tr) {
+            "PocketVibe, Android System WebView 94 ya da sonrasını istiyor; bu cihazdaki $version. " +
+                "Android System WebView'ı Play Store'dan kur ya da güncelle.\n\n" +
+                "Play Store kurmazsa sistemi güncelle ya da WebView APK'sını bilgisayardan adb ile kur. " +
+                "Android eskisini kullanmayı sürdürürse yenisini Geliştirici seçenekleri > WebView uygulaması'ndan seç."
+        } else {
+            "PocketVibe needs Android System WebView 94 or later, and this device has $version. " +
+                "Install or update Android System WebView from the Play Store.\n\n" +
+                "If the Play Store will not install it, update the system, or install the WebView APK from a computer " +
+                "with adb. If Android keeps using the old one, choose the new one in Developer options > WebView implementation."
+        }
+        val pad = (24 * resources.displayMetrics.density).toInt()
+        val store = Button(this).apply {
+            text = if (tr) "Play Store'da aç" else "Open in the Play Store"
+            setOnClickListener {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=com.google.android.webview")))
+                } catch (e: ActivityNotFoundException) {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=com.google.android.webview")))
+                }
+            }
+        }
+        val quit = Button(this).apply {
+            text = if (tr) "Çık" else "Quit"
+            setOnClickListener { finishAndRemoveTask() }
+        }
+        setContentView(
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundColor(0xFF0F1016.toInt())
+                setPadding(pad, pad, pad, pad)
+                addView(TextView(context).apply { text = title; textSize = 24f; setTextColor(Color.WHITE) })
+                addView(TextView(context).apply { text = body; textSize = 16f; setTextColor(0xFFF2F2F5.toInt()); setPadding(0, pad / 2, 0, pad / 2) })
+                addView(store)
+                addView(quit)
+            },
+        )
+        store.requestFocus() // a gamepad's A clicks the focused button
     }
 
     // ---------- Window ----------
@@ -281,9 +346,11 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        inputs.unregisterInputDeviceListener(gamepads)
-        service.onQuit = null
-        service.onGameStart = null
+        if (::root.isInitialized) {
+            inputs.unregisterInputDeviceListener(gamepads)
+            service.onQuit = null
+            service.onGameStart = null
+        }
         web?.destroy()
         web = null
         super.onDestroy()
