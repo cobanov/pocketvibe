@@ -1552,6 +1552,7 @@ async function unlockAudio() {
   addEventListener('resize', applyScreens);
   refreshScreens();
   render();
+  ui.app.classList.remove('booting');
   // The boot sound (or, back from a game, the music) as soon as audio may play.
   audio.start(returning);
   if (state.settings?.music || state.settings?.uiSounds) unlockAudio();
