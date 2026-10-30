@@ -14,6 +14,11 @@ QUIT_FLAG=/tmp/pocketvibe-quit
 SEED="$(cd "$(dirname "$0")" && pwd)/pocketvibe"
 
 if [ -f "$SEED/pocketvibed.py" ]; then
+  # A Mac copying the zip over Samba leaves AppleDouble files beside the real ones,
+  # and EmulationStation lists ._PocketVibe.sh as a port of its own.
+  PORTS="$(dirname "$SEED")"
+  rm -f "$PORTS"/._PocketVibe.sh "$PORTS"/._pocketvibe "$PORTS"/._images "$PORTS"/images/._pocketvibe-image.png "$PORTS"/.DS_Store
+  find "$SEED" \( -name '._*' -o -name .DS_Store \) -delete
   mkdir -p "$HOME_DIR"
   rm -rf "$APP"
   mv "$SEED" "$APP"
