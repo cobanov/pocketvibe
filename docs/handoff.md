@@ -105,7 +105,7 @@ geçmişinde (`git log -- docs/handoff.md`).
   `publish.yml` main'e push'ta derleyip `scripts/publish-games.mjs` ile mağazanın
   `POST /api/ci/publish` adresine gönderiyor (repo sırrı `POCKETVIBE_STORE_TOKEN`, sunucu sırrı
   `CI_TOKEN`, Mac mini Anahtar Zinciri'nde `pocketvibe-store-ci`). Aynı sürüm "Already published".
-- **CLI (npm'de):** `pocketvibe` 0.3.0: `publish` oyunun derlendiğini, kapağı, commit/push'u ve
+- **CLI (npm'de):** `pocketvibe` 0.3.1: `publish` oyunun derlendiğini, kapağı, commit/push'u ve
   reponun herkese açık olduğunu denetleyip mağaza reposuna PR açar (bakımcı değilse fork'tan),
   `review <PR numarası>` PR'ın derlediği zip'i el konsoluna sunar, `serve`, `status`.
   `create-pocketvibe` 0.1.2. Eski `/api/publish` (onay bekleyen yükleme) 2026-10-30'dan beri 410
