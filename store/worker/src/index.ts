@@ -3,7 +3,7 @@
 //
 //   GET  /catalog.json              published games, for the handheld app
 //   GET  /files/games/<id>/<file>   a published game zip or cover (zips are counted)
-//   POST /api/publish               upload a game zip (GitHub token)
+//   POST /api/publish               gone (410): publishing is a pull request to pocketvibe-store
 //   POST /api/ci/publish            publish a game the pocketvibe-store repository merged (CI token)
 //   GET  /api/me                    your games and uploads (GitHub token)
 //   GET  /api/admin/pending         uploads waiting for review (admin)
@@ -13,10 +13,10 @@
 //   GET  /api/admin/reports         reports not dealt with yet (admin)
 //   POST /api/admin/reports/resolve mark a report dealt with (admin)
 //
-// Developers sign in with a GitHub token; the store asks GitHub who it
-// belongs to and keeps nothing else. A game id belongs to whoever published it,
-// or holds it while their first upload waits for review; a rejected upload
-// frees it. Uploads by ADMIN_LOGIN are published at once, others wait for review.
+// Games arrive through the pocketvibe-store repository: its workflow publishes
+// what a maintainer merged, with the owner named there. A GitHub token only
+// lists a developer's games (/api/me) and lets the admin (ADMIN_LOGIN) review
+// uploads left from before pocketvibe 0.3.0 and players' reports.
 
 import { unzipSync } from 'fflate';
 
@@ -346,38 +346,6 @@ async function storeRelease(env: Env, upload: ReturnType<typeof readGameZip>, da
   }
 }
 
-async function publish(request: Request, env: Env) {
-  const login = await githubLogin(request);
-  if (Number(request.headers.get('Content-Length') ?? 0) > MAX_ZIP) throw new HttpError(413, 'the zip is larger than 50 MB');
-  const data = new Uint8Array(await request.arrayBuffer());
-  const upload = readGameZip(data);
-  const { manifest } = upload;
-
-  // The owner is whoever published the game. An id nobody has published yet
-  // is held by the first upload still waiting for review; the admin can always
-  // take an unpublished id.
-  const existing = await env.DB.prepare('SELECT owner, version FROM games WHERE id = ?').bind(manifest.id).first<{ owner: string; version: string }>();
-  const waiting = await env.DB.prepare("SELECT uploader FROM releases WHERE game_id = ? AND status = 'pending' ORDER BY created_at LIMIT 1")
-    .bind(manifest.id)
-    .first<{ uploader: string }>();
-  const isAdmin = login === env.ADMIN_LOGIN;
-  const owner = existing?.owner ?? (isAdmin ? login : (waiting?.uploader ?? login));
-  if (owner !== login && !isAdmin) throw new HttpError(403, `the id "${manifest.id}" belongs to another developer`);
-  const highest = await highestVersion(env, manifest.id);
-  if (highest && compareVersions(manifest.version, highest) <= 0) {
-    throw new HttpError(409, `version must be higher than ${highest}; bump it in pocketvibe.json`);
-  }
-
-  const status = isAdmin ? 'published' : 'pending';
-  await storeRelease(env, upload, data, login, owner, status);
-  return json({
-    status,
-    id: manifest.id,
-    version: manifest.version,
-    message: status === 'published' ? 'Published.' : 'Uploaded. It goes live after a review.',
-  });
-}
-
 // A game the pocketvibe-store repository reviewed and merged: its workflow
 // builds the zip from the game's source and sends it here with the CI token
 // and the owner named in the repository. Published at once; the same version
@@ -521,7 +489,10 @@ export default {
       if (request.method === 'GET' && pathname === '/') return await home(env, url.origin);
       if (request.method === 'GET' && pathname === '/catalog.json') return await catalog(env, url.origin);
       if (request.method === 'GET' && pathname.startsWith('/files/')) return await file(request, env, pathname.slice(7), ctx);
-      if (request.method === 'POST' && pathname === '/api/publish') return await publish(request, env);
+      // Uploads went through here before pocketvibe 0.3.0, which opens a pull request instead.
+      if (request.method === 'POST' && pathname === '/api/publish') {
+        throw new HttpError(410, 'publishing is a pull request to github.com/cobanov/pocketvibe-store now: run `npx pocketvibe@latest publish`');
+      }
       if (request.method === 'POST' && pathname === '/api/ci/publish') return await ciPublish(request, env);
       if (request.method === 'GET' && pathname === '/api/me') return await me(request, env);
       if (request.method === 'GET' && pathname === '/api/admin/pending') return await pending(request, env);

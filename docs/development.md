@@ -174,8 +174,9 @@ The schema is in `migrations/` (apply new ones with `cf d1 migrations apply <dat
 pocketvibe-store repository, and the iPhone app lists only games rated for its own rating.
 `POST /api/report` takes a player's report of a game (no sign-in); the admin reads them with
 `GET /api/admin/reports` and marks them dealt with with `POST /api/admin/reports/resolve`.
-`POST /api/publish` takes a game zip from a signed-in GitHub user; uploads from anyone but the
-admin (`ADMIN_LOGIN`) wait in `pocketvibe pending` until `pocketvibe approve` or `reject`.
+Games arrive only through the pocketvibe-store repository (`POST /api/ci/publish`, with its
+`CI_TOKEN`). The direct upload, `POST /api/publish`, answers 410 since pocketvibe 0.3.0 opens a
+pull request instead; `pocketvibe pending`, `approve` and `reject` remain for anything it left.
 
 ## The website
 
