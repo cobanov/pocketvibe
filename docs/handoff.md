@@ -108,8 +108,8 @@ geçmişinde (`git log -- docs/handoff.md`).
 - **CLI (npm'de):** `pocketvibe` 0.3.0: `publish` oyunun derlendiğini, kapağı, commit/push'u ve
   reponun herkese açık olduğunu denetleyip mağaza reposuna PR açar (bakımcı değilse fork'tan),
   `review <PR numarası>` PR'ın derlediği zip'i el konsoluna sunar, `serve`, `status`.
-  `create-pocketvibe` 0.1.2. Eski `/api/publish` (onay bekleyen yükleme) hâlâ çalışıyor ama
-  belgelerde yok. Mac mini'de npm oturumu açık (`cobanov`); yayın 2FA web onayı istiyor:
+  `create-pocketvibe` 0.1.2. Eski `/api/publish` (onay bekleyen yükleme) 2026-10-30'dan beri 410
+  dönüyor (#8); oyun yalnız mağaza reposundan gelir. Mac mini'de npm oturumu açık (`cobanov`); yayın 2FA web onayı istiyor:
   `expect` ile sanal terminalde çalıştır, çıkan `npmjs.com/auth/cli/...` bağlantısını `open` ile aç.
 - **Alan adı:** site `pocketvibe.dev` ve `www.pocketvibe.dev`'de de yayında (park kayıtları
   silindi). `pocketvibe.cobanov.dev` kalıcı: paylaşılan linkler ve uygulamanın motor indirmesi
