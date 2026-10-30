@@ -160,6 +160,8 @@ const STRINGS = {
     en: 'Update to {version}? Android asks before installing it; choose Open when it is done.',
     tr: "{version} sürümüne güncellensin mi? Android kurmadan önce sorar; bitince Aç'ı seç.",
   },
+  restarting: { en: 'Restarting...', tr: 'Yeniden başlıyor...' },
+  updateInstallerOpen: { en: 'Finish in the Android installer', tr: 'Android kurulumunda bitir' },
   updatedTo: { en: 'PocketVibe is now {version}.', tr: 'PocketVibe artık {version}.' },
   updateFailed: { en: 'Update failed: {error}', tr: 'Güncelleme başarısız: {error}' },
 

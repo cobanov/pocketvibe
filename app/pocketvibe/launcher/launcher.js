@@ -547,6 +547,9 @@ function updateValue() {
     const label = job.state === 'installing' ? t('installing') : t('downloading');
     return `${label} <span class="bar inline"><span style="width:${Math.round(job.progress * 100)}%"></span></span>`;
   }
+  // The update is in; until PocketVibe restarts (or Android's installer opens), the
+  // release it found is still in state.update.
+  if (job?.state === 'done') return t(state.info?.platform === 'android' ? 'updateInstallerOpen' : 'restarting');
   const u = state.update;
   if (!u) return '';
   if (u.available) return `<span class="update-badge">${escapeHtml(t('versionAvailable', { version: u.version }))}</span>`;
