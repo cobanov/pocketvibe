@@ -44,6 +44,12 @@ body {
   transform-origin: 0 0;
 }
 
+/* Until the first render: on a cold start the scripts and settings take a few
+   seconds, and the header's empty tabs looked broken. */
+#app.booting {
+  visibility: hidden;
+}
+
 /* Three columns with equal sides, so the tabs sit in the middle of the screen. */
 header {
   flex: none;
