@@ -175,7 +175,7 @@ async function publish(dir = '.') {
     fail(`github.com/${repoOwner}/${repoName} is private. Store games are open source: make it public (gh repo edit --visibility public --accept-visibility-change-consequences).`);
   }
 
-  const me = gh(['api', 'user', '--jq', '.login']);
+  const { login: me, id: myId } = JSON.parse(gh(['api', 'user', '--jq', '{login, id}']));
   const path = relative(top, project).split(sep).join('/') || '.';
   const file = `games/${manifest.id}.json`;
   let existing = null;
@@ -184,11 +184,18 @@ async function publish(dir = '.') {
   } catch {
     // A new game.
   }
-  if (existing && existing.owner !== me && !MAINTAINERS.includes(me)) fail(`${manifest.id} belongs to ${existing.owner} in the store; choose another id in pocketvibe.json.`);
+  if (existing && existing.owner_id !== myId && !MAINTAINERS.includes(me)) fail(`${manifest.id} belongs to ${existing.owner} in the store; choose another id in pocketvibe.json.`);
   if (existing?.source?.commit === commit && existing.source.repo === `https://github.com/${repoOwner}/${repoName}`) {
     fail(`${manifest.title} is already in the store at this commit. Change the game, raise "version" in pocketvibe.json, commit and push, then publish again.`);
   }
-  const entry = { id: manifest.id, owner: existing?.owner ?? me, source: { repo: `https://github.com/${repoOwner}/${repoName}`, commit, path } };
+  // The store's check compares owner_id, which survives a renamed login; an update keeps the age a maintainer set.
+  const entry = {
+    id: manifest.id,
+    owner: existing?.owner ?? me,
+    owner_id: existing?.owner_id ?? myId,
+    ...(existing?.age !== undefined && { age: existing.age }),
+    source: { repo: `https://github.com/${repoOwner}/${repoName}`, commit, path },
+  };
 
   // A branch with the file: in the store's repository for its maintainers,
   // in a fork of it for everyone else.
