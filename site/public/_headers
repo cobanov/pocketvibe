@@ -2,6 +2,3 @@
 /agents.md
   Content-Type: text/plain; charset=utf-8
 
-# The iPhone app's universal links: iOS wants this file as JSON.
-/.well-known/apple-app-site-association
-  Content-Type: application/json
