@@ -72,10 +72,7 @@ const shelf = games
 writeFileSync(join(play, 'catalog.json'), JSON.stringify(shelf));
 console.log(`demo ${version}, ${playable.length} playable games`);
 
-// A page for every game in the store, at /game/<id>/: what a link to a game
-// shows, and what opens the game in the iPhone app when it is installed
-// (its universal links: public/.well-known/apple-app-site-association). The
-// App Store asks an app with downloaded games for such a link to each one.
+// A page for every game in the store, at /game/<id>/: what a link to a game shows.
 // The header and footer are the "How it works" page's.
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const template = readFileSync(join(SITE, 'how', 'index.html'), 'utf8');
@@ -107,7 +104,7 @@ for (const game of games) {
           <a class="button primary" href="/#install">Get PocketVibe</a>
           ${playable.includes(game.id) ? '<a class="button" href="/#games">Play it in your browser</a>' : ''}
         </p>
-        <p class="note">With PocketVibe on your iPhone, this link opens the game in the app. On a handheld or an Android phone, find it in the app's Store.</p>
+        <p class="note">On a handheld or an Android phone, find it in the app's Store.</p>
       </section>
       ${controls ? `<section class="column"><h2>Controls</h2><table class="game-controls">${controls}</table></section>` : ''}
     </main>
